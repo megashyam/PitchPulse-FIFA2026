@@ -2,17 +2,36 @@
 
 
 
-PitchPulse is a live match tracking, statistical inference, and AI narration engine built for the 2026 World Cup. It ingests bare-bones live score data and mathematically enriches it using historical statistics, vectorized Monte Carlo tournament simulations, and large language models (LLMs). The primary technical goal is to deliver real-time, push-driven analytical updates: live momentum, counterfactual bracket shifts, and tactical briefings, without relying on an expensive commercial live-stats feed. The retrieval and agent layers are **built from scratch: no LangChain, no LangGraph, no LlamaIndex, or any other RAG framework.** Every prompt, retrieval call, and fallback path is hand-written directly against the Weaviate client and the LLM providers.
+PitchPulse is a live match tracking, statistical inference, and AI narration engine built for the 2026 World Cup. It ingests bare-bones live score data and mathematically enriches it using historical statistics, vectorized Monte Carlo tournament simulations, and large language models (LLMs). The primary goal is to deliver real-time, push-driven analytical updates: live momentum, counterfactual bracket shifts, and tactical briefings, without relying on an expensive commercial live-stats feed.
+
 
 ![Demo GIF](data/demo.gif)
 
+The retrieval and agent layers are **built from scratch: no LangChain, no LangGraph, no LlamaIndex, or any other RAG framework.** Every prompt, retrieval call, and fallback path is hand-written directly against the Weaviate client and the LLM providers.
 The backend operates entirely on a single OS process to preserve in-memory state, scaling horizontally via Redis pub/sub.
 
 
 
-## Why This Project?
+## Why Build This Project?
 
-PitchPulse was built to solve a critical data availability problem for live sports applications. The free, keyless live feed (`worldcup26.ir`) only exposes the score, match status, and clock. It lacks possession, shots, expected goals (xG), or any other tactical statistic. To provide an advanced analytics experience, the system relies on an architecture that lazily pairs real 2026 fixtures with structurally similar historical matches from StatsBomb's open data sets. This enables complex ML and RAG features without commercial data licenses.
+### The Need
+- Modern football coverage produces an overwhelming amount of fragmented information: live commentary, social sentiment, tactical analysis, and tournament projections exist across disconnected platforms. Fans liek myself are left manually synthesizing these signals to answer deeper questions: Why did momentum shift? How significant was that goal? How did a single event change tournament probabilities? etc.
+
+- While advanced analytics such as expected goals (xG), pressing intensity, and live probability models have transformed professional analysis, these capabilities remain largely inaccessible behind expensive data providers. Most free platforms expose only basic score updates, creating a gap between the analytical depth fans want and the limited information available during live matches.
+
+- The biggest moments in football are often defined by their downstream impact, a late penalty, red card, or unexpected goal can reshape qualification probabilities across an entire tournament. Existing platforms report what happened; PitchPulse focuses on explaining what it means and what could happen next.
+
+- PitchPulse was built to solve a critical data availability problem for live sports applications. The free, keyless live feed (`worldcup26.ir`) only exposes the score, match status, and clock. It lacks possession, shots, expected goals (xG), or any other tactical statistic. To provide an advanced analytics experience, the system relies on an architecture that lazily pairs real 2026 fixtures with structurally similar historical matches from StatsBomb's open data sets. This enables complex ML and RAG features without commercial data licenses.
+
+### The Problem
+- Building a real-time football intelligence system typically requires expensive commercial feeds containing possession, shots, xG, player tracking, and tactical events.
+- The available free live feed (worldcup26.ir) provides only minimal match state: score, clock, and status.
+- Without access to rich telemetry, traditional approaches cannot generate advanced live analysis.
+
+### The Solution 
+- PitchPulse solves this constraint through a custom enrichment architecture. Instead of relying on proprietary live data, it dynamically maps live 2026 fixtures to structurally similar historical World Cup matches from StatsBomb open datasets, transferring historical tactical context into sparse live events.
+
+- The enriched match state is combined with probabilistic models, vectorized Monte Carlo simulations, retrieval-grounded LLM agents, and real-time event streaming to create a predictive football intelligence platform capable of explaining live events, generating tactical narratives, and quantifying tournament-wide consequences without requiring commercial sports data licenses.
 
 
 
@@ -355,62 +374,165 @@ Every prediction traces to an explicit, inspectable formula.
 
 **Team strength to outcome probability.** Elo expectation:
 
-```
-E_a = 1 / (1 + 10^((R_b - R_a) / 400))
-```
+$$
+E_a=\frac{1}{1+10^{\frac{R_b-R_a}{400}}}
+$$
+
+Where:
+
+- \(E_a\) = expected score for Team A
+- \(R_a\) = Elo rating of Team A
+- \(R_b\) = Elo rating of Team B
 
 Converted into a full three-outcome distribution with a rating-gap-sensitive draw model:
 
-```
-p_draw = clip(0.25·e^(-ΔR/450) + 0.05, 0.10, 0.30)
-p_win  = (1 - p_draw)·E_a
-p_loss = (1 - p_draw)·(1 - E_a)
-```
-
+$$
+\begin{aligned}
+p_{\text{draw}}
+&=
+\operatorname{clip}
+\left(
+0.25e^{-\Delta R/450}+0.05,\;
+0.10,\;
+0.30
+\right)
+\\[6pt]
+p_{\text{win}}
+&=
+(1-p_{\text{draw}})E_a
+\\[6pt]
+p_{\text{loss}}
+&=
+(1-p_{\text{draw}})(1-E_a)
+\end{aligned}
+$$
+#
 **Market odds** are preferred over Elo when available and de-vigged with **Shin's (1993) method**, which discounts longshot prices less aggressively than a proportional split:
 
-```
-p_i = (√(z² + 4(1-z)·(1/o_i)²) - z) / (2(1-z))     where z = Ω/(Ω+2),  Ω = Σ(1/o_i) - 1
-```
+$$
+p_i=\frac{\sqrt{z^2+4(1-z)\left(\frac{1}{o_i}\right)^2}-z}{2(1-z)}
+$$
 
+where
+
+$$
+z=\frac{\Omega}{\Omega+2}
+$$
+
+$$
+\Omega=\sum_i\frac{1}{o_i}-1
+$$
+
+
+#
 **In-play win probability** updates live from score, minute, and red cards using two independent Poisson goal processes:
 
-```
-λ_home = max(0.02, 1.3f·(1+0.65σ))      λ_away = max(0.02, 1.3f·(1-0.65σ))
-P(g_h, g_a) = Pois(g_h; λ_home) · Pois(g_a; λ_away),     g_h, g_a ∈ [0, 8]
-```
+$$
+\lambda_{\text{home}}
+=
+\max\!\left(0.02,\;1.3f(1+0.65\sigma)\right)
+\qquad
+\lambda_{\text{away}}
+=
+\max\!\left(0.02,\;1.3f(1-0.65\sigma)\right)
+$$
 
-`f` is the fraction of the match remaining and `σ` is the pre-match win-probability differential. A red card multiplies the offending team's rate by 0.72 and the opponent's by 1.12.
+$$
+P(g_h,g_a)
+=
+\operatorname{Pois}(g_h;\lambda_{\text{home}})
+\cdot
+\operatorname{Pois}(g_a;\lambda_{\text{away}}),
+\qquad
+g_h,g_a\in[0,8]
+$$
 
+where
+
+- \(f\) is the fraction of the match remaining.
+- \(\sigma\) is the pre-match win-probability differential.
+
+A red card multiplies the offending team's scoring rate by **0.72** and the opponent's by **1.12**.
+#
 **Momentum** is EWMA-smoothed and scored by logistic regression, executing in microseconds with fully inspectable inputs:
 
-```
-ewma_x = α·x_t + (1-α)·ewma_x_prev,     α = 0.3
-P(goal within 5 min) = σ(β₀ + Σβᵢ·featureᵢ) + Σ bump_k·(0.8)^Δt_k
-```
+$$
+\operatorname{EWMA}_t
+=
+\alpha x_t
++
+(1-\alpha)\operatorname{EWMA}_{t-1},
+\qquad
+\alpha=0.3
+$$
 
-Goals and red cards inject a decaying additive bump directly into the output. Coefficients are trained offline by batch gradient descent on real StatsBomb matches. New coefficients ship only when they beat a base-rate log-loss baseline on held-out data.
+$$
+P(\text{goal within 5 min})
+=
+\sigma\!\left(
+\beta_0+\sum_i\beta_i\,\mathrm{feature}_i
+\right)
++
+\sum_k
+\mathrm{bump}_k(0.8)^{\Delta t_k}
+$$
 
-**Tournament simulation** resolves every simulated match and knockout round for all `N` runs simultaneously through vectorized NumPy operations, not sequential loops. Every reported stage probability carries a 95% confidence interval:
+Goals and red cards inject a decaying additive bump directly into the output. Coefficients are trained offline using batch gradient descent on real StatsBomb matches and are promoted only when they outperform a base-rate log-loss baseline on held-out data.
 
-```
-margin = 1.96·√(p̂(1-p̂)/N)
-```
+#
+**Tournament simulation** resolves every simulated match and knockout round for all \(N\) runs simultaneously through vectorized NumPy operations rather than sequential loops. Every reported stage probability carries a 95% confidence interval:
 
-**Tactical identity** is feature engineering plus cosine retrieval, not a trained classifier:
+$$
+\text{margin}
+=
+1.96
+\sqrt{
+\frac{\hat{p}(1-\hat{p})}{N}
+}
+$$
+#
+**Tactical identity** is derived through feature engineering and cosine retrieval rather than a trained classifier:
 
-```
-PPDA = opponent completed passes in press zone / defensive actions in press zone
-press_intensity = 0.7·min(1, 8/PPDA) + 0.3·min(1, pressures/150)
-```
+$$
+\mathrm{PPDA}
+=
+\frac{
+\text{Opponent completed passes in press zone}
+}{
+\text{Defensive actions in press zone}
+}
+$$
 
-**Narrative anomaly detection** fits a separate `IsolationForest` (`contamination=0.05`, 100 estimators) per tracked topic, refit every 30 ticks on a rolling 72-hour window of four-source activity, scoring every new observation against it. Per-topic baselines correct for activity volume that varies by roughly an order of magnitude between a heavily-followed team and a lightly-followed one:
+$$
+\text{press\_intensity}
+=
+0.7\,
+\min\!\left(1,\frac{8}{\mathrm{PPDA}}\right)
++
+0.3\,
+\min\!\left(1,\frac{\text{pressures}}{150}\right)
+$$
+#
+**Narrative anomaly detection** fits a separate `IsolationForest` (`contamination=0.05`, 100 estimators) per tracked topic, refit every 30 ticks on a rolling 72-hour window of four-source activity, scoring every new observation against it. Per-topic baselines correct for activity volume differences between heavily-followed and lightly-followed teams:
 
-```
-severity = clip((-s - 0.10) / 0.5, 0, 1)
-```
+$$
+\mathrm{severity}
+=
+\operatorname{clip}
+\left(
+\frac{-s-0.10}{0.5},
+0,
+1
+\right)
+$$
 
-`s` is the raw anomaly score. A spike fires when `s` falls below `-0.10`, outside a 300-second per-topic cooldown.
+where \(s\) is the raw anomaly score. A spike fires when:
+
+$$
+s < -0.10
+$$
+
+outside a 300-second per-topic cooldown window.
 
 <br />
 
