@@ -380,9 +380,9 @@ $$
 
 Where:
 
-- \(E_a\) = expected score for Team A
-- \(R_a\) = Elo rating of Team A
-- \(R_b\) = Elo rating of Team B
+- $E_a$ = expected score for Team A
+- $R_a$ = Elo rating of Team A
+- $R_b$ = Elo rating of Team B
 
 Converted into a full three-outcome distribution with a rating-gap-sensitive draw model:
 
@@ -406,7 +406,9 @@ p_{\text{loss}}
 (1-p_{\text{draw}})(1-E_a)
 \end{aligned}
 $$
-#
+
+---
+
 **Market odds** are preferred over Elo when available and de-vigged with **Shin's (1993) method**, which discounts longshot prices less aggressively than a proportional split:
 
 $$
@@ -423,8 +425,8 @@ $$
 \Omega=\sum_i\frac{1}{o_i}-1
 $$
 
+---
 
-#
 **In-play win probability** updates live from score, minute, and red cards using two independent Poisson goal processes:
 
 $$
@@ -449,11 +451,13 @@ $$
 
 where
 
-- \(f\) is the fraction of the match remaining.
-- \(\sigma\) is the pre-match win-probability differential.
+- $f$ is the fraction of the match remaining.
+- $\sigma$ is the pre-match win-probability differential.
 
 A red card multiplies the offending team's scoring rate by **0.72** and the opponent's by **1.12**.
-#
+
+---
+
 **Momentum** is EWMA-smoothed and scored by logistic regression, executing in microseconds with fully inspectable inputs:
 
 $$
@@ -479,8 +483,9 @@ $$
 
 Goals and red cards inject a decaying additive bump directly into the output. Coefficients are trained offline using batch gradient descent on real StatsBomb matches and are promoted only when they outperform a base-rate log-loss baseline on held-out data.
 
-#
-**Tournament simulation** resolves every simulated match and knockout round for all \(N\) runs simultaneously through vectorized NumPy operations rather than sequential loops. Every reported stage probability carries a 95% confidence interval:
+---
+
+**Tournament simulation** resolves every simulated match and knockout round for all $N$ runs simultaneously through vectorized NumPy operations rather than sequential loops. Every reported stage probability carries a 95% confidence interval:
 
 $$
 \text{margin}
@@ -490,7 +495,9 @@ $$
 \frac{\hat{p}(1-\hat{p})}{N}
 }
 $$
-#
+
+---
+
 **Tactical identity** is derived through feature engineering and cosine retrieval rather than a trained classifier:
 
 $$
@@ -512,7 +519,9 @@ $$
 0.3\,
 \min\!\left(1,\frac{\text{pressures}}{150}\right)
 $$
-#
+
+---
+
 **Narrative anomaly detection** fits a separate `IsolationForest` (`contamination=0.05`, 100 estimators) per tracked topic, refit every 30 ticks on a rolling 72-hour window of four-source activity, scoring every new observation against it. Per-topic baselines correct for activity volume differences between heavily-followed and lightly-followed teams:
 
 $$
@@ -526,7 +535,7 @@ $$
 \right)
 $$
 
-where \(s\) is the raw anomaly score. A spike fires when:
+where $s$ is the raw anomaly score. A spike fires when:
 
 $$
 s < -0.10
