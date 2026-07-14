@@ -1,0 +1,12 @@
+*.ts linguist-vendored
+*.tsx linguist-vendored
+*.css linguist-vendored
+node_modules/* linguist-generated
+.next/* linguist-generated
+dist/* linguist-generated
+ui/**/*.ts linguist-vendored
+ui/**/*.tsx linguist-vendored
+ui/**/*.css linguist-vendored
+
+ui/node_modules/* linguist-generated
+ui/.next/* linguist-generated
