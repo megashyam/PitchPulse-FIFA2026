@@ -1,4 +1,4 @@
-# PitchPulse: WC2026 Live Football Analytics Engine
+# PitchPulse: FIFA 2026 Live Football Analytics Engine
 
 
 
