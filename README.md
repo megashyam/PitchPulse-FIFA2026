@@ -10,58 +10,98 @@ The backend operates entirely on a single OS process to preserve in-memory state
 
 ***
 
-## Index
-
-* [Why This Project?](#why-this-project)
-* [Core Features](#core-features)
-* [The Stack](#the-stack)
-* [Architecture at a Glance](#architecture-at-a-glance)
-* [Data Pipeline](#data-pipeline)
-  * [Data Ingestion Architecture](#data-ingestion-architecture)
-  * [External Data Sources](#external-data-sources)
-  * [External Signals](#external-signals)
-  * [Schemas](#schemas)
-* [The ML Core](#the-ml-core)
-* [The Agent Layer](#the-agent-layer)
-  * [Match Intelligence Agent](#match-intelligence-agent)
-  * [Counterfactual Agent](#counterfactual-agent)
-  * [Tactical Agent](#tactical-agent)
-  * [Narrative Intelligence Agent](#narrative-intelligence-agent)
-  * [Briefing Agent](#briefing-agent)
-* [RAG + Knowledge Infrastructure](#rag--knowledge-infrastructure)
-  * [Knowledge Construction](#knowledge-construction)
-  * [Embedding Pipeline](#embedding-pipeline)
-  * [Hybrid Retrieval](#hybrid-retrieval)
-  * [Vector Database](#vector-database)
-  * [Grounded Generation](#grounded-generation)
-* [Real-Time Intelligence Runtime](#real-time-intelligence-runtime)
-  * [Worker Architecture](#worker-architecture)
-  * [Redis State Layer](#redis-state-layer)
-  * [Event Sourcing (Partial Implementation)](#event-sourcing-partial-implementation)
-  * [Async Execution](#async-execution)
-  * [Streaming Layer](#streaming-layer)
-* [Deep Dive: The Three Core Intelligence Engines](#deep-dive-the-three-core-intelligence-engines)
-  * [1. Narrative Intelligence Hub](#1-narrative-intelligence-hub)
-  * [2. Counterfactual What-If Engine](#2-counterfactual-what-if-engine)
-  * [3. Tournament Simulation Engine](#3-tournament-simulation-engine)
-* [Performance](#performance)
-* [Performance Optimizations](#performance-optimizations)
-* [Repository Structure](#repository-structure)
-* [Setup](#setup)
-  * [Prerequisites](#prerequisites)
-  * [Install and Run](#install-and-run)
-  * [Populate the Knowledge Base (offline, one time)](#populate-the-knowledge-base-offline-one-time)
-  * [Run the Elo Calibration Backtest](#run-the-elo-calibration-backtest)
-* [Tech Stack](#tech-stack)
-* [Limitations](#limitations)
-
-***
-
 ## Why This Project?
 
 PitchPulse was built to solve a critical data availability problem for live sports applications. The free, keyless live feed (`worldcup26.ir`) only exposes the score, match status, and clock. It lacks possession, shots, expected goals (xG), or any other tactical statistic. To provide an advanced analytics experience, the system relies on an architecture that lazily pairs real 2026 fixtures with structurally similar historical matches from StatsBomb's open data sets. This enables complex ML and RAG features without commercial data licenses.
 
 ###
+
+***
+## Index
+
+* [Why This Project?](#why-this-project)
+
+* [Core Features](#core-features)
+
+* [The Stack](#the-stack)
+
+* [Architecture at a Glance](#architecture-at-a-glance)
+
+* [Data Pipeline](#data-pipeline)
+
+  * [Data Ingestion Architecture](#data-ingestion-architecture)
+
+  * [External Data Sources](#external-data-sources)
+
+  * [External Signals](#external-signals)
+
+  * [Schemas](#schemas)
+
+* [The ML Core](#the-ml-core)
+
+* [The Agent Layer](#the-agent-layer)
+
+  * [Match Intelligence Agent](#match-intelligence-agent)
+
+  * [Counterfactual Agent](#counterfactual-agent)
+
+  * [Tactical Agent](#tactical-agent)
+
+  * [Narrative Intelligence Agent](#narrative-intelligence-agent)
+
+  * [Briefing Agent](#briefing-agent)
+
+* [RAG + Knowledge Infrastructure](#rag--knowledge-infrastructure)
+
+  * [Knowledge Construction](#knowledge-construction)
+
+  * [Embedding Pipeline](#embedding-pipeline)
+
+  * [Hybrid Retrieval](#hybrid-retrieval)
+
+  * [Vector Database](#vector-database)
+
+  * [Grounded Generation](#grounded-generation)
+
+* [Real-Time Intelligence Runtime](#real-time-intelligence-runtime)
+
+  * [Worker Architecture](#worker-architecture)
+
+  * [Redis State Layer](#redis-state-layer)
+
+  * [Event Sourcing (Partial Implementation)](#event-sourcing-partial-implementation)
+
+  * [Async Execution](#async-execution)
+
+  * [Streaming Layer](#streaming-layer)
+
+* [Deep Dive: The Three Core Intelligence Engines](#deep-dive-the-three-core-intelligence-engines)
+
+  * [1. Narrative Intelligence Hub](#1-narrative-intelligence-hub)
+
+  * [2. Counterfactual What-If Engine](#2-counterfactual-what-if-engine)
+
+  * [3. Tournament Simulation Engine](#3-tournament-simulation-engine)
+
+* [Performance](#performance)
+
+* [Performance Optimizations](#performance-optimizations)
+
+* [Repository Structure](#repository-structure)
+
+* [Setup](#setup)
+
+  * [Prerequisites](#prerequisites)
+
+  * [Install and Run](#install-and-run)
+
+  * [Populate the Knowledge Base (offline, one time)](#populate-the-knowledge-base-offline-one-time)
+
+  * [Run the Elo Calibration Backtest](#run-the-elo-calibration-backtest)
+
+* [Tech Stack](#tech-stack)
+
+* [Limitations](#limitations)
 
 ***
 
