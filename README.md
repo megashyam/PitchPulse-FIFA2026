@@ -70,7 +70,7 @@ The backend follows a single-process architecture to maintain in-memory analytic
 * [Real-Time Intelligence Runtime](#real-time-intelligence-runtime)
     - [Worker Architecture](#worker-architecture)
     - [Redis State Layer](#redis-state-layer)
-    - [Event Sourcing (Partial Implementation)](#event-sourcing-partial-implementation)
+    - [Event Sourcing ](#event-sourcing-partial-implementation)
     - [Async Execution](#async-execution)
     - [Streaming Layer](#streaming-layer)
 * [Deep Dive: The Six Core Intelligence Engines](#deep-dive-the-six-core-intelligence-engines)
@@ -659,7 +659,7 @@ Only seven recurring workers operate in the system, with additional one-time sta
 * State is managed with TTL-based expiration policies across different match lifecycle stages, from pre-kickoff preparation through completed analysis history.
 * Redis pub/sub channels distribute real-time updates for match state, momentum, intelligence, counterfactual analysis, and narrative events. Tactical and briefing outputs are consumed through their respective state access paths.
 
-### Event Sourcing (Partial Implementation)
+### Event Sourcing
 
 * The system uses state reconstruction rather than full event sourcing: `MatchState` is updated in place rather than stored as a durable event log.
 * Worker restarts recover tracking state from persisted Redis snapshots, preventing duplicate processing of previously handled match events.
@@ -843,7 +843,7 @@ $$
 The aggregate tournament impact is derived from the total probability movement across teams:
 
 $$
-\text{path\_shift} = \min\left(1,\frac{\sum_i |\Delta p_i|}{2}\right)
+\text{path shift} = \min\left(1,\frac{\sum_i |\Delta p_i|}{2}\right)
 $$
 
 
