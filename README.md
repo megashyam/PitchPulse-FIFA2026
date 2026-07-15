@@ -391,24 +391,7 @@ Where:
 Converted into a full three-outcome distribution with a rating-gap-sensitive draw model:
 
 $$
-\begin{aligned}
-p_{\text{draw}}
-&=
-\mathrm{clip}
-\left(
-0.25e^{-\Delta R/450}+0.05,\;
-0.10,\;
-0.30
-\right)
-\\[6pt]
-p_{\text{win}}
-&=
-(1-p_{\text{draw}})E_a
-\\[6pt]
-p_{\text{loss}}
-&=
-(1-p_{\text{draw}})(1-E_a)
-\end{aligned}
+\begin{aligned} p_{\text{draw}} &= \mathrm{clip}\left(0.25e^{-\Delta R/450}+0.05,\;0.10,\;0.30\right) \\ p_{\text{win}} &= (1-p_{\text{draw}})E_a \\ p_{\text{loss}} &= (1-p_{\text{draw}})(1-E_a) \end{aligned}
 $$
 
 ---
