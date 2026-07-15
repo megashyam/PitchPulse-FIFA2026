@@ -784,7 +784,7 @@ class NarrativeSpikeDetector:
         Returns:
             NarrativeSpike: Structured anomaly representation.
         """
-        severity = min(1.0, max(0.0, (-score - SCORE_THRESH) / 0.5))
+        severity = min(1.0, max(0.0, (-score + SCORE_THRESH) / 0.5))
         sources = {
             "mastodon": point.mastodon,
             "bluesky": point.bluesky,

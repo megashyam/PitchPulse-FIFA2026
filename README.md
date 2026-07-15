@@ -8,7 +8,7 @@ PitchPulse is a live match tracking, statistical inference, and AI narration eng
 ![Demo GIF](data/demo.gif)
 
 The retrieval and agent layers are **built from scratch: no LangChain, no LangGraph, no LlamaIndex, or any other RAG framework.** Every prompt, retrieval call, and fallback path is hand-written directly against the Weaviate client and the LLM providers.
-The backend operates entirely on a single OS process to preserve in-memory state, scaling horizontally via Redis pub/sub.
+The backend operates entirely on a single OS process to preserve in-memory state, scaling horizontally by running independent stacks against a shared Redis instance.
 
 
 
@@ -97,19 +97,19 @@ The backend operates entirely on a single OS process to preserve in-memory state
     - Low-scoring ticks return a numeric template directly; higher-scoring ticks retrieve grounding context from a vector store and generate a short reaction through local-first inference.
     - Output: a short narrative entry streamed to the match page as an SSE event, built from the same numbers used by the fallback template.
 2. **The Counterfactual What-If Engine**
-    - Triggers on any goal, own goal, penalty, or card event.
+    - Triggers on a goal, own goal, penalty, card, or substitution event. Own-goal, penalty, and second-yellow variants are handled in code but not yet produced by the live feed. A substitution consumes the rate-limit gap without changing the resulting state.
     - Reconstructs the match state immediately before the event and runs two 20,000-run tournament simulations under one shared random seed: one before the event, one after.
     - Bounded by a 45-second minimum gap per fixture to cap compute cost.
     - Output: a probability-shift percentage, ranked per-team deltas, and a narrative explanation traceable to that single simulation pair.
 3. **The Tournament Simulation Engine**
     - Takes static 48-team Elo configuration, optionally overridden by de-vigged market odds.
-    - Resolves the entire group stage and knockout bracket for every requested run in one vectorized NumPy pass rather than sequential loops.
+    - Resolves the group stage in one vectorized NumPy pass and the knockout bracket in five further vectorized passes (one per round, each fully vectorized across all requested runs), rather than sequential per-simulation loops.
     - Executes on demand: triggered explicitly, or implicitly on first read after a cache expiry.
     - Output: per-team, per-stage advancement and championship probabilities with 95% confidence intervals; no language model or retrieval step anywhere in the path.
 4. **Tactical Intelligence**
     - Builds a live style descriptor from possession, shot volume, and pass accuracy, since the live feed exposes none of the pressing statistics the historical index was built from.
     - Embeds that descriptor and retrieves the closest historical pressing fingerprint by cosine similarity against the indexed StatsBomb corpus.
-    - No generation step exists in this path. The match, or nothing if no candidate clears the similarity threshold, is returned directly.
+    - No generation step exists in this path. The best available match is always returned when the index holds any profile. Nothing is returned only when Weaviate is unreachable or the collection is empty; the interface falls back to live statistics directly.
 5. **The Narrative Intelligence Hub**
     - Runs a 60-second aggregation tick across four independent social and search sources per tracked topic.
     - Scores each topic's latest reading against a per-topic Isolation Forest fit on its own 72-hour rolling window, firing a spike when the anomaly score clears a fixed threshold outside a per-topic cooldown.
@@ -139,21 +139,23 @@ worldcup26.ir + StatsBomb ──► hybrid_producer (30s poll) ──► MatchSt
                                                                    │
                                                                    ⭣
                                                              Redis (only store)
-                          ┌──────────┬───────────┬──────────────┬───────────┐
-                          ⭣          ⭣           ⭣              ⭣           ⭣
-                     momentum    intel      counterfactual   tactical   narrative
-                     worker      worker     worker           worker     worker
-                     (EWMA)      (LLM+RAG)  (CRN Monte Carlo) (Weaviate)  (IsolationForest)
-                          │          │           │              │           │
-                          └──────────┴─────┬─────┴──────────────┴───────────┘
-                                            ⭣
-                                    Agent Layer (Ollama → Groq → template)
-                                            │
-                                            ⭣
-                              FastAPI SSE + REST ──► Next.js UI
+        ┌───────────┬────────────┬───────────────┬────────────┬───────────┬────────────┐
+        ⭣           ⭣            ⭣               ⭣            ⭣           ⭣            
+   momentum     tactical      intel        counterfactual  narrative   briefing
+   worker       worker        worker       worker          worker      worker
+   (EWMA)       (Weaviate     (LLM+RAG)    (CRN Monte      (LLM+RAG)   (LLM+RAG)
+                cosine)                    Carlo, LLM+RAG)             
+        |                                                                
+        │           │             │              │              │           │
+        │           │             └──────┬───────┴──────────────┴───────────┘
+        │           │                    ⭣
+        │           │            Agent Layer (Ollama → Groq → template)
+        │           │                    │
+        ⭣           ⭣                    ⭣
+                  FastAPI SSE + REST ──► Next.js UI
 ```
 
-One Redis connection, one Uvicorn process, seven `asyncio` tasks. Workers read and write `MatchState` and publish to Redis pub/sub only; they do not call each other directly. `ScoreTracker`, the momentum state dictionary, and the `IsolationForest` rolling windows are process-local. Scaling requires running additional independent stacks against a shared Redis instance, not adding Uvicorn workers.
+One Redis connection, one Uvicorn process, seven recurring `asyncio` workers, plus two one-shot startup tasks (an initial intel auto-seed and a tactical-index auto-populate check) that run once and exit. Workers read and write `MatchState` and publish to Redis pub/sub only; they do not call each other directly. Momentum and Tactical never reach the Agent Layer — momentum is pure EWMA/logistic arithmetic and Tactical has no generative step. `ScoreTracker`, the momentum state dictionary, and the `IsolationForest` rolling windows are process-local. Scaling requires running additional independent stacks against a shared Redis instance, not adding Uvicorn workers.
 
 
 
@@ -270,7 +272,7 @@ Log-loss falls monotonically from minute 15 (1.096) to minute 75 (0.613), droppi
 ### External Data Sources
 
 * **Live match state**: `worldcup26.ir`, polled every 30 seconds, providing score, status, kickoff time, and scorer text. Response shape varies (a bare list, or a `games`/`matches`/`data`/`fixtures` key) and is normalized to one shape before anything downstream sees it.
-* **Historical match data**: StatsBomb Open Data, competition 43, seasons `[106, 3]` (WC 2022, WC 2018). Full shot/pass/pressure/card event streams, fetched on demand and reused across four different paths: live-fixture proxying, RAG narrative extraction, tactical fingerprint indexing, and momentum-model training/backtesting.
+* **Historical match data**: StatsBomb Open Data, competition 43, seasons `[106, 3]` (WC 2022, WC 2018). Full shot/pass/pressure/card event streams, fetched on demand and reused across five paths: live-fixture proxying, RAG narrative extraction, tactical fingerprint indexing, momentum-model training, and the StatsBomb-proxy lineup fallback. The Elo calibration backtest is a lighter, sixth consumer of the same dataset — it uses only match-level scores, not the full event streams.
 * **Market data**: The Odds API, fetched on demand and cached for 900 seconds. Per-bookmaker decimal odds for head-to-head markets, averaged into one consensus price per fixture before de-vigging.
 * **Lineup data**: Zafronix roster API, API-Sports fixture lineups, and a StatsBomb-proxy starting-XI fallback, resolved in that order per request, with a PPDA-estimated formation as the final fallback when none of the three return usable data.
 * **Social/search signals**: Mastodon, Bluesky, Google Trends, and Wikipedia, read concurrently every 60 seconds per tracked topic. The only category with its own dedicated normalization and detection pipeline, covered below.
@@ -278,8 +280,8 @@ Log-loss falls monotonically from minute 15 (1.096) to minute 75 (0.613), droppi
 ### External Signals
 
 1. Mastodon search, Bluesky `searchPosts`, Google Trends via `pytrends`, and Wikipedia's recent-changes feed are read concurrently for every tracked topic on a 60-second cadence.
-2. Any source that is unauthenticated, rate-limited, or unreachable substitutes a deterministic mock generator: a phase-shifted sine wave plus Gaussian noise, seeded per topic, maintaining pipeline operation without live credentials.
-3. Each reading is converted into a per-source activity rate (posts/min, mentions/min, a trends index, edits/min) and unified into one four-dimensional feature vector per topic per tick, tagged `"live"` or `"mock"` per source.
+2. Any source that is unauthenticated, rate-limited, or unreachable substitutes a mock generator: a sine wave whose phase is deterministically seeded per topic, plus unseeded Gaussian noise. Only the baseline shape is reproducible per topic — the noise itself varies run to run.
+3. Each reading is converted into a per-source activity value — a rolling 24-hour post count for Mastodon, an unwindowed search-result count for Bluesky, a Google Trends index, and a true edits-per-minute rate for Wikipedia — and unified into one four-dimensional feature vector per topic per tick, tagged `"live"` or `"mock"` per source.
 4. That vector is appended to the topic's rolling 72-hour window and scored against a per-topic anomaly model, producing either a spike or an entry in the continuously-updated trending ranking.
 5. Downstream consumers are the narrative agent (for retrieval-grounded generation) and the narrative API routes that serve the resulting feed to the frontend.
 
@@ -302,10 +304,12 @@ class MatchState(BaseModel):
     kickoff_time: Optional[datetime] = None
     home_id: int = 0
     home_name: str = ""
+    home_logo: str = ""
     home_score: int = 0
     home_stats: TeamStats = Field(default_factory=TeamStats)
     away_id: int = 0
     away_name: str = ""
+    away_logo: str = ""
     away_score: int = 0
     away_stats: TeamStats = Field(default_factory=TeamStats)
     events: list[MatchEvent] = Field(default_factory=list)
@@ -456,7 +460,7 @@ $$
 P(\text{goal within 5 min})=\sigma\!\left(\beta_0+\sum_i\beta_i\,\mathrm{feature}_i\right)+\sum_k\mathrm{bump}_k(0.8)^{\Delta t_k}
 $$
 
-Goals and red cards inject a decaying additive bump directly into the output. Coefficients are trained offline using batch gradient descent on real StatsBomb matches and are promoted only when they outperform a base-rate log-loss baseline on held-out data.
+$\Delta t_k$ is measured in 30-second ticks (two per minute). The bump decays to roughly 64% of its initial value after one minute and under 11% after five. Goals and red cards inject this decaying additive bump directly into the output. Coefficients are trained offline using batch gradient descent on real StatsBomb matches and are promoted only when they outperform a base-rate log-loss baseline on held-out data.
 
 ---
 
@@ -475,7 +479,7 @@ $$
 $$
 
 $$
-\text{pressintensity}=0.7\,\min\!\left(1,\frac{8}{\mathrm{PPDA}}\right)+0.3\,\min\!\left(1,\frac{\text{pressures}}{150}\right)
+\text{press}\_\text{intensity}=0.7\,\min\!\left(1,\frac{8}{\mathrm{PPDA}}\right)+0.3\,\min\!\left(1,\frac{\text{pressures}}{150}\right)
 $$
 
 ---
@@ -500,20 +504,20 @@ outside a 300-second per-topic cooldown window.
 
 ## The Agent Layer
 
-Every agent follows the same execution order: deterministic scoring first, retrieval second, LLM narration last, template fallback always available. The language model narrates a result that has already been computed. It does not decide what happened. All five agents below are fully implemented in the current codebase; none are stubs or placeholders.
+Every agent scores or reconstructs a deterministic result before any generation step. The language model narrates a result that has already been computed; it does not decide what happened. Four of five agents retrieve grounding context from Weaviate before narrating. The Counterfactual Agent narrates directly from its simulation output with no retrieval step. Four of five fall back to a computed-number template when generation is unavailable. The Tactical Agent has no generative step and returns nothing; the interface falls back to live stats. All five agents below are fully implemented in the current codebase; none are stubs or placeholders.
 
 ### Match Intelligence Agent
 
 * Runs every 30 seconds against the current match state and momentum snapshot.
 * Scans the event stream for uncovered goals and cards, and factors in momentum delta and xG-versus-scoreline divergence even when no discrete event has occurred.
 * On quieter ticks, falls back to a periodic tactical read of live possession and pressure.
-* Whichever condition fires determines the retrieval target. Event or xG narration pulls from the goal/red-card narrative collection filtered by event type. Tactical narration pulls from the pressing-fingerprint collection.
+* Whichever condition fires determines the retrieval target. Event narration pulls from the goal/red-card narrative collection filtered by event type; xG-divergence narration pulls from the same collection unfiltered. Tactical narration pulls from the pressing-fingerprint collection.
 * Retrieved passages are folded into a prompt built from the real scoreline, xG, and momentum figures.
-* Generation runs through local-first inference only when the computed relevance score clears a threshold; ticks below threshold return a numeric template built from the same figures.
+* Generation runs through local-first inference whenever a key event (a goal or card) has occurred, a periodic tactical read is due, or the computed relevance score clears 0.50; ticks that satisfy none of the three return a numeric template built from the same figures.
 
 ### Counterfactual Agent
 
-* Fires on a goal, own goal, penalty, or yellow/red/second-yellow card, subject to a 45-second minimum gap per fixture.
+* Fires on a goal, own goal, penalty, yellow, red, second-yellow card, or substitution, subject to a 45-second minimum gap per fixture. Own-goal, penalty, and second-yellow variants are handled in code but are not currently produced by the live ingestion pipeline, which only ever emits goal/yellow/red/substitution events; a substitution consumes the gap and runs the full simulation pair but produces no state change.
 * Reverses the triggering event's effect on score and card counts to recover the state immediately beforehand.
 * Converts the resulting in-play probability swing into a bounded Elo adjustment.
 * Runs two 20,000-run tournament simulations, one under the pre-event adjustment and one under the post-event adjustment, sharing a single deterministic seed; the only source of divergence between the two runs is the adjustment itself.
@@ -525,7 +529,7 @@ Every agent follows the same execution order: deterministic scoring first, retri
 * Has no generative step anywhere in its path.
 * Converts live possession, shot volume, and pass accuracy into a short style descriptor, a proxy for the pressing statistics the live feed does not expose.
 * Embeds that descriptor and retrieves the nearest historical pressing fingerprint by cosine similarity, along with up to two runner-up matches for comparison.
-* If nothing clears the similarity threshold it returns nothing, and the interface falls back to displaying live statistics directly.
+* The best available match is always returned when Weaviate holds any indexed profile — there is no similarity cutoff. It returns nothing only when Weaviate is unreachable or `TacticalProfiles` is empty; the interface falls back to displaying live statistics directly.
 
 ### Narrative Intelligence Agent
 
@@ -538,7 +542,7 @@ Every agent follows the same execution order: deterministic scoring first, retri
 
 * Triggers inside a fixed pre-kickoff window, once per match status, or on demand, using only the two team names and retrieved historical precedent. No live match state feeds this path.
 * Retrieves precedent from the narrative collection and is instructed not to invent beyond it.
-* Falls back to quoting the retrieved passage's first line verbatim, or stating plainly that none was available, if generation fails.
+* Falls back to quoting the first 120 characters of the retrieved passage's first line, or stating plainly that none was available, if generation fails.
 * This is the one agent that calls Groq directly and never attempts local inference, an inconsistency with the other four rather than a deliberate design choice.
 
 Three of the five agents run continuously during live play through local-first inference, keeping goal, card, and anomaly narration off network latency and a metered API by default. Every agent falls back to a template built from the same computed numbers when generation fails, producing plain language instead of an empty response or an invented statistic.
@@ -578,9 +582,9 @@ Weaviate 1.27 is configured with no built-in vectorizer. Every insert supplies i
 
 ### Grounded Generation
 
-1. Up to 3-5 retrieved documents are interpolated directly into the prompt text.
+1. Retrieval fetches up to 5 candidates per query; 2-3 of the top-ranked documents are interpolated directly into the prompt text.
 2. Every prompt also states the real computed numbers (scoreline, xG, probability shifts, activity levels) alongside the retrieved text.
-3. The model is explicitly instructed not to invent facts beyond what the prompt provides.
+3. The Narrative and Briefing agents explicitly instruct the model not to invent facts beyond what the prompt provides. The Match Intelligence Agent's prompts inline the same real numbers but do not carry this explicit instruction.
 4. If the model is unavailable, a deterministic template reuses the identical numbers, producing plainer language rather than a fabricated fact.
 
 
@@ -599,7 +603,7 @@ Weaviate 1.27 is configured with no built-in vectorizer. Every insert supplies i
 | Briefing | 300s | Pre-match window gating; tactical preview |
 | Narrative | 60s | Social signal aggregation; anomaly scoring; arc synthesis |
 
-Only these seven workers exist in the codebase; no additional background processes are launched.
+Only these seven recurring workers exist in the codebase. Two one-shot startup tasks additionally run once at boot (an initial intel auto-seed and a tactical-index auto-populate check), and `predict.py` spawns short-lived on-demand tasks per simulation trigger.
 
 ### Redis State Layer
 
@@ -616,13 +620,13 @@ Only these seven workers exist in the codebase; no additional background process
 
 ### Async Execution
 
-1. All seven workers are `asyncio` tasks sharing one event loop and one Redis connection; none run in a separate OS process.
+1. All seven workers, plus two one-shot startup tasks, are `asyncio` tasks sharing one event loop and one Redis connection; none run in a separate OS process.
 2. Each worker's tick is wrapped in a try/except block, so one fixture's malformed state or one worker's exception never halts processing elsewhere.
 3. CPU-bound and blocking work is kept off the event loop via four dedicated thread pools: tournament simulation, counterfactual simulation pairs, embedding, and blocking HTTP calls (Google Trends).
 
 ### Streaming Layer
 
-* SSE channels (`match_update`, `momentum_update`, `intel_update`, `counterfactual_update`, `narrative_spike`) perform an initial Redis key read before subscribing, delivering current state immediately to a client connecting mid-match, and carry a periodic heartbeat distinguishing inactivity from a dropped connection.
+* SSE channels (`match_update`, `momentum_update`, `intel_update`, `counterfactual_update`, `narrative_spike`) subscribe to their Redis pub/sub channel first, then perform an initial key read, delivering current state immediately to a client connecting mid-match, and carry a periodic heartbeat distinguishing inactivity from a dropped connection.
 * Every frontend hook relies on the browser's native `EventSource` reconnect logic for failure recovery.
 * The Mastodon/social data path is not part of any SSE channel. Comment samples captured during the 60-second social-signal tick are cached in-process and pushed into a plain Redis list (600s TTL, 19-item cap, deduplicated by permalink or text hash). The frontend reads this by polling a REST endpoint every 15 seconds. No comment-streaming SSE route exists anywhere in the codebase. The sample cache populates only on live (non-mock) provider reads; without social API credentials, the comment UI displays nothing while anomaly detection continues operating on mock signal data.
 
@@ -638,12 +642,12 @@ A 60-second worker aggregates Mastodon, Bluesky, Google Trends, and Wikipedia ac
 
 Four sources are read concurrently every 60 seconds, per tracked topic:
 
-1. Mastodon authenticated full-text search, disabling itself after repeated authentication failures and falling back to a deterministic mock generator.
+1. Mastodon authenticated full-text search: a single 401 disables the source immediately, and a separate 5-consecutive-failure counter (any exception type, not only authentication failures) also falls back to mock.
 2. Bluesky session-token authenticated search, re-authenticating once on a token expiry before falling back to mock.
 3. Google Trends via `pytrends`, executed on a blocking I/O thread pool since the library is not async-native.
 4. Wikipedia recent-changes edit velocity, used as a proxy for reference and news activity.
 
-Each source's mock fallback substitutes a phase-shifted sine wave, Gaussian noise, and occasional injected spikes, seeded per topic, maintaining detector operation without live credentials.
+Each source's mock fallback substitutes a sine wave whose phase is deterministically seeded per topic, plus unseeded Gaussian noise and occasional injected spikes. Only the baseline shape is reproducible per topic, not the exact output.
 
 Detection pipeline:
 
@@ -661,7 +665,7 @@ A selected spike or trending topic generates a query from its topic name and act
 
 * Tournament impact of a goal or red card is not derivable from the scoreline alone: an early goal in a low-stakes group match and a late winner in a decisive fixture carry different implications for 48 teams' championship odds. The tournament simulator alone reports current odds, not the marginal effect of a specific moment.
 * Match events are translated into tournament-wide probability shifts through paired Monte Carlo simulation, powering the match page's "What If?" tab and the bracket-impact feed on the predictor page.
-* A trigger event (goal, own goal, penalty, or yellow/red/second-yellow card) is detected in the match event stream, and the state immediately before it is reconstructed by reversing its effect on score and card counts.
+* A trigger event (goal, own goal, penalty, yellow, red, second-yellow card, or substitution) is detected in the match event stream, and the state immediately before it is reconstructed by reversing its effect on score and card counts. A substitution has no score/card effect to reverse; the pipeline runs without producing a divergence.
 * In-play win probability is computed for both the pre- and post-event states, and the difference is converted into a bounded Elo adjustment.
 * Two full tournament simulations, 20,000 runs each by default, are executed: one under the pre-event adjustment, one under the post-event adjustment. The divergence in each team's championship probability across the two runs is the reported tournament impact.
 * Both simulations share one deterministic seed derived from the fixture, minute, event type, and team, producing identical random draws across both runs except for the strength adjustment. A shared deterministic seed isolates the event's effect from Monte Carlo sampling noise.
@@ -687,7 +691,7 @@ A selected spike or trending topic generates a query from its topic name and act
 
 ## Performance Optimizations
 
-* **Vectorized simulation.** `tournament_sim.py` resolves every group match and knockout round for all `N` requested runs in one NumPy pass (cumulative probability draws, `np.add.at`, `np.maximum.at`, fancy indexing into a precomputed advancement matrix), instead of looping per simulation. Vectorized execution keeps 50,000 runs at 0.70 seconds instead of scaling linearly with simulated matches.
+* **Vectorized simulation.** `tournament_sim.py` resolves every group match in one NumPy pass and each of the five knockout rounds in a further vectorized pass (cumulative probability draws, `np.add.at`, `np.maximum.at`, fancy indexing into a precomputed advancement matrix), instead of looping per simulation. Vectorized execution keeps 50,000 runs at 0.70 seconds instead of scaling linearly with simulated matches.
 * **Isolated thread pools instead of one shared pool.** `ml/executors.py` defines four dedicated `ThreadPoolExecutor`s (`SIM_EXECUTOR`, `CF_SIM_EXECUTOR`, `EMBED_EXECUTOR`, `IO_EXECUTOR`). A burst of counterfactual simulations cannot delay a tournament prediction request, and CPU-bound embedding never blocks the asyncio event loop handling SSE connections.
 * **TTL caching with stale-on-failure fallback.** `odds_api_client.py` caches bookmaker odds for 900 seconds and serves the last successful snapshot if a refresh fails, rather than blocking every simulation or prediction request on a fresh external call.
 * **Redis-level caching for expensive external lookups.** `lineups.py` caches Wikipedia player photos for 7 days and Zafronix rosters for 6 hours; `tactical.py` caches computed tactical fingerprints for 600 seconds, avoiding repeated similarity searches on every page load.
@@ -712,7 +716,8 @@ backend/
 │   ├── narrative_arc_agent.py       Evidence-grounded narrative synthesis for detected spikes
 │   ├── narrative_spike_detector.py  Four-source signal aggregation and per-topic IsolationForest
 │   ├── narrative_topics.py          Fixture-aware dynamic topic tracking, defined but unused
-│   ├── ollama_client.py             Local Ollama call with Groq fallback, shared by four agents
+│   ├── ollama_client.py             Local Ollama call with Groq fallback, shared by three
+│   │                                agents (match intel, counterfactual, narrative arc)
 │   ├── rag_indexer.py               Offline StatsBomb narrative document extraction and indexing
 │   ├── tactical_agent.py            Live style descriptor and cosine match against TacticalProfiles
 │   └── weaviate_client.py           Weaviate connection, collection schema, hybrid search wrapper
