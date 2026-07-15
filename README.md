@@ -395,12 +395,14 @@ p_{\text{draw}}=\mathrm{clip}\left(0.25e^{-\Delta R/450}+0.05,\;0.10,\;0.30\righ
 $$
 
 $$
-p_{\text{win}}=(1-p_{\text{draw}})E_a\qquad 
+p_{\text{win}}=(1-p_{\text{draw}})E_a
 $$
 
 $$
 p_{\text{loss}}=(1-p_{\text{draw}})(1-E_a)
 $$
+
+where $\Delta R = |R_a - R_b|$ is the absolute rating gap between the two teams.
 
 ---
 
@@ -420,6 +422,11 @@ $$
 \Omega=\sum_i\frac{1}{o_i}-1
 $$
 
+- $p_i$ = fair, de-vigged probability for outcome $i$ (home / draw / away)
+- $o_i$ = quoted decimal odds for outcome $i$
+- $\Omega$ = overround — the sum of implied probabilities across all outcomes, minus 1
+- $z$ = Shin's insider-trading parameter, derived from $\Omega$
+
 ---
 
 **In-play win probability** updates live from score, minute, and red cards using two independent Poisson goal processes:
@@ -434,10 +441,13 @@ $$
 
 where
 
+- $\lambda_{\text{home}}$, $\lambda_{\text{away}}$ = expected in-play goal rate for each team over the remaining match
 - $f$ is the fraction of the match remaining.
 - $\sigma$ is the pre-match win-probability differential.
+- $g_h$, $g_a$ = candidate home/away goal counts for the remainder of the match, enumerated over $[0,8]$
+- $P(g_h,g_a)$ = joint probability that the match finishes with exactly $g_h$ further home goals and $g_a$ further away goals
 
-A red card multiplies the offending team's scoring rate by **0.72** and the opponent's by **1.12**.
+
 
 ---
 
@@ -451,6 +461,14 @@ $$
 P(\text{goal within 5 min})=\sigma\!\left(\beta_0+\sum_i\beta_i\,\mathrm{feature}_i\right)+\sum_k\mathrm{bump}_k(0.8)^{\Delta t_k}
 $$
 
+- $x_t$ = raw input signal at tick $t$ (possession, pass accuracy, or pressure)
+- $\mathrm{EWMA}_{t-1}$ = previous smoothed value of that signal
+- $\alpha$ = smoothing factor
+- $\sigma(\cdot)$ = logistic sigmoid function
+- $\beta_0$ = intercept; $\beta_i$ = trained coefficient for $\mathrm{feature}_i$ (EWMA-smoothed pressure, possession, pass accuracy, match minute, score differential)
+- $\mathrm{bump}_k$ = initial magnitude of the $k$-th active event bump (goal or red card)
+- $\Delta t_k$ = ticks elapsed since event $k$ occurred
+
 $\Delta t_k$ is measured in 30-second ticks (two per minute). The bump decays to roughly 64% of its initial value after one minute and under 11% after five. Goals and red cards inject this decaying additive bump directly into the output. Coefficients are trained offline using batch gradient descent on real StatsBomb matches and are promoted only when they outperform a base-rate log-loss baseline on held-out data.
 
 ---
@@ -460,6 +478,10 @@ $\Delta t_k$ is measured in 30-second ticks (two per minute). The bump decays to
 $$
 \text{margin}=1.96\sqrt{\frac{\hat{p}(1-\hat{p})}{N}}
 $$
+
+- $\hat{p}$ = simulated probability estimate for a given stage outcome (e.g. reaching the quarterfinal)
+- $N$ = number of simulation runs
+- $\text{margin}$ = half-width of the 95% confidence interval around $\hat{p}$
 
 ---
 
@@ -472,6 +494,9 @@ $$
 $$
 \text{press}\_\text{intensity}=0.7\,\min\!\left(1,\frac{8}{\mathrm{PPDA}}\right)+0.3\,\min\!\left(1,\frac{\text{pressures}}{150}\right)
 $$
+
+- $\mathrm{PPDA}$ = passes per defensive action — a lower value indicates more aggressive pressing.
+- $\text{pressures}$ = count of raw pressure events recorded in the press zone.
 
 ---
 
