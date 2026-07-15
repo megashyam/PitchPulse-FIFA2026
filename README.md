@@ -432,7 +432,7 @@ $$
 **In-play win probability** updates live from score, minute, and red cards using two independent Poisson goal processes:
 
 $$
-\lambda_{\text{home}}=\max\!\left(0.02,\;1.3f(1+0.65\sigma)\right)\qquad\lambda_{\text{away}}=\max\!\left(0.02,\;1.3f(1-0.65\sigma)\right)
+\lambda_{\text{home}}=\max\left(0.02,\;1.3f(1+0.65\sigma)\right)\qquad\lambda_{\text{away}}=\max\left(0.02,\;1.3f(1-0.65\sigma)\right)
 $$
 
 $$
@@ -458,7 +458,7 @@ $$
 $$
 
 $$
-P(\text{goal within 5 min})=\sigma\!\left(\beta_0+\sum_i\beta_i\,\mathrm{feature}_i\right)+\sum_k\mathrm{bump}_k(0.8)^{\Delta t_k}
+P(\text{goal within 5 min})=\sigma\left(\beta_0+\sum_i\beta_i\,\mathrm{feature}_i\right)+\sum_k\mathrm{bump}_k(0.8)^{\Delta t_k}
 $$
 
 - $x_t$ = raw input signal at tick $t$ (possession, pass accuracy, or pressure)
@@ -492,7 +492,7 @@ $$
 $$
 
 $$
-\text{press}\_\text{intensity}=0.7\,\min\!\left(1,\frac{8}{\mathrm{PPDA}}\right)+0.3\,\min\!\left(1,\frac{\text{pressures}}{150}\right)
+\text{press}\_\text{intensity}=0.7\,\min\left(1,\frac{8}{\mathrm{PPDA}}\right)+0.3\,\min\left(1,\frac{\text{pressures}}{150}\right)
 $$
 
 - $\mathrm{PPDA}$ = passes per defensive action — a lower value indicates more aggressive pressing.
