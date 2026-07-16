@@ -1,3 +1,5 @@
+
+
 services:
 
   redis:
@@ -19,12 +21,12 @@ services:
     container_name: wc2026-weaviate
     ports:
       - "8080:8080"
-      - "50051:50051" 
+      - "50051:50051"
     environment:
       QUERY_DEFAULTS_LIMIT: 25
       AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
       PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
-      DEFAULT_VECTORIZER_MODULE: "none"   
+      DEFAULT_VECTORIZER_MODULE: "none"  
       ENABLE_MODULES: ""
       CLUSTER_HOSTNAME: "node1"
       STANDALONE_MODE: "true"
@@ -50,13 +52,27 @@ services:
       WEAVIATE_HOST: weaviate
       WEAVIATE_PORT: "8080"
       WEAVIATE_GRPC_PORT: "50051"
+      OLLAMA_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
-      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
+      GROQ_FALLBACK_MODELS: ${GROQ_FALLBACK_MODELS:-llama-3.3-70b-versatile}
       TRIGGER_TOKEN: ${TRIGGER_TOKEN:-}
       ODDS_API_KEY: ${ODDS_API_KEY:-}
+      API_SPORTS_KEY: ${API_SPORTS_KEY:-}
+      MASTODON_ACCESS_TOKEN: ${MASTODON_ACCESS_TOKEN:-}
+      MASTODON_CLIENT_KEY: ${MASTODON_CLIENT_KEY:-}
+      MASTODON_CLIENT_SECRET: ${MASTODON_CLIENT_SECRET:-}
+      BLUESKY_HANDLE: ${BLUESKY_HANDLE:-}
+      BLUESKY_APP_PASSWORD: ${BLUESKY_APP_PASSWORD:-}
+      ZAFRONIX_API_KEY: ${ZAFRONIX_API_KEY:-}
+      ZAFRONIX_SEASON: ${ZAFRONIX_SEASON:-2026}
+      CF_SIMS: ${CF_SIMS:-20000}
+      WC26_BASE: ${WC26_BASE:-https://worldcup26.ir}
+      POLL_INTERVAL: ${POLL_INTERVAL:-30}
+      FT_ACTIVE_GRACE_S: ${FT_ACTIVE_GRACE_S:-21600}
       SELF_BASE_URL: http://localhost:8000
       WC26_SOURCE_TZ: ${WC26_SOURCE_TZ:-America/New_York}
-
       WEB_CONCURRENCY: "1"
     depends_on:
       redis:

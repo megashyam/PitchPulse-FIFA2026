@@ -22,14 +22,14 @@ from typing import List, Optional
 
 import httpx
 
+from agents.ollama_client import _clean
+from ml.embedding_model import get_embed_model as _get_embed_model
 from ml.executors import EMBED_EXECUTOR
 
 log = logging.getLogger(__name__)
 
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 GROQ_BASE = "https://api.groq.com/openai/v1"
-
-_embed_model = None
 
 
 def _groq_key() -> str:
@@ -39,16 +39,6 @@ def _groq_key() -> str:
 def _model_label(with_rag: bool) -> str:
     base = f"{GROQ_MODEL} via Groq"
     return f"{base} + RAG" if with_rag else base
-
-
-def _get_embed_model():
-    global _embed_model
-    if _embed_model is None:
-        from sentence_transformers import SentenceTransformer
-
-        log.info("Loading all-MiniLM-L6-v2 for briefing RAG (first use)…")
-        _embed_model = SentenceTransformer("all-MiniLM-L6-v2")
-    return _embed_model
 
 
 async def _retrieve_context(
@@ -145,7 +135,9 @@ async def generate(
                 },
             )
             resp.raise_for_status()
-            text = resp.json()["choices"][0]["message"]["content"].strip()
+            text = _clean(resp.json()["choices"][0]["message"]["content"])
+            if not text:
+                return _template(home_name, away_name, rag_docs), "template"
             label = _model_label(with_rag=bool(rag_docs))
             log.info(
                 f"Briefing for {home_name} vs {away_name} "

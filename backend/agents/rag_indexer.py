@@ -21,13 +21,20 @@ import asyncio
 import logging
 from collections import defaultdict, deque
 from pathlib import Path
-import weaviate
-import weaviate.classes as wvc
 
 import httpx
 from sentence_transformers import SentenceTransformer
 
-from agents.weaviate_client import get_weaviate_client
+from agents.weaviate_client import (
+    get_weaviate_client,
+    WEAVIATE_HOST,
+    WEAVIATE_PORT,
+    WEAVIATE_GRPC_PORT,
+)
+import weaviate
+import weaviate.classes as wvc
+
+from ml.statsbomb import sort_events
 
 logging.basicConfig(
     level=logging.INFO,
@@ -201,10 +208,7 @@ def extract_documents(
             - minute
             - event_type
     """
-    evs = sorted(
-        events,
-        key=lambda e: (e.get("period", 1), e.get("minute", 0), e.get("index", 0)),
-    )
+    evs = sort_events(events)
 
     h = defaultdict(float)
     a = defaultdict(float)
@@ -306,7 +310,6 @@ def extract_documents(
                     }
                 )
 
-        # Momentum shift detection every 5 minutes
         if minute % 5 == 0 and minute > last_momentum_min:
             last_momentum_min = minute
             total_ev = h["ev_total"] + a["ev_total"]
@@ -367,7 +370,7 @@ def _get_count() -> int:
     try:
         q = json.dumps({"query": "{Aggregate{NarrativeArcs{meta{count}}}}"})
         req = urllib.request.Request(
-            "http://localhost:8080/v1/graphql",
+            f"http://{WEAVIATE_HOST}:{WEAVIATE_PORT}/v1/graphql",
             data=q.encode(),
             headers={"Content-Type": "application/json"},
             method="POST",
@@ -400,7 +403,9 @@ async def main(check_only: bool = False) -> None:
         5. Batch insert documents and vectors.
     """
 
-    client = weaviate.connect_to_local(host="localhost", port=8080, grpc_port=50051)
+    client = weaviate.connect_to_local(
+        host=WEAVIATE_HOST, port=WEAVIATE_PORT, grpc_port=WEAVIATE_GRPC_PORT
+    )
 
     try:
         log.info(f"Weaviate ready: {client.is_ready()}")
@@ -444,6 +449,32 @@ async def main(check_only: bool = False) -> None:
             )
             if ans != "y":
                 return
+
+            log.info(f"Dropping {existing} existing documents for a clean rebuild...")
+            client.collections.delete("NarrativeArcs")
+            client.collections.create(
+                name="NarrativeArcs",
+                properties=[
+                    wvc.config.Property(
+                        name="content", data_type=wvc.config.DataType.TEXT
+                    ),
+                    wvc.config.Property(
+                        name="match_id", data_type=wvc.config.DataType.TEXT
+                    ),
+                    wvc.config.Property(
+                        name="competition", data_type=wvc.config.DataType.TEXT
+                    ),
+                    wvc.config.Property(
+                        name="season", data_type=wvc.config.DataType.TEXT
+                    ),
+                    wvc.config.Property(
+                        name="minute", data_type=wvc.config.DataType.INT
+                    ),
+                    wvc.config.Property(
+                        name="event_type", data_type=wvc.config.DataType.TEXT
+                    ),
+                ],
+            )
 
         log.info("Loading all-MiniLM-L6-v2 embedding model...")
         model = SentenceTransformer("all-MiniLM-L6-v2")

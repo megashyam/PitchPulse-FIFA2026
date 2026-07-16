@@ -99,7 +99,6 @@ class WeaviateClient:
         self._client: Optional[weaviate.WeaviateClient] = None
 
     def connect(self) -> None:
-        """Open a local Weaviate connection and ensure required collections."""
         try:
             self._client = weaviate.connect_to_local(
                 host=WEAVIATE_HOST, port=WEAVIATE_PORT, grpc_port=WEAVIATE_GRPC_PORT
@@ -117,7 +116,6 @@ class WeaviateClient:
             self._client = None
 
     def close(self) -> None:
-        """Close the underlying client if it is open."""
         if self._client:
             try:
                 self._client.close()
@@ -126,21 +124,19 @@ class WeaviateClient:
 
     @property
     def ready(self) -> bool:
-        """Return True when the underlying connection is healthy."""
         try:
             return self._client is not None and self._client.is_ready()
         except Exception:
             return False
 
     def ensure_collections(self) -> None:
-        """Create any missing collections used by the RAG layer."""
+        """Create any missing collections. Safe to call on every startup."""
         if not self._client:
             return
         for name, props in _SCHEMAS.items():
             self._ensure_one(name, props)
 
     def _ensure_one(self, name: str, props) -> None:
-        """Create a single collection if it is not already present."""
         if self._client.collections.exists(name):
             log.info(f"Weaviate collection '{name}' already exists")
             return
@@ -154,7 +150,6 @@ class WeaviateClient:
         log.info(f"Created Weaviate collection '{name}'")
 
     def get_count(self, collection: str = DEFAULT_COLLECTION) -> int:
-        """Return the object count for a collection via the GraphQL endpoint."""
         if collection not in _SCHEMAS:
             log.warning(f"get_count: unknown collection '{collection}'")
             return 0
@@ -174,7 +169,7 @@ class WeaviateClient:
             return 0
 
     def counts(self) -> dict:
-        """Return counts for all registered collections."""
+        """All collection counts — used by /health and debug routes."""
         return {name: self.get_count(name) for name in _SCHEMAS}
 
     def hybrid_search(
@@ -298,7 +293,6 @@ _client: Optional[WeaviateClient] = None
 
 
 def get_weaviate_client() -> WeaviateClient:
-    """Return the process-wide Weaviate client singleton."""
     global _client
     if _client is None:
         _client = WeaviateClient()

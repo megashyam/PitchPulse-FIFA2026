@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { useNarrativeStream } from "@/hooks/useNarrativeStream"
 import type { NarrativeSpike } from "@/hooks/useNarrativeStream"
 import { CommentBubbles } from "@/components/narrative/CommentBubbles"
+import { triggerHeaders } from "@/lib/api"
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
@@ -36,7 +37,7 @@ function fixtureBadge(spike: NarrativeSpike): { label: string; color: string; bg
 
 async function forceTick(): Promise<string> {
     try {
-        const r = await fetch(`${API}/narrative/trigger`)
+        const r = await fetch(`${API}/narrative/trigger`, { headers: triggerHeaders() })
         const d = await r.json()
         if (d.status === "warming_up") return d.message ?? "Still warming up…"
         if (d.status === "no_spikes") return "No anomalies this tick"
@@ -112,8 +113,7 @@ export default function NarrativePage() {
                 </div>
             </div>
 
-            Narrative Arc — first thing shown, above the
-            source-strip KPI cards.
+
             {selected && (
                 <div className="narrative-arc-top">
                     <div style={{ fontFamily: "var(--font-mono)", fontSize: ".6rem", textTransform: "uppercase", letterSpacing: ".12em", color: "var(--c-ai)", display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -182,7 +182,7 @@ export default function NarrativePage() {
                         )}
                     </div>
 
-                    { }
+
                     <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
                         <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "uppercase", letterSpacing: ".1em", color: "var(--text-3)" }}>
                             Driving sources
@@ -205,7 +205,7 @@ export default function NarrativePage() {
                         })}
                     </div>
 
-                    { }
+
                     <div style={{ marginTop: 14, padding: "12px", background: "var(--bg-3)", borderRadius: "var(--r-md)", border: "1px solid var(--border)" }}>
                         <div style={{ fontFamily: "var(--font-mono)", fontSize: ".56rem", textTransform: "uppercase", letterSpacing: ".1em", color: "var(--text-3)", marginBottom: 8 }}>
                             Detection info
@@ -388,7 +388,7 @@ export default function NarrativePage() {
                     </div>
                 )}
 
-                { }
+
                 <div className="predict-method" style={{ margin: "16px 18px 0" }}>
                     <strong>Methodology —</strong> IsolationForest(contamination=0.05, n_estimators=100) on a 72-hour rolling window (4320 ticks × 4 features). Score threshold −0.10. Results sorted so topics tied to a currently-live fixture rank first, upcoming-kickoff topics next, then severity within each tier. Spikes trigger RAG over NarrativeArcs → Mistral 7B synthesis → arc stored back into Weaviate. 5-min cooldown per topic.
                 </div>

@@ -1,13 +1,16 @@
 "use client"
-
-/**
- * Live win probability card for the match view.
- *
- * The backend supplies the primary in-play probability model so the UI stays
- * aligned with the same simulation stack used by counterfactual analysis.
- * A local heuristic remains only as a fallback when the live endpoint is
- * unavailable, which keeps the card informative instead of blank.
- */
+// components/match/LiveProbCard.tsx
+// Live win probability. Now backed by GET /matches/{id}/live-prob — the
+// same in-play model (ml/in_play.py) the counterfactual agent conditions
+// on — polled every 30s. Falls back to the local calcProbs() heuristic only
+// if that fetch fails, so the card never goes blank on a transient error.
+//
+// Fix (audit finding): this component previously computed its OWN
+// probability from score + momentum + elapsed time — a fourth, independent
+// probability model alongside the backend's Elo/Betfair prior, in-play
+// model, and counterfactual conditioning, with no guarantee any of them
+// agreed. calcProbs() is kept only as an offline/error fallback so the UI
+// degrades gracefully instead of going blank.
 
 import { useEffect, useState } from "react"
 import { useMomentumStream } from "@/hooks/useMomentumStream"
@@ -28,6 +31,7 @@ interface LiveProbResponse {
     pre_match_source: string
 }
 
+// Fallback-only heuristic — used if /live-prob is unreachable.
 function calcProbs(
     homeGoals: number, awayGoals: number,
     homeMom: number, elapsed: number, status: string
@@ -124,71 +128,44 @@ export function LiveProbCard({ state, fixtureId }: Props) {
         : `In-play model · ${live.pre_match_source} prior`
 
     return (
-        <div style={{
-            background: "var(--bg-2)",
-            border: "1px solid var(--border)",
-            borderTop: "2px solid var(--c-data)",
-            borderRadius: "var(--r-lg)",
-            overflow: "hidden",
-        }}>
-
-            <div style={{
-                padding: "11px 14px 8px",
-                borderBottom: "1px solid var(--border)",
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-            }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                    <div style={{
-                        width: 22, height: 22, borderRadius: 7,
-                        background: "rgba(56,189,248,0.12)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: ".82rem",
-                    }}>🎲</div>
-                    <span style={{ fontSize: ".78rem", fontWeight: 700, color: "var(--text-1)" }}>
-                        Win Probability
-                    </span>
-                </div>
+        <div>
+            <div className="stats-section-header">
+                Win Probability
                 <span style={{
-                    fontFamily: "var(--font-mono)", fontSize: ".56rem",
-                    textTransform: "uppercase", letterSpacing: ".06em",
-                    color: isLive ? "var(--c-data)" : "var(--text-3)",
-                    padding: "2px 8px", borderRadius: 10,
-                    background: isLive ? "rgba(56,189,248,0.1)" : "var(--bg-3)",
+                    marginLeft: "auto", fontSize: ".52rem", color: "var(--text-3)",
+                    textTransform: "none", letterSpacing: 0,
                 }}>
-                    {isFT ? "Final" : isLive ? `${elapsed}' live` : "Pre-match"}
+                    {isFT ? "Final" : isLive ? `${elapsed}'` : "Pre-match"}
                 </span>
             </div>
 
-            <div style={{ padding: "12px 14px 10px" }}>
+            <div style={{ padding: "3px 14px 5px" }}>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 6, marginBottom: 8, alignItems: "center" }}>
-                    <div>
-                        <div style={{ fontSize: ".7rem", fontWeight: 700, color: "var(--home)" }}>{hn}</div>
-                        <div style={{ fontFamily: "var(--font-display)", fontSize: "1.4rem", color: "var(--home)", lineHeight: 1 }}>
-                            {homeW}%
-                        </div>
-                    </div>
-                    <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: ".58rem", fontFamily: "var(--font-mono)", color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".06em" }}>Draw</div>
-                        <div style={{ fontFamily: "var(--font-display)", fontSize: "1.1rem", color: "var(--text-2)", lineHeight: 1 }}>
-                            {drawW}%
-                        </div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: ".7rem", fontWeight: 700, color: "var(--away)" }}>{an}</div>
-                        <div style={{ fontFamily: "var(--font-display)", fontSize: "1.4rem", color: "var(--away)", lineHeight: 1 }}>
-                            {awayW}%
-                        </div>
-                    </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 4, marginBottom: 3, alignItems: "baseline" }}>
+                    <span style={{ fontSize: ".68rem", fontWeight: 700, color: "var(--home)" }}>
+                        {hn} <span style={{ fontSize: ".76rem" }}>{homeW}%</span>
+                    </span>
+                    <span style={{ fontSize: ".56rem", color: "var(--text-3)", textAlign: "center" }}>{drawW}%</span>
+                    <span style={{ fontSize: ".68rem", fontWeight: 700, color: "var(--away)", textAlign: "right" }}>
+                        <span style={{ fontSize: ".76rem" }}>{awayW}%</span> {an}
+                    </span>
                 </div>
 
-                <div style={{ height: 7, borderRadius: 4, overflow: "hidden", display: "flex", gap: 2 }}>
-                    <div style={{ width: `${homeW}%`, background: "var(--home)", borderRadius: "4px 0 0 4px", transition: "width .6s ease" }} />
-                    <div style={{ width: `${drawW}%`, background: "var(--text-3)", transition: "width .6s ease" }} />
-                    <div style={{ width: `${awayW}%`, background: "var(--away)", borderRadius: "0 4px 4px 0", transition: "width .6s ease" }} />
+
+                <div style={{ height: 4, borderRadius: 2, overflow: "hidden", display: "flex", gap: 1 }}>
+                    <div style={{ width: `${homeW}%`, background: "var(--home)" }} />
+                    <div style={{ width: `${drawW}%`, background: "var(--text-3)" }} />
+                    <div style={{ width: `${awayW}%`, background: "var(--away)" }} />
                 </div>
 
-                <div style={{ marginTop: 7, fontFamily: "var(--font-mono)", fontSize: ".56rem", color: "var(--text-3)" }}>
+                {/* Model note — kept, but as small as possible; drops entirely
+                    on narrow renders rather than getting clipped mid-word. */}
+                <div style={{
+                    marginTop: 3, fontFamily: "var(--font-mono)", fontSize: ".5rem",
+                    color: "var(--text-3)", whiteSpace: "nowrap", overflow: "hidden",
+                    textOverflow: "ellipsis",
+                }}>
                     {modelNote}
                 </div>
 

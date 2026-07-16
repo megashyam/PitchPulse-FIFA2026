@@ -48,8 +48,7 @@ SB_BASE = "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
 COMPETITION_ID = 43  # FIFA World Cup
 SEASON_IDS = [106, 3]  # WC 2022, WC 2018
 
-# Shot outcomes that count as "on target". Compared case-insensitively —
-# StatsBomb data contains both "Saved to Post" and "Saved To Post" variants.
+
 ON_TARGET_SHOT_OUTCOMES = {
     "goal",
     "saved",
@@ -165,6 +164,6 @@ def sort_events(events: list[dict]) -> list[dict]:
         Chronologically ordered list of StatsBomb events.
     """
     return sorted(
-        events,
+        (e for e in events if e.get("period", 1) < 5),
         key=lambda e: (e.get("period", 1), e.get("minute", 0), e.get("index", 0)),
     )

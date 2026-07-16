@@ -369,6 +369,8 @@ def _extract_card_sub_events(
     out: list[dict] = []
 
     for ev in events:
+        if ev.get("period", 1) >= 5:  # penalty shootout — not a card/sub
+            continue
         team_name = ev.get("team", {}).get("name", "")
         if team_name not in match_teams:
             continue
@@ -646,12 +648,7 @@ def _parse_scorer_events(home_name: str, away_name: str, g: dict) -> list[MatchE
 
 
 def _parse_wc26_game(g: dict) -> Optional[dict]:
-    """Parse one worldcup26.ir game dict into a normalised record.
-
-    Known field names: home_team_name_en / away_team_name_en, home_score /
-    away_score (strings or null), finished ("TRUE"/"FALSE"), time_elapsed
-    ("finished"/"45"/"halftime"/null), id ("1".."104"), group, type,
-    local_date ("06/11/2026 13:00"), home_scorers/away_scorers."""
+    """Parse one worldcup26.ir game dict into a normalised record."""
     try:
         home_name = g.get("home_team_name_en") or g.get("home_team_name") or ""
         away_name = g.get("away_team_name_en") or g.get("away_team_name") or ""
@@ -681,7 +678,7 @@ def _parse_wc26_game(g: dict) -> Optional[dict]:
             "fixture_id": fid,
             "home_name": home_name,
             "away_name": away_name,
-            "home_score": home_score,  # Optional[int] — None = feed unknown
+            "home_score": home_score,
             "away_score": away_score,
             "status": status,
             "elapsed": elapsed,
@@ -737,9 +734,6 @@ async def fetch_wc26_games(client: httpx.AsyncClient) -> list[dict]:
     except Exception as e:
         log.warning(f"worldcup26.ir fetch failed: {e}")
         return []
-
-
-# Score-change event synthesis
 
 
 class ScoreTracker:
@@ -817,7 +811,7 @@ class ScoreTracker:
                         elapsed=elapsed,
                         team_id=team_id,
                         team_name=name,
-                        player_name=None,  # not available without scorer data
+                        player_name=None,
                         type="goal",
                         detail="synthesised",
                     )
@@ -828,9 +822,7 @@ class ScoreTracker:
         return list(events)
 
 
-# Redis persistence
-
-FT_AT_TTL = 40 * 24 * 3600  # keep the FT timestamp for the CF feed's lifetime
+FT_AT_TTL = 40 * 24 * 3600
 
 
 async def _worker_visible(r: aioredis.Redis, fid: int, status: str) -> bool:
@@ -884,7 +876,6 @@ async def persist(
     await pipe.execute()
 
     if changed:
-        # Publish only when the persisted match state actually changes.
         await r.publish("match_update", json.dumps({"fixture_id": state.fixture_id}))
         log.info(
             f"  [{state.fixture_id}] "
@@ -942,7 +933,6 @@ async def _loop(r: aioredis.Redis) -> None:
     """
     bank = StatsBank()
     tracker = ScoreTracker()
-    # fid → last persisted payload (excluding updated_at) for change detection
     last_payload: dict[int, str] = {}
 
     headers = {"User-Agent": "wc2026-hybrid/1.0", "Accept": "application/json"}
@@ -991,95 +981,89 @@ async def _loop(r: aioredis.Redis) -> None:
                             stats_source="unavailable",
                         )
                         await _persist_if_changed(r, state, last_payload)
-                        continue
 
-                    await tracker.hydrate(r, fid)
-                    prev_h, prev_a = tracker.last_score(fid)
-                    home_score = (
-                        game["home_score"] if game["home_score"] is not None else prev_h
-                    )
-                    away_score = (
-                        game["away_score"] if game["away_score"] is not None else prev_a
-                    )
-
-                    # Load StatsBomb proxy stats for the fixture at the current minute.
-                    try:
-                        timeline = await bank.get_timeline(
-                            client, home_name, away_name, fid
-                        )
-                    except Exception as e:
-                        log.error(f"  [{fid}] get_timeline failed: {e}")
-                        timeline = {}
-
-                    # Use feed-provided scorers when available, otherwise synthesize goals from score deltas.
-                    goal_events = game["pre_events"]
-                    if not goal_events:
-                        goal_events = tracker.update(
-                            fid,
-                            home_name,
-                            away_name,
-                            home_score,
-                            away_score,
-                            game["elapsed"] or 0,
-                        )
-
-                    # Clamp completed matches so stoppage-time goals never appear after the final whistle.
-                    elapsed = game["elapsed"]
-                    estimated = game["elapsed_estimated"]
-                    if status in COMPLETED_STATUSES:
-                        max_ev = max((e.elapsed for e in goal_events), default=90)
-                        elapsed = max(90, max_ev)
-                        estimated = True
-
-                    h_stats, a_stats = bank.stats_at_minute(timeline, elapsed or 0)
-
-                    proxy_events = [
-                        MatchEvent(
-                            elapsed=pe["minute"],
-                            team_id=1 if pe["is_home"] else 2,
-                            team_name=home_name if pe["is_home"] else away_name,
-                            player_name=None,
-                            type=pe["type"],
-                            detail="statsbomb proxy",
-                        )
-                        for pe in bank.events_at_minute(fid, elapsed or 0)
-                    ]
-
-                    events = sorted(goal_events + proxy_events, key=lambda e: e.elapsed)
-
-                    state = MatchState(
-                        fixture_id=fid,
-                        league_id=43,
-                        season=2026,
-                        round=game["round"],
-                        venue=game["venue"],
-                        status_short=status,
-                        status_long=_STATUS_LONG.get(status, status),
-                        elapsed=elapsed,
-                        elapsed_estimated=estimated,
-                        kickoff_time=game["kickoff"],
-                        home_id=1,
-                        home_name=home_name,
-                        home_score=home_score,
-                        home_stats=h_stats,
-                        away_id=2,
-                        away_name=away_name,
-                        away_score=away_score,
-                        away_stats=a_stats,
-                        events=events,
-                        stats_source="statsbomb_proxy" if timeline else "unavailable",
-                        stats_proxy_match_id=bank.get_assigned_match_id(fid),
-                    )
-                    await _persist_if_changed(r, state, last_payload)
-                except asyncio.CancelledError:
-                    raise
                 except Exception as e:
-                    fid_hint = raw.get("id") if isinstance(raw, dict) else None
                     log.error(
-                        f"  [{fid_hint}] fixture processing failed, skipping: {e}",
+                        f"Fixture processing failed: {raw.get('id', 'unknown')} — {e}",
                         exc_info=True,
                     )
                     continue
+
+                await tracker.hydrate(r, fid)
+                prev_h, prev_a = tracker.last_score(fid)
+                home_score = (
+                    game["home_score"] if game["home_score"] is not None else prev_h
+                )
+                away_score = (
+                    game["away_score"] if game["away_score"] is not None else prev_a
+                )
+
+                try:
+                    timeline = await bank.get_timeline(
+                        client, home_name, away_name, fid
+                    )
+                except Exception as e:
+                    log.error(f"  [{fid}] get_timeline failed: {e}")
+                    timeline = {}
+
+                goal_events = game["pre_events"]
+                if not goal_events:
+                    goal_events = tracker.update(
+                        fid,
+                        home_name,
+                        away_name,
+                        home_score,
+                        away_score,
+                        game["elapsed"] or 0,
+                    )
+
+                elapsed = game["elapsed"]
+                estimated = game["elapsed_estimated"]
+                if status in COMPLETED_STATUSES:
+                    max_ev = max((e.elapsed for e in goal_events), default=90)
+                    elapsed = max(90, max_ev)
+                    estimated = True
+
+                h_stats, a_stats = bank.stats_at_minute(timeline, elapsed or 0)
+
+                proxy_events = [
+                    MatchEvent(
+                        elapsed=pe["minute"],
+                        team_id=1 if pe["is_home"] else 2,
+                        team_name=home_name if pe["is_home"] else away_name,
+                        player_name=None,
+                        type=pe["type"],
+                        detail="statsbomb proxy",
+                    )
+                    for pe in bank.events_at_minute(fid, elapsed or 0)
+                ]
+
+                events = sorted(goal_events + proxy_events, key=lambda e: e.elapsed)
+
+                state = MatchState(
+                    fixture_id=fid,
+                    league_id=43,
+                    season=2026,
+                    round=game["round"],
+                    venue=game["venue"],
+                    status_short=status,
+                    status_long=_STATUS_LONG.get(status, status),
+                    elapsed=elapsed,
+                    elapsed_estimated=estimated,
+                    kickoff_time=game["kickoff"],
+                    home_id=1,
+                    home_name=home_name,
+                    home_score=home_score,
+                    home_stats=h_stats,
+                    away_id=2,
+                    away_name=away_name,
+                    away_score=away_score,
+                    away_stats=a_stats,
+                    events=events,
+                    stats_source="statsbomb_proxy" if timeline else "unavailable",
+                    stats_proxy_match_id=bank.get_assigned_match_id(fid),
+                )
+                await _persist_if_changed(r, state, last_payload)
 
             if seen_ids:
                 await expire_stale(r, seen_ids)
@@ -1089,7 +1073,6 @@ async def _loop(r: aioredis.Redis) -> None:
                     "Check WC26_BASE or whether the tournament is on a rest day."
                 )
 
-            # Drop change-detection entries for fixtures the feed no longer returns.
             for gone in set(last_payload) - seen_ids:
                 last_payload.pop(gone, None)
 

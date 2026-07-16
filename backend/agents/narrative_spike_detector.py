@@ -192,7 +192,7 @@ def _parse_mastodon_timestamp(created_at: str) -> float:
             time when parsing fails.
     """
     try:
-        s = created_at[:19]  # trim sub-second precision
+        s = created_at[:19]
         dt = datetime.fromisoformat(s).replace(tzinfo=timezone.utc)
         return dt.timestamp()
     except Exception:
@@ -226,6 +226,7 @@ class SignalPoint:
     trends: float
     wikipedia: float
     timestamp: float = field(default_factory=time.time)
+    # "live" | "mock" per source — provenance for the UI (audit H4/H11-adjacent)
     data_sources: Dict[str, str] = field(default_factory=dict)
 
     def to_vector(self) -> np.ndarray:
@@ -524,8 +525,7 @@ class BlueskySource:
                 timeout=HTTP_TIMEOUT,
             )
             if resp.status_code == 401:
-                # Refresh once on expiry so a stale token falls back cleanly
-                # instead of treating a recoverable auth lapse as a hard fail.
+
                 self._session_token = None
                 if not await self._authenticate(client):
                     return self._mock.read(topic), "mock"
@@ -688,7 +688,6 @@ class NarrativeSpikeDetector:
         self._bluesky = BlueskySource()
         self._trends = TrendsSource()
         self._wikipedia = WikipediaSource()
-        # Kept for external callers (narrative_worker) that read .sources
         self.sources = {
             "mastodon": self._mastodon,
             "bluesky": self._bluesky,
@@ -784,7 +783,7 @@ class NarrativeSpikeDetector:
         Returns:
             NarrativeSpike: Structured anomaly representation.
         """
-        severity = min(1.0, max(0.0, (-score + SCORE_THRESH) / 0.5))
+        severity = min(1.0, max(0.0, (-score - SCORE_THRESH) / 0.5))
         sources = {
             "mastodon": point.mastodon,
             "bluesky": point.bluesky,

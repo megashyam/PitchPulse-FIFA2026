@@ -1,12 +1,6 @@
 """
-agents/narrative_arc_agent.py — v3
-====================================
 Engaging-voice arc synthesis for narrative spikes.
 
-Fixes (audit H4/H3):
-    - Removed fabricated fallback stats.
-    - Prompt now labels mock/simulated signals.
-    - Embedding uses ml.executors.EMBED_EXECUTOR.
 """
 
 from __future__ import annotations
@@ -19,47 +13,13 @@ from typing import List
 from agents.narrative_spike_detector import NarrativeSpike
 from agents.ollama_client import generate
 from agents.weaviate_client import get_weaviate_client, NARRATIVE_ARCS
+from ml.embedding_model import get_embed_model as _get_embed_model
 from ml.executors import EMBED_EXECUTOR
 
 log = logging.getLogger(__name__)
 
-_embed_model = None
-
-
-def _get_embed_model():
-    """
-    Load and return the sentence embedding model used for narrative arc synthesis.
-
-    The model is initialized lazily on first use to avoid unnecessary startup
-    overhead. The loaded model instance is cached globally and reused for future
-    embedding requests.
-
-    Returns:
-        SentenceTransformer: Cached embedding model instance.
-    """
-    global _embed_model
-    if _embed_model is None:
-        from sentence_transformers import SentenceTransformer
-
-        log.info("Loading all-MiniLM-L6-v2 for arc synthesis (first use)…")
-        _embed_model = SentenceTransformer("all-MiniLM-L6-v2")
-    return _embed_model
-
 
 def _build_query(spike: NarrativeSpike) -> str:
-    """
-    Build a semantic search query from a narrative spike.
-
-    Combines the spike topic, summary, and contextual keywords to retrieve
-    historical narrative arcs with similar patterns from the vector database.
-
-    Args:
-        spike (NarrativeSpike): Detected narrative spike containing topic and
-            summary information.
-
-    Returns:
-        str: Query string optimized for narrative arc retrieval.
-    """
     return (
         f"{spike.topic} World Cup narrative arc tournament storyline "
         f"{spike.summary} historical precedent momentum shift"
@@ -276,7 +236,6 @@ def _template_arc(spike: NarrativeSpike) -> str:
     if spike.data_sources and any(v == "mock" for v in spike.data_sources.values()):
         mock_note = " (signal is partly simulated — live source unavailable)"
 
-    # Lead with the strongest available number.
     lead_parts = []
     if s.get("mastodon", 0) > 10:
         lead_parts.append(f"{s['mastodon']:.0f} Mastodon posts/min")
@@ -288,7 +247,6 @@ def _template_arc(spike: NarrativeSpike) -> str:
         lead_parts.append(f"{s['wikipedia']:.1f} Wikipedia edits/min")
     lead = lead_parts[0] if lead_parts else f"{sev_pct}% above its rolling baseline"
 
-    # Shape-based reasoning from moved vs quiet sources.
     if len(driving) == 1:
         shape_sentence = (
             f"The move is concentrated entirely on {driving[0]}, with "
@@ -356,7 +314,7 @@ async def synthesise(
             query = _build_query(spike)
             model = _get_embed_model()
             vec = await loop.run_in_executor(
-                EMBED_EXECUTOR,  # audit H3 — was the shared default pool
+                EMBED_EXECUTOR,
                 lambda: model.encode(query, normalize_embeddings=True).tolist(),
             )
             rag_docs = wv.hybrid_search(
@@ -406,7 +364,7 @@ async def synthesise(
             )
             model = _get_embed_model()
             vec = await loop.run_in_executor(
-                EMBED_EXECUTOR,  # audit H3 — was the shared default pool
+                EMBED_EXECUTOR,
                 lambda: model.encode(content, normalize_embeddings=True).tolist(),
             )
             wv.insert_document(

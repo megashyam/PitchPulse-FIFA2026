@@ -1,10 +1,6 @@
 """
 Tournament prediction routes.
 
-The prediction API is deliberately split into a trigger endpoint, a status
-endpoint, and cache-backed read endpoints. That separation keeps the heavy
-Monte Carlo simulation off the request path and makes cross-worker coordination
-safe by storing the simulation state in Redis rather than process memory.
 """
 
 import asyncio
@@ -15,7 +11,9 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
+from sse_starlette.sse import EventSourceResponse
 
+from api.routes._sse import pubsub_sse
 from api.schemas.predict import (
     SimStatus,
     SimTriggerResponse,
@@ -24,6 +22,7 @@ from api.schemas.predict import (
 )
 from ml.executors import SIM_EXECUTOR
 from ml.odds_api_client import get_oddsapi_client
+from ml.real_bracket_override import compute_real_overrides
 from ml.tournament_sim import SimResult, run_simulation
 
 logger = logging.getLogger(__name__)
@@ -85,6 +84,27 @@ async def get_status(request: Request):
     return await _get_status(request.app.state.redis)
 
 
+@router.get("/stream")
+async def predict_stream(request: Request):
+    """SSE, pub/sub-backed (mirrors /matches/{id}/intel/stream). Tournament-
+    wide — no fixture filter — so every connected client gets notified when
+    prediction_worker's 30-min resim (or a manually triggered one) lands,
+    instead of needing a manual refresh to see it."""
+    r = request.app.state.redis
+
+    async def generator():
+        async for event in pubsub_sse(
+            redis_client=r,
+            channel="prediction_update",
+            key=REDIS_KEY,
+            event_name="prediction_update",
+            is_disconnected=request.is_disconnected,
+        ):
+            yield event
+
+    return EventSourceResponse(generator(), ping=15)
+
+
 @router.get("/tournament", response_model=TournamentPrediction)
 async def get_tournament(request: Request):
     """Return the latest tournament prediction, auto-triggering if empty."""
@@ -127,18 +147,48 @@ async def get_team(name: str, request: Request):
     return team
 
 
+async def _apply_real_overrides(redis, pred: TournamentPrediction) -> None:
+    """Overwrite stage probabilities with real, already-known knockout
+    results where they exist (see ml/real_bracket_override.py) — the plain
+    Monte Carlo sim has no idea a team was actually eliminated today."""
+    try:
+        overrides = await compute_real_overrides(redis)
+    except Exception as exc:
+        logger.warning(f"compute_real_overrides failed, using plain sim: {exc}")
+        return
+    if not overrides:
+        return
+
+    applied = 0
+    for team_pred in pred.teams:
+        team_ovr = overrides.get(team_pred.name)
+        if not team_ovr:
+            continue
+        for stage, val in team_ovr.items():
+            sp = getattr(team_pred, stage, None)
+            if sp is not None:
+                sp.p = val
+                sp.ci_lo = val
+                sp.ci_hi = val
+                applied += 1
+    logger.info(
+        f"Real-bracket override applied: {len(overrides)} team(s), "
+        f"{applied} stage value(s) overwritten"
+    )
+
+
 async def _run_and_store(redis, sim_id: str, n_sims: int) -> None:
     """Run the simulation, persist the result, and refresh the cache."""
     global _latest_result
 
     try:
-        betfair = get_oddsapi_client()
-        betfair_odds = await betfair.get_all_odds()
+        odds_client = get_oddsapi_client()
+        odds_table = await odds_client.get_all_odds()
 
         loop = asyncio.get_running_loop()
         result: SimResult = await loop.run_in_executor(
             SIM_EXECUTOR,
-            lambda: run_simulation(betfair_odds=betfair_odds, n_sims=n_sims),
+            lambda: run_simulation(odds_table=odds_table, n_sims=n_sims),
         )
 
         pred = TournamentPrediction(
@@ -149,6 +199,8 @@ async def _run_and_store(redis, sim_id: str, n_sims: int) -> None:
             teams=[TeamPrediction.from_result(t) for t in result.teams],
             status="complete",
         )
+
+        await _apply_real_overrides(redis, pred)
 
         await redis.setex(REDIS_KEY, REDIS_TTL, pred.model_dump_json())
         _latest_result = pred

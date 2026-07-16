@@ -70,7 +70,6 @@ try:
 except ImportError:
     pass
 
-import httpx
 import redis.asyncio as aioredis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -90,19 +89,18 @@ from api.routes.narrative_comments import router as narrative_comments_router
 from api.routes.predict import router as predict_router
 from api.routes.tactical import router as tactical_router
 from api.routes.team_form import router as team_form_router
-from api.schemas.schema import MatchState
 from api.workers.briefing_worker import run as briefing_worker_run
 from api.workers.counterfactual_worker import run as cf_worker_run
 from api.workers.hybrid_producer import run as hybrid_producer_run
 from api.workers.intel_worker import run as intel_worker_run
 from api.workers.momentum_worker import run as momentum_worker_run
 from api.workers.narrative_worker import run as narrative_worker_run
+from api.workers.prediction_worker import run as prediction_worker_run
 from api.workers.tactical_worker import run as tactical_worker_run
 from ml.tactical_indexer import ensure_indexed as ensure_tactical_indexed
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 PORT = int(os.getenv("PORT", "8000"))
-SELF_BASE_URL = os.getenv("SELF_BASE_URL", f"http://localhost:{PORT}")
 WEB_CONCURRENCY = int(os.getenv("WEB_CONCURRENCY", "1"))
 HEALTH_CACHE_S = 30.0
 
@@ -174,54 +172,6 @@ async def _guarded(name: str, r: aioredis.Redis, fn) -> None:
         log.warning(f"{name}: skipping — no data within timeout")
 
 
-async def _auto_seed(r: aioredis.Redis) -> None:
-    """
-    Trigger initial intelligence generation for active fixtures.
-
-    After startup, this seeds derived-data pipelines including:
-
-        - momentum estimation
-        - match intelligence
-        - counterfactual analysis
-        - tactical fingerprints
-
-    Uses authenticated internal trigger endpoints so workers can reuse the
-    same execution paths as external API requests.
-
-    Fixtures that have not started are intentionally skipped.
-    """
-    if not await _wait_for_data(r):
-        return
-    ids = await r.smembers("matches:active")
-    headers = {"X-Trigger-Token": TRIGGER_TOKEN} if TRIGGER_TOKEN else {}
-
-    async with httpx.AsyncClient(headers=headers, timeout=30.0) as client:
-        for fid in ids:
-            raw = await r.get(f"match:{fid}:state")
-            if not raw:
-                continue
-            try:
-                state = MatchState.model_validate_json(raw)
-                if state.status_short == "NS":
-                    continue
-            except Exception:
-                continue
-            for label, url in [
-                ("momentum/trigger", f"{SELF_BASE_URL}/matches/{fid}/momentum/trigger"),
-                ("intel/trigger", f"{SELF_BASE_URL}/matches/{fid}/intel/trigger"),
-                (
-                    "counterfactual/trigger",
-                    f"{SELF_BASE_URL}/matches/{fid}/counterfactual/trigger",
-                ),
-                ("tactical/trigger", f"{SELF_BASE_URL}/matches/{fid}/tactical/trigger"),
-            ]:
-                try:
-                    resp = await client.post(url)
-                    log.info(f"Auto-seed [{fid}]: {label} → {resp.status_code}")
-                except Exception as e:
-                    log.warning(f"Auto-seed [{fid}]: {label} failed — {e}")
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -251,9 +201,10 @@ async def lifespan(app: FastAPI):
     intel_task = asyncio.create_task(_guarded("intel", r, intel_worker_run))
     cf_task = asyncio.create_task(_guarded("counterfactual", r, cf_worker_run))
     briefing_task = asyncio.create_task(_guarded("briefing", r, briefing_worker_run))
-    narrative_task = asyncio.create_task(_guarded("narrative", r, narrative_worker_run))
     tactical_task = asyncio.create_task(_guarded("tactical", r, tactical_worker_run))
-    seed_task = asyncio.create_task(_auto_seed(r))
+
+    narrative_task = asyncio.create_task(narrative_worker_run(r), name="narrative")
+    prediction_task = asyncio.create_task(prediction_worker_run(r), name="prediction")
 
     asyncio.create_task(ensure_tactical_indexed(), name="tactical_auto_index")
 
@@ -267,7 +218,7 @@ async def lifespan(app: FastAPI):
         briefing_task,
         narrative_task,
         tactical_task,
-        seed_task,
+        prediction_task,
     ):
         t.cancel()
     await asyncio.gather(
@@ -278,7 +229,7 @@ async def lifespan(app: FastAPI):
         briefing_task,
         narrative_task,
         tactical_task,
-        seed_task,
+        prediction_task,
         return_exceptions=True,
     )
     wv.close()

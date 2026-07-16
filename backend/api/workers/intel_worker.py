@@ -50,8 +50,14 @@ from api.schemas.schema import MatchState
 log = logging.getLogger(__name__)
 INTERVAL = 30.0
 FEED_CAP = 30
+TTL_LIVE = 3_600
+TTL_COMPLETED = 2_592_000
 
 _known_fixtures: set[str] = set()
+
+
+def _ttl_for(status_short: str) -> int:
+    return TTL_COMPLETED if status_short in COMPLETED_STATUSES else TTL_LIVE
 
 
 async def run(redis_client: aioredis.Redis) -> None:
@@ -222,8 +228,7 @@ async def _update_fixture(
     if completed:
         ft_sig = f"ft_summary:{state.home_score}:{state.away_score}"
         already_have_ft = any(e.get("event_sig") == ft_sig for e in existing)
-        # Only bother if there are no event-reaction entries either — if the
-        # match had goals, those already tell the story.
+
         has_event_narration = bool(have_event_sigs) or any(
             e.get("event_sig") for e in existing
         )
@@ -245,12 +250,14 @@ async def _update_fixture(
         :FEED_CAP
     ]
 
+    ttl = _ttl_for(state.status_short)
+
     pipe = r.pipeline(transaction=True)
     pipe.delete(f"match:{fid}:intel:feed")
     for e in ordered:
         pipe.rpush(f"match:{fid}:intel:feed", json.dumps(e))
-    pipe.expire(f"match:{fid}:intel:feed", 3600)
-    pipe.setex(f"match:{fid}:intel:latest", 3600, json.dumps(ordered[0]))
+    pipe.expire(f"match:{fid}:intel:feed", ttl)
+    pipe.setex(f"match:{fid}:intel:latest", ttl, json.dumps(ordered[0]))
     await pipe.execute()
 
     await r.publish(

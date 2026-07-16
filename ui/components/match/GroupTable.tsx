@@ -1,14 +1,9 @@
 "use client"
-
-/**
- * Group standings table.
- *
- * The table keeps the current group compact and readable by using a
- * FotMob-style row layout with the key standings columns aligned in one view.
- */
+// components/match/GroupTable.tsx
+// FotMob-style group standings table
 
 import { useEffect, useState } from "react"
-import { flag } from "./ScoreHeader"
+import { Flag } from "@/components/Flag"
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
@@ -40,6 +35,7 @@ export function GroupTable({ fixtureId, highlightTeams }: Props) {
                 <span className="fm-gt-title">Group {data.group}</span>
             </div>
 
+
             <div className="fm-gt-cols">
                 <div className="fm-gt-col-label">#</div>
                 <div className="fm-gt-col-label left">Team</div>
@@ -59,7 +55,7 @@ export function GroupTable({ fixtureId, highlightTeams }: Props) {
                 >
                     <div className="fm-gt-pos">{row.pos}</div>
                     <div className="fm-gt-team">
-                        <span style={{ fontSize: "1rem" }}>{flag(row.name)}</span>
+                        <Flag team={row.name} size="sm" />
                         <span className="fm-gt-team-name">{row.name}</span>
                     </div>
                     <div className="fm-gt-val">{row.p}</div>

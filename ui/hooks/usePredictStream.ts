@@ -1,14 +1,4 @@
-/**
- * Poll and cache tournament prediction state.
- *
- * The hook coordinates three backend interactions: fetch the latest cached
- * tournament prediction, poll simulation status while a bracket run is
- * active, and trigger a new simulation when the user explicitly requests it.
- *
- * If the backend returns 202 from the prediction endpoint, it means the
- * simulation has been auto-started and the hook should transition into the
- * same loading/polling state as an explicit trigger.
- */
+
 
 "use client";
 
@@ -16,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { TournamentPrediction, SimStatus } from "@/types/predict";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
 
 const POLL_INTERVAL_MS = 2_000;
 
@@ -36,6 +27,7 @@ export function usePredictStream(): UsePredictStreamReturn {
 
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const mountRef = useRef(true);
+
     const fetchStatusRef = useRef<() => Promise<void>>(async () => { });
 
     const stopPolling = useCallback(() => {
@@ -50,10 +42,12 @@ export function usePredictStream(): UsePredictStreamReturn {
         pollRef.current = setInterval(() => { fetchStatusRef.current(); }, POLL_INTERVAL_MS);
     }, []);
 
+
     const fetchPrediction = useCallback(async () => {
         try {
             const res = await fetch(`${API}/predict/tournament`);
             if (res.status === 202) {
+
                 if (mountRef.current) setIsLoading(true);
                 startPolling();
                 return;
@@ -68,6 +62,7 @@ export function usePredictStream(): UsePredictStreamReturn {
             if (mountRef.current) setError(String(err));
         }
     }, [startPolling]);
+
 
     const fetchStatus = useCallback(async () => {
         try {
@@ -95,6 +90,7 @@ export function usePredictStream(): UsePredictStreamReturn {
         fetchStatusRef.current = fetchStatus;
     }, [fetchStatus]);
 
+
     const triggerSim = useCallback(async (nSims = 50_000) => {
         setIsLoading(true);
         setError(null);
@@ -103,7 +99,7 @@ export function usePredictStream(): UsePredictStreamReturn {
                 method: "POST",
             });
             if (res.status === 409) {
-
+                // Already running — just start polling
                 startPolling();
                 return;
             }
@@ -115,15 +111,23 @@ export function usePredictStream(): UsePredictStreamReturn {
         }
     }, [startPolling]);
 
+
     useEffect(() => {
         mountRef.current = true;
 
         fetchPrediction();
         fetchStatus();
 
+        const es = new EventSource(`${API}/predict/stream`);
+        es.addEventListener("prediction_update", () => {
+            if (mountRef.current) fetchPrediction();
+        });
+        es.onerror = () => { };
+
         return () => {
             mountRef.current = false;
             stopPolling();
+            es.close();
         };
     }, [fetchPrediction, fetchStatus, stopPolling]);
 

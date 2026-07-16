@@ -1,13 +1,13 @@
 "use client"
-
-/**
- * Lineup pitch visualization.
- *
- * The component renders a horizontal pitch with the home team on the left
- * and the away team on the right. Live lineups can include player photos,
- * but the visual always degrades to number-only markers when photo data is
- * missing or fails to load so the pitch remains readable.
- */
+// components/match/LineupCard.tsx
+// Horizontal pitch layout — home left / away right, like Image 2.
+//
+// New: player headshots. The backend now supplies a `photo` URL per player
+// (API-Sports media, live lineups only — the "estimated" fallback has no
+// real player identities to attach an image to). Each dot tries to render
+// the photo clipped into the circle; on load failure it falls back to the
+// original solid-circle + number rendering automatically (per-player, not
+// per-team) since the circle is always drawn underneath the image.
 
 import { useEffect, useState } from "react"
 import { Flag } from "@/components/Flag"
@@ -18,6 +18,7 @@ interface Player { number: number; name: string; position: string; grid?: string
 interface TeamLineup { team: string; formation: string; startingXI: Player[]; coach?: string }
 interface LineupData { home: TeamLineup; away: TeamLineup; source: "zafronix" | "api-sports" | "statsbomb_proxy" | "estimated" }
 
+// (H_POS, ROLES tables unchanged from the original)
 const H_POS: Record<string, [number, number][]> = {
     "4-3-3": [
         [5, 50],
@@ -109,7 +110,10 @@ function PlayerDot({ x, y, num, trimmed, player, fill, stroke, numColor, idKey }
 
     return (
         <g>
+
             <circle cx={x} cy={y} r={R + 1} fill="rgba(0,0,0,0.25)" />
+            {/* Base circle — always present, doubles as the fallback when the
+                photo fails to load or isn't available */}
             <circle cx={x} cy={y} r={R} fill={fill} stroke={stroke} strokeWidth={1} />
 
             {hasPhoto && (
@@ -117,49 +121,44 @@ function PlayerDot({ x, y, num, trimmed, player, fill, stroke, numColor, idKey }
                     <clipPath id={clipId}>
                         <circle cx={x} cy={y} r={R - 0.4} />
                     </clipPath>
-                    <g transform={`rotate(-90 ${x} ${y})`}>
-                        <image
-                            href={player!.photo!}
-                            x={x - R} y={y - R}
-                            width={R * 2} height={R * 2}
-                            clipPath={`url(#${clipId})`}
-                            preserveAspectRatio="xMidYMid slice"
-                            onError={() => setImgFailed(true)}
-                        />
-                    </g>
+                    <image
+                        href={player!.photo!}
+                        x={x - R} y={y - R}
+                        width={R * 2} height={R * 2}
+                        clipPath={`url(#${clipId})`}
+                        preserveAspectRatio="xMidYMid slice"
+                        onError={() => setImgFailed(true)}
+                    />
                 </>
             )}
 
+            {/* Number: centered when there's no photo, small corner badge
+                when a photo is showing (so the face stays visible). */}
             {hasPhoto ? (
                 <>
                     <circle cx={x + R - 1.4} cy={y + R - 1.4} r={2.1} fill={fill} stroke={stroke} strokeWidth={0.5} />
-                    <g transform={`rotate(-90 ${x + R - 1.4} ${y + R - 1.3})`}>
-                        <text x={x + R - 1.4} y={y + R - 1.3}
-                            textAnchor="middle" dominantBaseline="middle"
-                            fontSize={1.9} fontWeight="bold" fill={numColor} fontFamily="monospace">
-                            {num}
-                        </text>
-                    </g>
-                </>
-            ) : (
-                <g transform={`rotate(-90 ${x} ${y + 0.5})`}>
-                    <text x={x} y={y + 0.5}
+                    <text x={x + R - 1.4} y={y + R - 1.3}
                         textAnchor="middle" dominantBaseline="middle"
-                        fontSize={NFS} fontWeight="bold" fill={numColor} fontFamily="monospace">
+                        fontSize={1.9} fontWeight="bold" fill={numColor} fontFamily="monospace">
                         {num}
                     </text>
-                </g>
+                </>
+            ) : (
+                <text x={x} y={y + 0.5}
+                    textAnchor="middle" dominantBaseline="middle"
+                    fontSize={NFS} fontWeight="bold" fill={numColor} fontFamily="monospace">
+                    {num}
+                </text>
             )}
 
+
             {trimmed && (
-                <g transform={`rotate(-90 ${x} ${y + R + 3.5})`}>
-                    <text x={x} y={y + R + 3.5}
-                        textAnchor="middle" dominantBaseline="hanging"
-                        fontSize={LFS} fill="rgba(255,255,255,0.9)"
-                        fontFamily="Arial, sans-serif">
-                        {trimmed}
-                    </text>
-                </g>
+                <text x={x} y={y + R + 3.5}
+                    textAnchor="middle" dominantBaseline="hanging"
+                    fontSize={LFS} fill="rgba(255,255,255,0.9)"
+                    fontFamily="Arial, sans-serif">
+                    {trimmed}
+                </text>
             )}
         </g>
     )
@@ -236,12 +235,14 @@ export function LineupCard({ fixtureId, homeTeam, awayTeam }: Props) {
 
     return (
         <div>
+
             <div style={{
                 display: "grid", gridTemplateColumns: "1fr auto 1fr",
                 alignItems: "center", padding: "10px 14px 8px",
                 borderBottom: "1px solid var(--border)", gap: 6,
                 background: "var(--bg-3)",
             }}>
+
                 <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                     <Flag team={homeTeam} size="sm" />
                     <span style={{
@@ -258,6 +259,7 @@ export function LineupCard({ fixtureId, homeTeam, awayTeam }: Props) {
                         {home.formation}
                     </span>
                 </div>
+
 
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                     <span style={{
@@ -296,6 +298,7 @@ export function LineupCard({ fixtureId, homeTeam, awayTeam }: Props) {
                     )}
                 </div>
 
+
                 <div style={{ display: "flex", alignItems: "center", gap: 7, justifyContent: "flex-end" }}>
                     <span style={{
                         fontFamily: "var(--font-mono)", fontSize: ".68rem",
@@ -314,56 +317,60 @@ export function LineupCard({ fixtureId, homeTeam, awayTeam }: Props) {
                 </div>
             </div>
 
+            {/* Pitch — natural landscape orientation (home left, away
+                right). Previously rotated 90° to fit a narrow column; now
+                that this card gets a full-width tab pane, the horizontal
+                layout has plenty of room and reads more like a real
+                match-engine formation view. */}
             <div style={{
                 background: "#1a5c30",
                 position: "relative",
                 overflow: "hidden",
-                aspectRatio: `${VH} / ${VW}`,
+                aspectRatio: `${VW} / ${VH}`,
                 width: "100%",
-                maxWidth: 420,
+                maxWidth: 900,
                 margin: "0 auto",
             }}>
-                <div style={{
-                    position: "absolute",
-                    top: "50%", left: "50%",
-                    width: `${(VW / VH) * 100}%`,
-                    transform: "translate(-50%, -50%) rotate(90deg)",
-                    transformOrigin: "center center",
-                }}>
-                    <svg
-                        viewBox={`0 0 ${VW} ${VH}`}
-                        style={{ display: "block", width: "100%", height: "auto" }}
-                        xmlns="http://www.w3.org/2000/svg"
-                    >
-                        <rect x="1" y="1" width={VW - 2} height={VH - 2}
-                            fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="0.6" />
-                        <line x1={VW / 2} y1="1" x2={VW / 2} y2={VH - 1}
-                            stroke="rgba(255,255,255,0.2)" strokeWidth="0.7" />
-                        <circle cx={VW / 2} cy={VH / 2} r="11"
-                            fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="0.6" />
-                        <circle cx={VW / 2} cy={VH / 2} r="0.8" fill="rgba(255,255,255,0.3)" />
-                        <rect x="1" y="28" width="18" height="44"
-                            fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
-                        <rect x="1" y="36" width="7" height="28"
-                            fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="0.4" />
-                        <rect x={VW - 19} y="28" width="18" height="44"
-                            fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
-                        <rect x={VW - 8} y="36" width="7" height="28"
-                            fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="0.4" />
-                        {[0, 1, 2, 3].map(i => (
-                            <rect key={i} x={i * 50} y="0" width="50" height={VH}
-                                fill={i % 2 === 0 ? "rgba(0,0,0,0.06)" : "transparent"} />
-                        ))}
+                <svg
+                    viewBox={`0 0 ${VW} ${VH}`}
+                    style={{ display: "block", width: "100%", height: "100%" }}
+                    xmlns="http://www.w3.org/2000/svg"
+                >
 
-                        <Dots lineup={home} isHome={true}
-                            fill="#ffffff" stroke="rgba(0,0,0,0.25)"
-                            numColor="#111" lbl={homeAbbr} />
-                        <Dots lineup={away} isHome={false}
-                            fill="#1a1a2e" stroke="rgba(255,255,255,0.4)"
-                            numColor="#fff" lbl={awayAbbr} />
-                    </svg>
-                </div>
+                    <rect x="1" y="1" width={VW - 2} height={VH - 2}
+                        fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="0.6" />
+
+                    <line x1={VW / 2} y1="1" x2={VW / 2} y2={VH - 1}
+                        stroke="rgba(255,255,255,0.2)" strokeWidth="0.7" />
+
+                    <circle cx={VW / 2} cy={VH / 2} r="11"
+                        fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="0.6" />
+                    <circle cx={VW / 2} cy={VH / 2} r="0.8" fill="rgba(255,255,255,0.3)" />
+
+                    <rect x="1" y="28" width="18" height="44"
+                        fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
+                    <rect x="1" y="36" width="7" height="28"
+                        fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="0.4" />
+
+                    <rect x={VW - 19} y="28" width="18" height="44"
+                        fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
+                    <rect x={VW - 8} y="36" width="7" height="28"
+                        fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="0.4" />
+
+                    {[0, 1, 2, 3].map(i => (
+                        <rect key={i} x={i * 50} y="0" width="50" height={VH}
+                            fill={i % 2 === 0 ? "rgba(0,0,0,0.06)" : "transparent"} />
+                    ))}
+
+                    <Dots lineup={home} isHome={true}
+                        fill="#ffffff" stroke="rgba(0,0,0,0.25)"
+                        numColor="#111" lbl={homeAbbr} />
+                    <Dots lineup={away} isHome={false}
+                        fill="#1a1a2e" stroke="rgba(255,255,255,0.4)"
+                        numColor="#fff" lbl={awayAbbr} />
+                </svg>
             </div>
+
 
             <div style={{
                 padding: "6px 14px", borderTop: "1px solid var(--border)",
@@ -379,6 +386,7 @@ export function LineupCard({ fixtureId, homeTeam, awayTeam }: Props) {
                             ? `Historical proxy lineup (StatsBomb) — not this match's confirmed XI · ${home.startingXI.length + away.startingXI.length} players${photoCount ? ` · ${photoCount} photos` : ""}`
                             : "Lineups not confirmed · formation estimated"}
             </div>
+
 
             {(home.coach || away.coach) && (
                 <div style={{

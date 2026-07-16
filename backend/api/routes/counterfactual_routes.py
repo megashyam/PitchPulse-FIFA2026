@@ -1,16 +1,3 @@
-"""Counterfactual, prediction, and live-probability routes.
-
-GET /matches/{id}/counterfactual              latest counterfactual result
-GET /matches/{id}/counterfactual/feed         counterfactual history
-GET /matches/{id}/counterfactual/stream       SSE stream for live updates
-GET/POST /matches/{id}/counterfactual/trigger force a refresh when needed
-GET /matches/{id}/prediction                  per-match W/D/L and path data
-GET /matches/{id}/live-prob                   in-play W/D/L from ml/in_play.py
-
-The live-prob endpoint keeps the frontend on one model-backed source of truth
-for in-play win probability.
-"""
-
 import asyncio
 import json
 import logging
@@ -21,7 +8,6 @@ from sse_starlette.sse import EventSourceResponse
 
 from agents import counterfactual_agent
 from api.routes._security import require_trigger_token
-from api.routes._sse import pubsub_sse
 from api.schemas.event_types import COMPLETED_STATUSES
 from api.schemas.schema import MatchState
 from ml.in_play import inplay_wdl
@@ -46,18 +32,18 @@ def _ci(p: float, n: int = 500):
     return round(max(0.0, p - margin), 4), round(min(1.0, p + margin), 4)
 
 
-async def _pre_match_wdl(state: MatchState, betfair_odds):
-    priors = build_prior_table(betfair_odds)
+async def _pre_match_wdl(state: MatchState, odds_table):
+    priors = build_prior_table(odds_table)
     key = (state.home_name, state.away_name)
     rev_key = (state.away_name, state.home_name)
 
     if key in priors:
         p_win, p_draw, p_loss = priors[key]
-        source = "betfair" if betfair_odds.get(key) else "elo"
+        source = "market_odds" if odds_table.get(key) else "elo"
     elif rev_key in priors:
         p_l, p_d, p_w = priors[rev_key]
         p_win, p_draw, p_loss = p_w, p_d, p_l
-        source = "betfair" if betfair_odds.get(rev_key) else "elo"
+        source = "market_odds" if odds_table.get(rev_key) else "elo"
     else:
         h = TEAM_BY_NAME.get(state.home_name)
         a = TEAM_BY_NAME.get(state.away_name)
@@ -80,9 +66,9 @@ async def get_match_prediction(fixture_id: str, request: Request):
 
     state = MatchState.model_validate_json(state_raw)
 
-    betfair = get_oddsapi_client()
-    betfair_odds = await betfair.get_all_odds()
-    p_win, p_draw, p_loss, source = await _pre_match_wdl(state, betfair_odds)
+    odds_client = get_oddsapi_client()
+    odds_table = await odds_client.get_all_odds()
+    p_win, p_draw, p_loss, source = await _pre_match_wdl(state, odds_table)
 
     tournament_raw = await r.get("predict:tournament:latest")
     home_tournament = away_tournament = None
@@ -137,9 +123,9 @@ async def get_live_prob(fixture_id: str, request: Request):
 
     state = MatchState.model_validate_json(state_raw)
 
-    betfair = get_oddsapi_client()
-    betfair_odds = await betfair.get_all_odds()
-    p_win, p_draw, p_loss, source = await _pre_match_wdl(state, betfair_odds)
+    odds_client = get_oddsapi_client()
+    odds_table = await odds_client.get_all_odds()
+    p_win, p_draw, p_loss, source = await _pre_match_wdl(state, odds_table)
 
     red_h = sum(
         1
@@ -173,19 +159,32 @@ async def get_live_prob(fixture_id: str, request: Request):
     }
 
 
+async def _pending_response(r, fixture_id: str) -> dict:
+
+    state_raw = await r.get(f"match:{fixture_id}:state")
+    match_status = None
+    if state_raw:
+        try:
+            state = MatchState.model_validate_json(state_raw)
+            match_status = state.status_short
+        except Exception:
+            pass
+    return {
+        "fixture_id": int(fixture_id),
+        "status": "pending",
+        "match_status": match_status,
+        "entries": [],
+        "message": "No counterfactual data yet — appears after a goal or red card.",
+    }
+
+
 @router.get("/{fixture_id}/counterfactual")
 async def get_counterfactual(fixture_id: str, request: Request):
     """Latest counterfactual result for this fixture."""
     r = request.app.state.redis
     raw = await r.get(f"match:{fixture_id}:counterfactual:latest")
     if not raw:
-        raise HTTPException(
-            404,
-            detail=(
-                f"No counterfactual data for fixture {fixture_id}. "
-                "Counterfactual analysis runs when a goal or red card is detected."
-            ),
-        )
+        return await _pending_response(r, fixture_id)
     return json.loads(raw)
 
 
@@ -196,25 +195,66 @@ async def get_counterfactual_feed(fixture_id: str, request: Request):
     r = request.app.state.redis
     feed_raw = await r.lrange(f"match:{fixture_id}:counterfactual:feed", 0, FEED_MAX)
     if not feed_raw:
-        raise HTTPException(404, "No counterfactual history yet")
+        return await _pending_response(r, fixture_id)
     return {"fixture_id": int(fixture_id), "entries": [json.loads(e) for e in feed_raw]}
 
 
 @router.get("/{fixture_id}/counterfactual/stream")
 async def counterfactual_stream(fixture_id: str, request: Request):
-    """Pub/sub-backed SSE stream for the counterfactual feed."""
+
     r = request.app.state.redis
 
     async def generator():
-        async for event in pubsub_sse(
-            redis_client=r,
-            channel="counterfactual_update",
-            key=f"match:{fixture_id}:counterfactual:latest",
-            event_name="counterfactual_update",
-            is_disconnected=request.is_disconnected,
-            match_fixture_id=fixture_id,
-        ):
-            yield event
+        pubsub = r.pubsub()
+        await pubsub.subscribe("counterfactual_update")
+        last_raw: str | None = None
+        try:
+            raw = await r.get(f"match:{fixture_id}:counterfactual:latest")
+            if raw is not None:
+                last_raw = raw
+                yield {"event": "counterfactual_update", "data": raw}
+            else:
+                yield {
+                    "event": "waiting",
+                    "data": json.dumps({"message": "waiting for counterfactual data"}),
+                }
+
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    msg = await pubsub.get_message(
+                        ignore_subscribe_messages=True, timeout=10.0
+                    )
+                except Exception:
+                    msg = None
+
+                if msg is None:
+                    continue
+
+                try:
+                    payload = json.loads(msg["data"])
+                except Exception:
+                    continue
+
+                if str(payload.get("fixture_id")) != str(fixture_id):
+                    continue
+
+                if payload.get("status") == "calculating":
+
+                    yield {
+                        "event": "counterfactual_calculating",
+                        "data": json.dumps(payload),
+                    }
+                    continue
+
+                raw = await r.get(f"match:{fixture_id}:counterfactual:latest")
+                if raw is not None and raw != last_raw:
+                    last_raw = raw
+                    yield {"event": "counterfactual_update", "data": raw}
+        finally:
+            await pubsub.unsubscribe("counterfactual_update")
+            await pubsub.aclose()
 
     return EventSourceResponse(generator(), ping=15)
 
@@ -234,8 +274,22 @@ async def trigger_counterfactual(fixture_id: str, request: Request):
 
     state = MatchState.model_validate_json(state_raw)
 
+    async def _on_calc_start(info: dict) -> None:
+        await r.publish(
+            "counterfactual_update",
+            json.dumps(
+                {
+                    "fixture_id": state.fixture_id,
+                    "status": "calculating",
+                    "minute": info["minute"],
+                    "event_type": info["event_type"],
+                    "event_team": info["event_team"],
+                }
+            ),
+        )
+
     loop = asyncio.get_running_loop()
-    result = await counterfactual_agent.update(state, loop)
+    result = await counterfactual_agent.update(state, loop, on_start=_on_calc_start)
 
     if result is None:
         events_with_types = [(ev.elapsed, ev.type) for ev in state.events[-5:]]

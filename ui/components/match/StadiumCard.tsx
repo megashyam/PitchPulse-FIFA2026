@@ -1,12 +1,6 @@
 "use client"
 
-/**
- * Stadium information card.
- *
- * Venue metadata is resolved from a static tournament map, while the weather
- * snippet is fetched lazily from Open-Meteo so the page can show local match
- * conditions without introducing another backend dependency.
- */
+
 
 import { useEffect, useState } from "react"
 

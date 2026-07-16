@@ -1,13 +1,5 @@
 "use client"
 
-/**
- * Recent-form card for both teams.
- *
- * The component shows the last few results side by side so the user can read
- * short-term momentum without leaving the match view. It intentionally keeps
- * the data dense and local to the fixture rather than expanding into a full
- * historical form table.
- */
 
 import { useEffect, useState } from "react"
 import { Flag } from "@/components/Flag"

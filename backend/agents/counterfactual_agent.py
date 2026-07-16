@@ -49,12 +49,14 @@ from ml.odds_api_client import get_oddsapi_client
 from ml.prior_builder import oddsapi_to_wdl, elo_to_wdl
 from ml.team_names import SIM_NAMES, to_sim
 from ml.tournament_sim import run_simulation
-from ml.wc_2026_config import WC2026_TEAMS
+from ml.wc_2026_config import TEAM_BY_NAME, WC2026_TEAMS
 
 log = logging.getLogger(__name__)
 
 DELTA_THRESHOLD = 0.003
 CF_SIMS = int(os.getenv("CF_SIMS", "20000"))
+CF_NARRATIVE_MAX_TOKENS = 130
+CF_NARRATIVE_NUM_CTX = 1280
 
 _ELO: Dict[str, float] = {t.name: t.elo for t in WC2026_TEAMS}
 
@@ -71,10 +73,10 @@ _states: Dict[int, CfState] = {}
 
 def _sig(ev: MatchEvent) -> str:
 
-    return f"{ev.elapsed}:{ev.type}:{ev.team_id}"
+    return f"{ev.elapsed}:{ev.extra or 0}:{ev.type}:{ev.team_id}"
 
 
-def event_sig(elapsed: int, ev_type: str, team_id: int) -> str:
+def event_sig(elapsed: int, extra: Optional[int], ev_type: str, team_id: int) -> str:
     """
     Create a deterministic event identifier used for deduplication.
 
@@ -89,7 +91,7 @@ def event_sig(elapsed: int, ev_type: str, team_id: int) -> str:
     Returns:
         Stable event signature string.
     """
-    return f"{elapsed}:{ev_type}:{team_id}"
+    return f"{elapsed}:{extra or 0}:{ev_type}:{team_id}"
 
 
 def seed_covered(fixture_id: int, sigs: Set[str]) -> None:
@@ -164,7 +166,7 @@ def _find_all_triggers(state: MatchState, cf: CfState) -> List[MatchEvent]:
     return out
 
 
-def _pre_match_wdl(home: str, away: str, betfair_odds) -> Tuple[float, float, float]:
+def _pre_match_wdl(home: str, away: str, odds_table) -> Tuple[float, float, float]:
     """
     Estimate baseline match win probabilities.
 
@@ -174,11 +176,11 @@ def _pre_match_wdl(home: str, away: str, betfair_odds) -> Tuple[float, float, fl
     Returns:
         Tuple containing home win, draw, and away win probabilities.
     """
-    if betfair_odds:
-        if (home, away) in betfair_odds:
-            return oddsapi_to_wdl(*betfair_odds[(home, away)])
-        if (away, home) in betfair_odds:
-            r = oddsapi_to_wdl(*betfair_odds[(away, home)])
+    if odds_table:
+        if (home, away) in odds_table:
+            return oddsapi_to_wdl(*odds_table[(home, away)])
+        if (away, home) in odds_table:
+            r = oddsapi_to_wdl(*odds_table[(away, home)])
             return (r[2], r[1], r[0])
     eh, ea = _ELO.get(home), _ELO.get(away)
     if eh is None or ea is None:
@@ -263,12 +265,29 @@ def _divergence(
     return changes, path_shift
 
 
+# ── Narrative ──────────────────────────────────────────────────────────────
+
+
+def _team_stage_line(after_teams, sim_name: str) -> Optional[str]:
+    """One team's multi-stage odds (not just champion) — gives the model
+    something to reason about besides a flat leaderboard of percentages."""
+    for t in after_teams:
+        if t.name == sim_name:
+            p = t.probs
+            return (
+                f"{t.name}: {p.get('champion', 0):.1%} champion, "
+                f"{p.get('final', 0):.1%} to reach the final, "
+                f"{p.get('sf', 0):.1%} to reach the semifinal"
+            )
+    return None
+
+
 def _build_prompt(state, trigger, changes, path_shift, after_teams, swing) -> str:
     ev_desc = trigger.type.replace("_", " ")
-    score = f"{state.home_score}\u2013{state.away_score}"
+    score = f"{state.home_score}–{state.away_score}"
     swing_line = (
         f"In-play win probability for {trigger.team_name} moved "
-        f"{swing[0]:.0%} \u2192 {swing[1]:.0%} on this event.\n"
+        f"{swing[0]:.0%} → {swing[1]:.0%} on this event.\n"
         if swing
         else ""
     )
@@ -280,48 +299,101 @@ def _build_prompt(state, trigger, changes, path_shift, after_teams, swing) -> st
     )
     if changes:
         lines = "\n".join(
-            f"  {name}: {pb:.1%} \u2192 {pa:.1%}  ({'+' if d > 0 else ''}{d:.1%})"
-            for name, pb, pa, d in changes[:3]
+            f"  {name}: {pb:.1%} → {pa:.1%}  ({'+' if d > 0 else ''}{d:.1%})"
+            for name, pb, pa, d in changes[:4]
         )
         bracket_context = (
             f"CHAMPION PROBABILITY SHIFTS "
             f"(two {CF_SIMS:,}-sim brackets, common random numbers):\n{lines}\n\n"
             f"Champion-probability mass relocated: {path_shift:.1%}."
         )
+        task = (
+            f"Explain how this event reshapes the tournament outlook. Lead with "
+            f"the size of the shift and which team it favours or costs most — "
+            f"don't open by restating the scoreline or event type, the reader "
+            f"already knows those. Weave in a second team from the shifts list "
+            f"so the ripple is visible, not just the headline mover, and land on "
+            f"one non-obvious consequence: a team whose odds moved despite not "
+            f"playing, or a favourite quietly benefiting from the result. Write "
+            f"ONE tight paragraph, no more than 80 words — every clause should "
+            f"add new information."
+        )
     else:
+        home_line = _team_stage_line(after_teams, to_sim(state.home_name))
+        away_line = _team_stage_line(after_teams, to_sim(state.away_name))
+        team_lines = "\n".join(l for l in (home_line, away_line) if l)
         top_now = sorted(after_teams, key=lambda t: t.probs["champion"], reverse=True)[
             :3
         ]
-        lines = "\n".join(
-            f"  {t.name}: {t.probs['champion']:.1%} champion probability"
-            for t in top_now
-        )
+        leaderboard = ", ".join(f"{t.name} {t.probs['champion']:.1%}" for t in top_now)
         bracket_context = (
-            f"CURRENT CHAMPION PROBABILITIES ({CF_SIMS:,} simulated tournaments):\n"
-            f"{lines}\n\nThis event did not move the bracket."
+            f"TOURNAMENT STATE — this event produced IDENTICAL odds to omitting "
+            f"it entirely, because the simulator only conditions on scoreline and "
+            f"dismissals, not on cautions or substitutions:\n"
+            f"{team_lines}\n\n"
+            f"Current championship-odds leaderboard: {leaderboard}."
+        )
+        task = (
+            f"Explain why the simulator treated this {ev_desc} as inconsequential "
+            f"— ground it in how the model actually works (it conditions on "
+            f"scoreline and dismissals, not on cautions or substitutions), not "
+            f"just 'nothing changed'. Use the multi-stage odds above (final, "
+            f"semifinal, champion — not just one number) to say something real "
+            f"about where {trigger.team_name} and their opponent actually stand "
+            f"in the tournament right now. Do not end by simply noting that a "
+            f"goal or red card would matter — that's obvious; instead close on "
+            f"what's specifically at stake for these two teams. Write ONE tight "
+            f"paragraph, no more than 60 words."
         )
 
     return (
         f"[INST] You are the lead tournament analyst for a live World Cup 2026 "
         f"intelligence desk. Your job is to explain, vividly and specifically, "
-        f"how one match event reshapes the ENTIRE tournament bracket — the kind "
-        f"of insight a smart fan couldn't get just from watching the game.\n\n"
+        f"how one match event reshapes (or fails to reshape) the ENTIRE "
+        f"tournament bracket — the kind of insight a smart fan couldn't get "
+        f"just from watching the game.\n\n"
         f"MATCH: {state.home_name} {score} {state.away_name} "
-        f"\u00b7 Minute {trigger.elapsed}' \u00b7 {state.status_short}\n"
-        f"EVENT: {trigger.team_name} \u2014 {ev_desc}\n"
+        f"· Minute {trigger.elapsed}' · {state.status_short}\n"
+        f"EVENT: {trigger.team_name} — {ev_desc}\n"
         f"{swing_line}{proxy_note}\n"
         f"{bracket_context}\n\n"
-        f"Write 3-4 sentences that capture the absolute shockwave of this event:\n"
-        f"1. The Earthquake: Open with the single most striking percentage shift from the numbers above. Frame it as an immediate consequence.\n"
-        f"2. The Fallout: Name exactly which teams saw their title equity shattered or skyrocketed. Connect this to their new path through the bracket (who they dodge, who they now face).\n"
-        f"3. Add one sharp, non-obvious consequence: a rival whose odds moved "
-        f"even though they weren't playing, a group-stage knock-on, or a "
-        f"favourite quietly benefiting.\n\n"
-        f"Be concrete and confident. Use the actual percentages. Avoid the words "
-        f"'significant', 'crucial', 'notable', 'pivotal'. Do not hedge with "
-        f"'could' or 'might' more than once. Sound like someone who finds this "
-        f"genuinely fascinating. [/INST]"
+        f"{task}\n\n"
+        f"Use the actual percentages given. Avoid the words 'significant', "
+        f"'crucial', 'notable', 'pivotal'. Only name teams that appear above — "
+        f"do not invent a rival, precedent match, or scoreline not given here. "
+        f"[/INST]"
     )
+
+
+def _allowed_teams(state, changes, after_teams) -> set:
+    """Closed set of team names the narrative is allowed to mention: the two
+    sides actually playing, every team in the computed bracket shift
+    (changes), and the top handful of the post-event championship
+    leaderboard. Deliberately NOT the full after_teams population (all 48
+    WC2026 teams) — that made this check a no-op, since every real team name
+    is a simulated team by definition. Anything outside this narrower set is
+    a team the model never actually saw a number for, i.e. a fabricated
+    rival/precedent — mirrors match_intel_agent._allowed_teams()."""
+    allowed = {state.home_name, state.away_name}
+    allowed.update(name for name, *_ in changes)
+    top = sorted(after_teams, key=lambda t: t.probs["champion"], reverse=True)[:8]
+    allowed.update(t.name for t in top)
+    return allowed
+
+
+def _grounding_violation(narrative: str, state, changes, after_teams) -> bool:
+    """True if the narrative name-drops a real WC2026 team that isn't one of
+    the two teams playing or a team the simulation actually computed a shift
+    for — i.e. the model invented a rival or precedent. Prompt instructions
+    alone don't reliably stop this (see match_intel_agent._grounding_violation),
+    so this is a deterministic backstop, not a prompt tweak."""
+    allowed = _allowed_teams(state, changes, after_teams)
+    for name in TEAM_BY_NAME:
+        if name in allowed:
+            continue
+        if name in narrative:
+            return True
+    return False
 
 
 def _ordinal_pct(x: float) -> str:
@@ -335,9 +407,8 @@ def _template(state, trigger, changes, path_shift, after_teams, swing) -> str:
     produced the bland/empty-looking narratives when Ollama+Groq were both
     unavailable.)"""
     ev_desc = trigger.type.replace("_", " ")
-    score = f"{state.home_score}\u2013{state.away_score}"
+    score = f"{state.home_score}–{state.away_score}"
 
-    # Swing line (this team's in-match win prob before/after the event).
     swing_txt = ""
     if swing and abs(swing[1] - swing[0]) > 0.005:
         swing_txt = (
@@ -346,7 +417,6 @@ def _template(state, trigger, changes, path_shift, after_teams, swing) -> str:
         )
 
     if changes:
-        # Biggest riser and biggest faller across the whole bracket.
         risers = [c for c in changes if c[3] > 0]
         fallers = [c for c in changes if c[3] < 0]
         top = changes[0]
@@ -386,7 +456,6 @@ def _template(state, trigger, changes, path_shift, after_teams, swing) -> str:
             f"result — it reweighted the whole draw.{swing_txt}"
         )
 
-    # No material bracket change.
     top = sorted(after_teams, key=lambda t: t.probs["champion"], reverse=True)[:2]
     leaders = (
         ", ".join(f"{t.name} ({_ordinal_pct(t.probs['champion'])})" for t in top)
@@ -394,10 +463,16 @@ def _template(state, trigger, changes, path_shift, after_teams, swing) -> str:
         else "the field"
     )
     return (
-        f"{trigger.team_name}'s {ev_desc} at {trigger.elapsed}' barely moved the "
-        f"title picture — under {max(0.1, path_shift * 100):.1f}% of championship "
-        f"probability shifted. The favourites are unchanged at the top: {leaders}."
-        f"{swing_txt}"
+        f"{trigger.team_name}'s {ev_desc} at {trigger.elapsed}' in "
+        f"{state.home_name} {score} {state.away_name} didn't touch the "
+        f"championship math — under {max(0.1, path_shift * 100):.1f}% of title "
+        f"probability shifted, which the model treats as noise rather than "
+        f"signal. That's because the two conditioned brackets only diverge on "
+        f"scoreline and red cards, and this event changed neither.{swing_txt} "
+        f"The favourites sit exactly where they did before kickoff on this "
+        f"storyline: {leaders}. It would take a goal, an equaliser, or a "
+        f"sending-off — not a caution or a fresh legs substitution — to move "
+        f"any of those numbers again."
     )
 
 
@@ -458,11 +533,7 @@ async def update_all(
     """
     Backfill all uncovered counterfactual events for a match.
 
-    Unlike the live update path, this processes historical events in bulk,
-    allowing completed matches to display their full causal event history.
 
-    Events are processed chronologically with a configurable cap to avoid
-    monopolizing simulation resources.
     """
     fid = state.fixture_id
     cf = _states.setdefault(fid, CfState())
@@ -514,14 +585,14 @@ async def _analyze_trigger(
         except Exception:
             log.warning(f"[{fid}] on_start callback failed", exc_info=True)
 
-    betfair = get_oddsapi_client()
-    betfair_odds = await betfair.get_all_odds()
+    odds_client = get_oddsapi_client()
+    odds_table = await odds_client.get_all_odds()
 
     cf.covered.add(_sig(trigger))
 
     home_c, away_c = to_sim(state.home_name), to_sim(state.away_name)
     conditioned = home_c in SIM_NAMES or away_c in SIM_NAMES
-    pre_wdl = _pre_match_wdl(home_c, away_c, betfair_odds)
+    pre_wdl = _pre_match_wdl(home_c, away_c, odds_table)
 
     red_h, red_a = _red_counts(state)
     hb, ab, rhb, rab = _pre_event_state(state, trigger, red_h, red_a)
@@ -553,7 +624,7 @@ async def _analyze_trigger(
             after_result = await loop.run_in_executor(
                 CF_SIM_EXECUTOR,
                 lambda: run_simulation(
-                    betfair_odds=betfair_odds,
+                    odds_table=odds_table,
                     n_sims=CF_SIMS,
                     seed=seed,
                     elo_overrides=after_ovr,
@@ -565,7 +636,7 @@ async def _analyze_trigger(
                 loop.run_in_executor(
                     CF_SIM_EXECUTOR,
                     lambda: run_simulation(
-                        betfair_odds=betfair_odds,
+                        odds_table=odds_table,
                         n_sims=CF_SIMS,
                         seed=seed,
                         elo_overrides=after_ovr,
@@ -574,7 +645,7 @@ async def _analyze_trigger(
                 loop.run_in_executor(
                     CF_SIM_EXECUTOR,
                     lambda: run_simulation(
-                        betfair_odds=betfair_odds,
+                        odds_table=odds_table,
                         n_sims=CF_SIMS,
                         seed=seed,
                         elo_overrides=before_ovr,
@@ -596,7 +667,17 @@ async def _analyze_trigger(
         after_result.teams,
         None if negligible else swing,
     )
-    narrative = await generate(prompt, timeout=20.0)
+    narrative = await generate(
+        prompt,
+        timeout=35.0,
+        max_tokens=CF_NARRATIVE_MAX_TOKENS,
+        num_ctx=CF_NARRATIVE_NUM_CTX,
+    )
+    if narrative and _grounding_violation(
+        narrative, state, changes, after_result.teams
+    ):
+        log.warning(f"[{fid}] CF narrative failed grounding check — discarding")
+        narrative = ""
     if not narrative:
         narrative = _template(
             state, trigger, changes, path_shift, after_result.teams, swing
@@ -611,6 +692,7 @@ async def _analyze_trigger(
     return {
         "fixture_id": fid,
         "minute": trigger.elapsed,
+        "extra": trigger.extra,
         "event_type": trigger.type,
         "event_team": trigger.team_name,
         "event_team_id": trigger.team_id,

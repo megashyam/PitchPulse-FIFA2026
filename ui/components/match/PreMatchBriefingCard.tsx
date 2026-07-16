@@ -1,15 +1,15 @@
 "use client"
-
-/**
- * Pre-match and live briefing card.
- *
- * The card polls the backend trigger endpoint on a fixed cadence because
- * briefings are only regenerated when the match status changes. That keeps
- * the frontend simple while still surfacing kickoff, halftime, and full-time
- * briefings automatically.
- */
+// components/match/PreMatchBriefingCard.tsx
+// v2 — polls /briefing/trigger periodically (every 60s) instead of
+// firing once on mount. Since the backend only actually generates a
+// NEW briefing when match status has changed (see briefing_routes.py
+// v3), this is safe to poll continuously — it's a no-op most of the
+// time and naturally produces a fresh entry at kickoff, half-time,
+// and full-time without needing a separate backend worker loop.
+// Renders the full feed (newest first) instead of a single static block.
 
 import { useEffect, useState, useRef } from "react"
+import { triggerHeaders } from "@/lib/api"
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 const POLL_MS = 60_000
@@ -45,7 +45,7 @@ export function PreMatchBriefingCard({ fixtureId }: Props) {
     const triggerAndRefresh = async () => {
         setTriggering(true)
         try {
-            await fetch(`${API}/matches/${fixtureId}/briefing/trigger`)
+            await fetch(`${API}/matches/${fixtureId}/briefing/trigger`, { headers: triggerHeaders() })
             await fetchFeed()
         } catch { } finally {
             setTriggering(false)

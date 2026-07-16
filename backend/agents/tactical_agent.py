@@ -18,23 +18,12 @@ import asyncio
 import logging
 from typing import List, Optional
 
-from sentence_transformers import SentenceTransformer
-
 from agents.weaviate_client import get_weaviate_client, TACTICAL_PROFILES
 from api.schemas.schema import MatchState, TeamStats
+from ml.embedding_model import get_embed_model as _get_embed_model
 from ml.executors import EMBED_EXECUTOR
 
 log = logging.getLogger(__name__)
-
-_embed_model: Optional[SentenceTransformer] = None
-
-
-def _get_embed_model() -> SentenceTransformer:
-    global _embed_model
-    if _embed_model is None:
-        log.info("Loading all-MiniLM-L6-v2 for tactical matching (first use)…")
-        _embed_model = SentenceTransformer("all-MiniLM-L6-v2")
-    return _embed_model
 
 
 def _describe(team: str, opp: str, stats: TeamStats, minute: int) -> str:

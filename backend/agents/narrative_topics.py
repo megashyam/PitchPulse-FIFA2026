@@ -1,5 +1,7 @@
 """
-Redis-backed fixture-aware topic management for the Narrative Hub.
+agents/narrative_topics.py
+============================
+Fixture-aware topic tracking for the Narrative Hub.
 
 Provides dynamic topic discovery by combining active and recently completed
 fixtures into a unified tracking set. Team names are used as detector topics,

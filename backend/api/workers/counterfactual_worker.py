@@ -19,13 +19,13 @@ import logging
 import redis.asyncio as aioredis
 
 from agents import counterfactual_agent
-from api.schemas.event_types import COMPLETED_STATUSES, SIGNIFICANT_TYPES
+from api.schemas.event_types import COMPLETED_STATUSES, TRIGGER_TYPES
 from api.schemas.schema import MatchState
 
 log = logging.getLogger(__name__)
 INTERVAL = 30.0
 
-PROCESSABLE = {"1H", "HT", "2H", "ET", "P", "FT"}
+PROCESSABLE = {"1H", "HT", "2H", "ET", "P", "FT", "AET", "PEN"}
 TTL_LIVE = 3_600
 TTL_COMPLETED = 2_592_000
 FEED_MAX = 19
@@ -54,6 +54,8 @@ async def run(redis_client: aioredis.Redis) -> None:
 
 
 async def _update_all(r: aioredis.Redis, loop) -> None:
+    active = set(await r.smembers("matches:active"))
+    completed_ids = await r.smembers("matches:completed")
     fixture_ids = await r.smembers("matches:active")
 
     active = set(fixture_ids)
@@ -65,10 +67,15 @@ async def _update_all(r: aioredis.Redis, loop) -> None:
         except (TypeError, ValueError):
             pass
 
-    if not fixture_ids:
+    fixtures_to_process = set(active)
+    for cid in completed_ids:
+        if not await r.exists(f"match:{cid}:counterfactual:feed"):
+            fixtures_to_process.add(cid)
+
+    if not fixtures_to_process:
         return
 
-    for fid in fixture_ids:
+    for fid in fixtures_to_process:
         try:
             await _update_fixture(r, fid, loop)
         except Exception as exc:
@@ -78,7 +85,7 @@ async def _update_all(r: aioredis.Redis, loop) -> None:
 async def _seed_coverage_from_feed(
     r: aioredis.Redis, fid: str, state: MatchState
 ) -> None:
-    """Rebuild the agent's covered set from the persisted feed."""
+    """Rebuild the agent's covered set from the persisted feed (restart-safe)."""
     if fid in _seeded:
         return
     _seeded.add(fid)
@@ -95,7 +102,9 @@ async def _seed_coverage_from_feed(
             if team_id is None:
                 team_id = 1 if e.get("event_team") == state.home_name else 2
             sigs.add(
-                counterfactual_agent.event_sig(e["minute"], e["event_type"], team_id)
+                counterfactual_agent.event_sig(
+                    e["minute"], e.get("extra"), e["event_type"], team_id
+                )
             )
         except Exception:
             continue
@@ -122,7 +131,7 @@ async def _update_fixture(r: aioredis.Redis, fid: str, loop) -> None:
 
     completed = state.status_short in COMPLETED_STATUSES
 
-    if completed and not any(ev.type in SIGNIFICANT_TYPES for ev in state.events):
+    if completed and not any(ev.type in TRIGGER_TYPES for ev in state.events):
         return
 
     await _seed_coverage_from_feed(r, fid, state)
@@ -141,15 +150,41 @@ async def _update_fixture(r: aioredis.Redis, fid: str, loop) -> None:
         _seeded.discard(fid)
 
     _prev_elapsed[fid] = current_elapsed
+    ttl = _ttl_for(state.status_short)
+
+    if completed:
+
+        results = await counterfactual_agent.update_all(state, loop)
+        if not results:
+            return
+
+        pipe = r.pipeline(transaction=True)
+        for res in results:
+            pipe.lpush(f"match:{fid}:counterfactual:feed", json.dumps(res))
+        pipe.ltrim(f"match:{fid}:counterfactual:feed", 0, FEED_MAX)
+        pipe.expire(f"match:{fid}:counterfactual:feed", ttl)
+        latest = max(results, key=lambda x: x.get("minute", 0))
+        pipe.setex(f"match:{fid}:counterfactual:latest", ttl, json.dumps(latest))
+        await pipe.execute()
+
+        for res in results:
+            await r.publish(
+                "counterfactual_update",
+                json.dumps(
+                    {
+                        "fixture_id": res["fixture_id"],
+                        "minute": res["minute"],
+                        "event_type": res["event_type"],
+                        "path_shift_pct": res["path_shift_pct"],
+                    }
+                ),
+            )
+        return
 
     result = await counterfactual_agent.update(state, loop)
     if result is None:
         return
 
-    if completed and result.get("event_type") not in SIGNIFICANT_TYPES:
-        return
-
-    ttl = _ttl_for(state.status_short)
     result_json = json.dumps(result)
 
     pipe = r.pipeline(transaction=True)

@@ -1,20 +1,13 @@
 "use client"
 
-/**
- * Compact bilateral team stats panel.
- *
- * The layout keeps home and away numbers aligned around a shared label so the
- * viewer can compare the two sides at a glance. Possession gets a dedicated
- * bar because raw percentages are easier to read as a visual balance.
- */
 
 import type { TeamStats } from "@/types/match"
 
 interface Props { home: TeamStats; away: TeamStats }
 
-function StatRow({ label, home, away, format, showBar }: {
+function StatRow({ label, home, away, format }: {
     label: string; home: number; away: number;
-    format?: (v: number) => string; showBar?: boolean
+    format?: (v: number) => string
 }) {
     const h = home ?? 0
     const a = away ?? 0
@@ -24,16 +17,14 @@ function StatRow({ label, home, away, format, showBar }: {
     const ap = (a / total) * 100
 
     return (
-        <div className={`stat-row-v2${showBar ? " possession-row" : ""}`}>
+        <div className="stat-row-v2 possession-row">
             <span className="stat-num-home">{fmt(h)}</span>
             <div className="stat-center-col">
                 <span className="stat-center-name">{label}</span>
-                {showBar && (
-                    <div className="stat-poss-bar">
-                        <div className="stat-poss-home" style={{ width: `${hp.toFixed(1)}%` }} />
-                        <div className="stat-poss-away" style={{ width: `${ap.toFixed(1)}%` }} />
-                    </div>
-                )}
+                <div className="stat-poss-bar">
+                    <div className="stat-poss-home" style={{ width: `${hp.toFixed(1)}%` }} />
+                    <div className="stat-poss-away" style={{ width: `${ap.toFixed(1)}%` }} />
+                </div>
             </div>
             <span className="stat-num-away">{fmt(a)}</span>
         </div>
@@ -49,7 +40,7 @@ export function StatsPanel({ home, away }: Props) {
             <StatRow
                 label="Possession"
                 home={home.possession} away={away.possession}
-                format={v => `${v}%`} showBar
+                format={v => `${v}%`}
             />
             <StatRow label="Shots" home={home.shots_total} away={away.shots_total} />
             <StatRow label="On Target" home={home.shots_on_goal} away={away.shots_on_goal} />
