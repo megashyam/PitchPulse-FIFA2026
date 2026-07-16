@@ -35,7 +35,12 @@ function FingerprintNarrative({ homeName, awayName, fp }: { homeName: string; aw
             <style jsx>{`
                 .tactical-narrative {
                     padding: 12px 18px 14px;
-                    border-top: 1px solid var(--border);
+                    margin: 8px;
+                    background: var(--glass-bg-inner, rgba(255, 255, 255, .04));
+                    border: 1px solid var(--glass-border-inner, rgba(255, 255, 255, .08));
+                    border-radius: var(--r-md);
+                    backdrop-filter: blur(12px);
+                    -webkit-backdrop-filter: blur(12px);
                 }
                 .tactical-narrative-head {
                     display: flex;

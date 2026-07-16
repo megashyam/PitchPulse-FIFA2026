@@ -18,12 +18,12 @@ import { NarrativeCarousel } from "@/components/match/NarrativeCarousel"
 interface Props { state: MatchState; fixtureId: string }
 
 const TABS = [
-    { id: "tactical", icon: "📐", label: "Tactical" },
-    { id: "counterfactual", icon: "🔀", label: "What If?" },
-    { id: "briefing", icon: "📋", label: "Briefing" },
-    { id: "live", icon: "📡", label: "Live" },
-    { id: "predictor", icon: "🏆", label: "Predictor" },
-    { id: "narrative", icon: "🔥", label: "Narrative" },
+    { id: "tactical", label: "Tactical" },
+    { id: "counterfactual", label: "What If?" },
+    { id: "briefing", label: "Briefing" },
+    { id: "live", label: "Live" },
+    { id: "predictor", label: "Predictor" },
+    { id: "narrative", label: "Narrative" },
 ]
 
 export function UnifiedTabs({ state, fixtureId }: Props) {
@@ -46,7 +46,6 @@ export function UnifiedTabs({ state, fixtureId }: Props) {
                     <button key={t.id}
                         className={`ai-tab-btn${active === t.id ? " active" : ""}`}
                         onClick={() => switchTab(t.id)}>
-                        <span className="ai-tab-icon">{t.icon}</span>
                         {t.label}
                     </button>
                 ))}

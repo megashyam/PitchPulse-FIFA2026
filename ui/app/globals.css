@@ -11,7 +11,7 @@
 :root {
   --font-display: 'Bebas Neue', sans-serif;
   --font-body: 'Outfit', sans-serif;
-  --font-mono: 'DM Mono', monospace;
+  --font-mono: 'Outfit', sans-serif;
 
   /* Electric mint — the brand accent */
   --accent: #10d9a0;
@@ -156,8 +156,8 @@ code {
 .section-label {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .12em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border-bright);
@@ -170,8 +170,8 @@ code {
 .panel-title {
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   margin-bottom: 12px;
   display: flex;
@@ -237,8 +237,8 @@ code {
   font-family: var(--font-mono);
   font-size: .56rem;
   font-weight: 500;
-  letter-spacing: .05em;
-  text-transform: uppercase;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .src-api {
@@ -376,8 +376,8 @@ code {
 .nav-soon-badge {
   font-family: var(--font-mono);
   font-size: .5rem;
-  text-transform: uppercase;
-  letter-spacing: .06em;
+  text-transform: none;
+  letter-spacing: normal;
   padding: 1px 5px;
   border-radius: 3px;
   background: var(--bg-4);
@@ -421,8 +421,8 @@ code {
 .home-eyebrow {
   font-family: var(--font-mono);
   font-size: .62rem;
-  text-transform: uppercase;
-  letter-spacing: .14em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--accent);
   margin-bottom: 10px;
   display: flex;
@@ -456,8 +456,8 @@ code {
 .fixture-section-label {
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   margin-bottom: 10px;
   display: flex;
@@ -521,8 +521,8 @@ code {
 .fc-badge {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .07em;
+  text-transform: none;
+  letter-spacing: normal;
   padding: 2px 8px;
   border-radius: 20px;
   background: var(--bg-3);
@@ -638,8 +638,8 @@ code {
 .round-label {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   padding: 2px 7px;
   background: var(--bg-3);
@@ -777,8 +777,8 @@ code {
   font-size: .58rem;
   color: var(--text-3);
   margin-top: 3px;
-  text-transform: uppercase;
-  letter-spacing: .05em;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .score-center-block {
@@ -817,8 +817,8 @@ code {
 .status-label {
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-2);
 }
 
@@ -883,8 +883,8 @@ code {
 .stats-group-label {
   font-family: var(--font-mono);
   font-size: .55rem;
-  text-transform: uppercase;
-  letter-spacing: .12em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   margin-bottom: 7px;
   padding-bottom: 5px;
@@ -1028,7 +1028,12 @@ code {
    ══════════════════════════════════════════════════════════ */
 .timeline-wrap {
   padding: 10px 14px 12px;
-  border-top: 1px solid var(--border);
+  margin: 8px;
+  background: var(--glass-bg-inner, rgba(255, 255, 255, .04));
+  border: 1px solid var(--glass-border-inner, rgba(255, 255, 255, .08));
+  border-radius: var(--r-md);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .timeline {
@@ -1051,7 +1056,7 @@ code {
   font-family: var(--font-mono);
   font-size: .48rem;
   color: var(--text-3);
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .timeline-track {
@@ -1133,8 +1138,8 @@ code {
 .xg-title {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   margin-bottom: 10px;
   padding-bottom: 6px;
@@ -1400,8 +1405,8 @@ code {
 .momentum-center-label {
   font-family: var(--font-mono);
   font-size: .55rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   display: block;
 }
@@ -1509,8 +1514,8 @@ code {
 .momentum-label-center {
   font-family: var(--font-mono);
   font-size: .53rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   align-self: center;
 }
@@ -1662,8 +1667,8 @@ code {
 .intel-type-v2 {
   font-family: var(--font-mono);
   font-size: .56rem;
-  text-transform: uppercase;
-  letter-spacing: .06em;
+  text-transform: none;
+  letter-spacing: normal;
   padding: 2px 6px;
   border-radius: 3px;
 }
@@ -2254,8 +2259,8 @@ code {
   text-align: right;
   font-family: var(--font-mono);
   font-size: .57rem;
-  text-transform: uppercase;
-  letter-spacing: .07em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   background: var(--bg-3);
   border-bottom: 1px solid var(--border-bright);
@@ -2375,8 +2380,7 @@ code {
 /* Prediction panel */
 .pred-panel {
   background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--c-ai);
+  border: 1px solid var(--glass-border-nested, var(--border));
   border-radius: var(--r-lg);
   padding: 14px;
 }
@@ -2488,8 +2492,8 @@ code {
 .pred-tourney-header {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   margin-bottom: 7px;
 }
@@ -2761,8 +2765,7 @@ code {
 /* Bracket */
 .pred-bracket {
   background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--c-ai);
+  border: 1px solid var(--glass-border-nested, var(--border));
   border-radius: var(--r-lg);
   padding: 13px 14px;
   display: flex;
@@ -2798,8 +2801,8 @@ code {
 .pred-bracket-section {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -3116,8 +3119,8 @@ code {
   font-family: var(--font-mono);
   font-size: .57rem;
   color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: .06em;
+  text-transform: none;
+  letter-spacing: normal;
   display: block;
   margin-bottom: 4px;
 }
@@ -3463,8 +3466,8 @@ code {
   padding: 13px 8px;
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   border-right: 1px solid var(--border);
   transition: all .15s;
@@ -3519,8 +3522,8 @@ code {
   padding: 14px 20px 10px;
   font-family: var(--font-mono);
   font-size: .56rem;
-  text-transform: uppercase;
-  letter-spacing: .14em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   border-bottom: 1px solid var(--border);
   display: flex;
@@ -3587,8 +3590,8 @@ code {
 .stat-center-name {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   white-space: nowrap;
 }
@@ -3677,8 +3680,8 @@ code {
 .momentum-vs-label {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .12em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -3719,8 +3722,8 @@ code {
 .momentum-grid-label {
   font-family: var(--font-mono);
   font-size: .54rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   text-align: center;
 }
@@ -3816,8 +3819,8 @@ code {
 .intel-entry-type-badge {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .07em;
+  text-transform: none;
+  letter-spacing: normal;
   padding: 2px 8px;
   border-radius: 3px;
   font-weight: 500;
@@ -3889,8 +3892,8 @@ code {
 .cf-event-label {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   margin-bottom: 4px;
 }
@@ -3920,8 +3923,8 @@ code {
   font-family: var(--font-mono);
   font-size: .56rem;
   color: var(--text-3);
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .cf-event-body {
@@ -3954,8 +3957,8 @@ code {
   color: var(--c-ai);
   margin-bottom: 5px;
   display: block;
-  text-transform: uppercase;
-  letter-spacing: .06em;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .cf-narrative-text {
@@ -3987,8 +3990,8 @@ code {
 .briefing-hero-label {
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--c-ai);
 }
 
@@ -4147,6 +4150,14 @@ code {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0;
+  margin: 8px;
+  width: auto;
+  background: var(--glass-bg-inner, rgba(255, 255, 255, .04));
+  border: 1px solid var(--glass-border-inner, rgba(255, 255, 255, .08));
+  border-radius: var(--r-md);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  overflow: hidden;
 }
 
 .tactical-stat-cell {
@@ -4169,8 +4180,8 @@ code {
 .tactical-stat-cell-label {
   font-family: var(--font-mono);
   font-size: .56rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -4183,19 +4194,23 @@ code {
 
 .tactical-fingerprint-block {
   padding: 14px 18px;
-  border-top: 1px solid var(--border);
+  margin: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: rgba(167, 139, 250, .04);
+  background: var(--glass-bg-inner, rgba(255, 255, 255, .04));
+  border: 1px solid var(--glass-border-inner, rgba(255, 255, 255, .08));
+  border-radius: var(--r-md);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .tactical-fp-label {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -4290,8 +4305,8 @@ code {
 .score-team-sub {
   font-family: var(--font-mono);
   font-size: .56rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   margin-top: 4px;
 }
@@ -4334,8 +4349,8 @@ code {
 .score-status-badge {
   font-family: var(--font-mono);
   font-size: .62rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-2);
 }
 
@@ -4379,8 +4394,8 @@ code {
 .xg-header-title {
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .12em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   display: flex;
   align-items: center;
@@ -4423,8 +4438,8 @@ code {
 .xg-cell-label {
   font-family: var(--font-mono);
   font-size: .56rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   text-align: center;
 }
@@ -4515,8 +4530,8 @@ code {
 .side-nav-brand-sub {
   font-family: var(--font-mono);
   font-size: .5rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -4525,8 +4540,8 @@ code {
   padding: 16px 16px 6px;
   font-family: var(--font-mono);
   font-size: .52rem;
-  text-transform: uppercase;
-  letter-spacing: .14em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   flex-shrink: 0;
 }
@@ -4585,8 +4600,8 @@ code {
 .side-nav-item-badge {
   font-family: var(--font-mono);
   font-size: .5rem;
-  text-transform: uppercase;
-  letter-spacing: .06em;
+  text-transform: none;
+  letter-spacing: normal;
   padding: 1px 5px;
   border-radius: 3px;
   background: var(--bg-4);
@@ -4609,8 +4624,8 @@ code {
   font-family: var(--font-mono);
   font-size: .58rem;
   color: var(--amber);
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .side-nav-live-fixture {
@@ -4698,8 +4713,8 @@ code {
 .page-header-eyebrow {
   font-family: var(--font-mono);
   font-size: .56rem;
-  text-transform: uppercase;
-  letter-spacing: .14em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--accent);
   display: flex;
   align-items: center;
@@ -4790,8 +4805,8 @@ code {
 .kpi-card-label {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -4879,8 +4894,8 @@ code {
 .predict-panel-title {
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .12em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   display: flex;
   align-items: center;
@@ -4963,8 +4978,8 @@ code {
 .narrative-panel-title {
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .12em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   display: flex;
   align-items: center;
@@ -5086,8 +5101,8 @@ code {
 .spike-severity-label {
   font-family: var(--font-mono);
   font-size: .54rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -5107,8 +5122,8 @@ code {
 .spike-arc-label {
   font-family: var(--font-mono);
   font-size: .56rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--accent);
   display: block;
   margin-bottom: 5px;
@@ -5158,8 +5173,8 @@ code {
 .spike-feed-title {
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -5354,8 +5369,8 @@ code {
 .ip-eyebrow {
   font-family: var(--font-mono);
   font-size: .56rem;
-  text-transform: uppercase;
-  letter-spacing: .16em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--accent);
   display: flex;
   align-items: center;
@@ -5444,8 +5459,8 @@ code {
   font-family: var(--font-mono);
   font-size: .56rem;
   color: var(--text-3);
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .kpi-cell-value {
@@ -5494,8 +5509,8 @@ code {
 .kpi-expand-stage {
   font-family: var(--font-mono);
   font-size: .56rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   width: 36px;
 }
@@ -5661,8 +5676,8 @@ code {
 .team-path-stage {
   font-family: var(--font-mono);
   font-size: .52rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -5862,8 +5877,8 @@ code {
   padding: 8px 10px;
   font-family: var(--font-mono);
   font-size: .57rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   background: var(--bg-3);
   border-bottom: 1px solid var(--border-bright);
@@ -6000,8 +6015,8 @@ code {
 .tt-expand-stage {
   font-family: var(--font-mono);
   font-size: .52rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -6085,8 +6100,8 @@ code {
   font-family: var(--font-mono);
   font-size: .56rem;
   color: var(--text-3);
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .source-cell-bar {
@@ -6135,8 +6150,8 @@ code {
 .bubble-section-title {
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .12em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   display: flex;
   align-items: center;
@@ -6221,8 +6236,8 @@ code {
 .spike-carousel-label {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .12em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   margin-bottom: 12px;
   display: flex;
@@ -6384,8 +6399,8 @@ code {
 .spike-detail-sev-lbl {
   font-family: var(--font-mono);
   font-size: .54rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -6438,8 +6453,8 @@ code {
 .spike-arc-label {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--c-ai);
 }
 
@@ -6478,8 +6493,8 @@ code {
 .spike-signal-name {
   font-family: var(--font-mono);
   font-size: .54rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -6749,8 +6764,8 @@ code {
 .hf-badge {
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .06em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   white-space: nowrap;
 }
@@ -6971,8 +6986,8 @@ code {
 .fm-header-badge {
   font-family: var(--font-mono);
   font-size: .64rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-2);
 }
 
@@ -7059,8 +7074,8 @@ code {
   padding: 10px 16px 4px;
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .12em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -7227,8 +7242,8 @@ code {
 .fm-gt-col-label {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .06em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   text-align: center;
 }
@@ -7312,8 +7327,8 @@ code {
   gap: 6px;
   font-family: var(--font-mono);
   font-size: .62rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--fm-green);
   font-weight: 700;
   margin-bottom: 8px;
@@ -7761,8 +7776,8 @@ code {
 .hf-badge {
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .06em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   white-space: nowrap;
 }
@@ -7815,7 +7830,7 @@ code {
 :root {
   --font-display: 'Bebas Neue', sans-serif;
   --font-body: 'Outfit', sans-serif;
-  --font-mono: 'DM Mono', monospace;
+  --font-mono: 'Outfit', sans-serif;
 
   /* Electric mint — the brand accent */
   --accent: #10d9a0;
@@ -7960,8 +7975,8 @@ code {
 .section-label {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .12em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border-bright);
@@ -7974,8 +7989,8 @@ code {
 .panel-title {
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   margin-bottom: 12px;
   display: flex;
@@ -8041,8 +8056,8 @@ code {
   font-family: var(--font-mono);
   font-size: .56rem;
   font-weight: 500;
-  letter-spacing: .05em;
-  text-transform: uppercase;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .src-api {
@@ -8180,8 +8195,8 @@ code {
 .nav-soon-badge {
   font-family: var(--font-mono);
   font-size: .5rem;
-  text-transform: uppercase;
-  letter-spacing: .06em;
+  text-transform: none;
+  letter-spacing: normal;
   padding: 1px 5px;
   border-radius: 3px;
   background: var(--bg-4);
@@ -8225,8 +8240,8 @@ code {
 .home-eyebrow {
   font-family: var(--font-mono);
   font-size: .62rem;
-  text-transform: uppercase;
-  letter-spacing: .14em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--accent);
   margin-bottom: 10px;
   display: flex;
@@ -8260,8 +8275,8 @@ code {
 .fixture-section-label {
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   margin-bottom: 10px;
   display: flex;
@@ -8325,8 +8340,8 @@ code {
 .fc-badge {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .07em;
+  text-transform: none;
+  letter-spacing: normal;
   padding: 2px 8px;
   border-radius: 20px;
   background: var(--bg-3);
@@ -8442,8 +8457,8 @@ code {
 .round-label {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   padding: 2px 7px;
   background: var(--bg-3);
@@ -8581,8 +8596,8 @@ code {
   font-size: .58rem;
   color: var(--text-3);
   margin-top: 3px;
-  text-transform: uppercase;
-  letter-spacing: .05em;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .score-center-block {
@@ -8621,8 +8636,8 @@ code {
 .status-label {
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-2);
 }
 
@@ -8687,8 +8702,8 @@ code {
 .stats-group-label {
   font-family: var(--font-mono);
   font-size: .55rem;
-  text-transform: uppercase;
-  letter-spacing: .12em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   margin-bottom: 7px;
   padding-bottom: 5px;
@@ -8832,7 +8847,12 @@ code {
    ══════════════════════════════════════════════════════════ */
 .timeline-wrap {
   padding: 10px 14px 12px;
-  border-top: 1px solid var(--border);
+  margin: 8px;
+  background: var(--glass-bg-inner, rgba(255, 255, 255, .04));
+  border: 1px solid var(--glass-border-inner, rgba(255, 255, 255, .08));
+  border-radius: var(--r-md);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .timeline {
@@ -8855,7 +8875,7 @@ code {
   font-family: var(--font-mono);
   font-size: .48rem;
   color: var(--text-3);
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .timeline-track {
@@ -8937,8 +8957,8 @@ code {
 .xg-title {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   margin-bottom: 10px;
   padding-bottom: 6px;
@@ -9204,8 +9224,8 @@ code {
 .momentum-center-label {
   font-family: var(--font-mono);
   font-size: .55rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   display: block;
 }
@@ -9313,8 +9333,8 @@ code {
 .momentum-label-center {
   font-family: var(--font-mono);
   font-size: .53rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   align-self: center;
 }
@@ -9466,8 +9486,8 @@ code {
 .intel-type-v2 {
   font-family: var(--font-mono);
   font-size: .56rem;
-  text-transform: uppercase;
-  letter-spacing: .06em;
+  text-transform: none;
+  letter-spacing: normal;
   padding: 2px 6px;
   border-radius: 3px;
 }
@@ -10058,8 +10078,8 @@ code {
   text-align: right;
   font-family: var(--font-mono);
   font-size: .57rem;
-  text-transform: uppercase;
-  letter-spacing: .07em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   background: var(--bg-3);
   border-bottom: 1px solid var(--border-bright);
@@ -10179,8 +10199,7 @@ code {
 /* Prediction panel */
 .pred-panel {
   background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--c-ai);
+  border: 1px solid var(--glass-border-nested, var(--border));
   border-radius: var(--r-lg);
   padding: 14px;
 }
@@ -10292,8 +10311,8 @@ code {
 .pred-tourney-header {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   margin-bottom: 7px;
 }
@@ -10565,8 +10584,7 @@ code {
 /* Bracket */
 .pred-bracket {
   background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--c-ai);
+  border: 1px solid var(--glass-border-nested, var(--border));
   border-radius: var(--r-lg);
   padding: 13px 14px;
   display: flex;
@@ -10602,8 +10620,8 @@ code {
 .pred-bracket-section {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -10920,8 +10938,8 @@ code {
   font-family: var(--font-mono);
   font-size: .57rem;
   color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: .06em;
+  text-transform: none;
+  letter-spacing: normal;
   display: block;
   margin-bottom: 4px;
 }
@@ -11267,8 +11285,8 @@ code {
 .ip-eyebrow {
   font-family: var(--font-mono);
   font-size: .56rem;
-  text-transform: uppercase;
-  letter-spacing: .16em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--accent);
   display: flex;
   align-items: center;
@@ -11357,8 +11375,8 @@ code {
   font-family: var(--font-mono);
   font-size: .56rem;
   color: var(--text-3);
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .kpi-cell-value {
@@ -11407,8 +11425,8 @@ code {
 .kpi-expand-stage {
   font-family: var(--font-mono);
   font-size: .56rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   width: 36px;
 }
@@ -11574,8 +11592,8 @@ code {
 .team-path-stage {
   font-family: var(--font-mono);
   font-size: .52rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -11775,8 +11793,8 @@ code {
   padding: 8px 10px;
   font-family: var(--font-mono);
   font-size: .57rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   background: var(--bg-3);
   border-bottom: 1px solid var(--border-bright);
@@ -11913,8 +11931,8 @@ code {
 .tt-expand-stage {
   font-family: var(--font-mono);
   font-size: .52rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -11998,8 +12016,8 @@ code {
   font-family: var(--font-mono);
   font-size: .56rem;
   color: var(--text-3);
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .source-cell-bar {
@@ -12048,8 +12066,8 @@ code {
 .bubble-section-title {
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .12em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   display: flex;
   align-items: center;
@@ -12134,8 +12152,8 @@ code {
 .spike-carousel-label {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .12em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   margin-bottom: 12px;
   display: flex;
@@ -12297,8 +12315,8 @@ code {
 .spike-detail-sev-lbl {
   font-family: var(--font-mono);
   font-size: .54rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -12351,8 +12369,8 @@ code {
 .spike-arc-label {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--c-ai);
 }
 
@@ -12391,8 +12409,8 @@ code {
 .spike-signal-name {
   font-family: var(--font-mono);
   font-size: .54rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -12487,8 +12505,8 @@ code {
   padding: 13px 8px;
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   border-right: 1px solid var(--border);
   transition: all .15s;
@@ -12543,8 +12561,8 @@ code {
   padding: 14px 20px 10px;
   font-family: var(--font-mono);
   font-size: .56rem;
-  text-transform: uppercase;
-  letter-spacing: .14em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   border-bottom: 1px solid var(--border);
   display: flex;
@@ -12611,8 +12629,8 @@ code {
 .stat-center-name {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   white-space: nowrap;
 }
@@ -12701,8 +12719,8 @@ code {
 .momentum-vs-label {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .12em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -12743,8 +12761,8 @@ code {
 .momentum-grid-label {
   font-family: var(--font-mono);
   font-size: .54rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   text-align: center;
 }
@@ -12840,8 +12858,8 @@ code {
 .intel-entry-type-badge {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .07em;
+  text-transform: none;
+  letter-spacing: normal;
   padding: 2px 8px;
   border-radius: 3px;
   font-weight: 500;
@@ -12913,8 +12931,8 @@ code {
 .cf-event-label {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   margin-bottom: 4px;
 }
@@ -12944,8 +12962,8 @@ code {
   font-family: var(--font-mono);
   font-size: .56rem;
   color: var(--text-3);
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .cf-event-body {
@@ -12978,8 +12996,8 @@ code {
   color: var(--c-ai);
   margin-bottom: 5px;
   display: block;
-  text-transform: uppercase;
-  letter-spacing: .06em;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .cf-narrative-text {
@@ -13011,8 +13029,8 @@ code {
 .briefing-hero-label {
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--c-ai);
 }
 
@@ -13171,6 +13189,14 @@ code {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0;
+  margin: 8px;
+  width: auto;
+  background: var(--glass-bg-inner, rgba(255, 255, 255, .04));
+  border: 1px solid var(--glass-border-inner, rgba(255, 255, 255, .08));
+  border-radius: var(--r-md);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  overflow: hidden;
 }
 
 .tactical-stat-cell {
@@ -13193,8 +13219,8 @@ code {
 .tactical-stat-cell-label {
   font-family: var(--font-mono);
   font-size: .56rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -13207,19 +13233,23 @@ code {
 
 .tactical-fingerprint-block {
   padding: 14px 18px;
-  border-top: 1px solid var(--border);
+  margin: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: rgba(167, 139, 250, .04);
+  background: var(--glass-bg-inner, rgba(255, 255, 255, .04));
+  border: 1px solid var(--glass-border-inner, rgba(255, 255, 255, .08));
+  border-radius: var(--r-md);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .tactical-fp-label {
   font-family: var(--font-mono);
   font-size: .58rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -13314,8 +13344,8 @@ code {
 .score-team-sub {
   font-family: var(--font-mono);
   font-size: .56rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   margin-top: 4px;
 }
@@ -13358,8 +13388,8 @@ code {
 .score-status-badge {
   font-family: var(--font-mono);
   font-size: .62rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-2);
 }
 
@@ -13403,8 +13433,8 @@ code {
 .xg-header-title {
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .12em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   display: flex;
   align-items: center;
@@ -13447,8 +13477,8 @@ code {
 .xg-cell-label {
   font-family: var(--font-mono);
   font-size: .56rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   text-align: center;
 }
@@ -13543,8 +13573,8 @@ code {
 .v4-hero-eyebrow {
   font-family: var(--font-mono);
   font-size: .62rem;
-  text-transform: uppercase;
-  letter-spacing: .14em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--accent);
   margin-bottom: 6px;
 }
@@ -13669,8 +13699,8 @@ code {
 .v4-mc-comp {
   font-family: var(--font-mono);
   font-size: .56rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -13764,8 +13794,8 @@ code {
 .v4-mc-kickoff-label {
   font-family: var(--font-mono);
   font-size: .54rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
   margin-top: 2px;
 }
@@ -14042,8 +14072,8 @@ code {
   font-family: var(--font-mono);
   font-size: .6rem;
   color: var(--c-goal);
-  text-transform: uppercase;
-  letter-spacing: .06em;
+  text-transform: none;
+  letter-spacing: normal;
   display: block;
   margin-bottom: 4px;
 }
@@ -14210,8 +14240,8 @@ code {
 .spike-grid-title {
   font-family: var(--font-mono);
   font-size: .62rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -15079,8 +15109,8 @@ code {
   --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 
   --font-display: "Bebas Neue", "Oswald", sans-serif;
-  --font-mono: "JetBrains Mono", "Roboto Mono", monospace;
-  --font-body: -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Outfit", sans-serif;
+  --font-body: "Outfit", -apple-system, "Segoe UI", sans-serif;
 
   --r-sm: 6px;
   --r-md: 10px;
@@ -15441,10 +15471,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--accent);
+  background: var(--glass-bg-nested, rgba(0, 0, 0, .20));
+  border: 1px solid var(--glass-border-nested, rgba(255, 255, 255, .05));
   border-radius: var(--r-lg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   overflow-y: auto;
   position: sticky;
   top: 10px;
@@ -15487,10 +15518,11 @@ body {
 }
 
 .mp-tabs {
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--c-ai);
+  background: var(--glass-bg-nested, rgba(0, 0, 0, .20));
+  border: 1px solid var(--glass-border-nested, rgba(255, 255, 255, .05));
   border-radius: var(--r-lg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -15525,8 +15557,8 @@ body {
   gap: 6px;
   font-family: var(--font-mono);
   font-size: .6rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-3);
 }
 
@@ -15776,4 +15808,18 @@ body {
 [data-theme="light"] {
   --glass-bg: rgba(255, 255, 255, .40);
   --glass-border: rgba(255, 255, 255, .55);
+}
+
+[data-theme="dark"] {
+  --glass-bg-nested: rgba(0, 0, 0, .20);
+  --glass-border-nested: rgba(255, 255, 255, .05);
+  --glass-bg-inner: rgba(255, 255, 255, .04);
+  --glass-border-inner: rgba(255, 255, 255, .08);
+}
+
+[data-theme="light"] {
+  --glass-bg-nested: rgba(255, 255, 255, .25);
+  --glass-border-nested: rgba(0, 0, 0, .06);
+  --glass-bg-inner: rgba(255, 255, 255, .45);
+  --glass-border-inner: rgba(0, 0, 0, .07);
 }
