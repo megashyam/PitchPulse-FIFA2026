@@ -5,6 +5,8 @@
 PitchPulse is a live match tracking, statistical inference, and AI narration engine built for the 2026 World Cup. It ingests bare-bones live score data and mathematically enriches it using historical statistics, vectorized Monte Carlo tournament simulations, and large language models (LLMs). The primary goal is to deliver real-time, push-driven analytical updates: live momentum, counterfactual bracket shifts, and tactical briefings, without relying on an expensive commercial live-stats feed.
 
 
+> __Demo__
+---
 ![Demo GIF](data/demo.gif)
 
 The retrieval and agent layers are built from scratch without LangChain, LangGraph, LlamaIndex, or other RAG frameworks. Prompt construction, retrieval logic, agent orchestration, and deterministic fallback paths are implemented directly using the Weaviate client and LLM providers.
