@@ -1,5 +1,6 @@
 venv/
 .venv/
+.venv-eval/
 
 __pycache__/
 *.pyc
@@ -20,3 +21,14 @@ node_modules/
 .next/
 dist/
 .env
+
+
+weaviate_data/
+weaviate-data/
+data/weaviate/
+volumes/weaviate/
+neo4j_data/
+backend/data/
+# build/archive artifacts
+*.zip
+*.tsbuildinfo
