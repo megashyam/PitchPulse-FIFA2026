@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # The backend is ruff-clean, so any new lint error fails the build.
+      - name: Lint (ruff)
+        run: ruff check .
+
+      # Integration tests skip, rather than fail, when an external service
+      # (Redis, Weaviate, Neo4j, odds provider, LLM) is unavailable.
+      - name: Test (pytest)
+        env:
+          PYTHONPATH: .
+        run: pytest tests/ -v
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend Docker image
+        run: docker build -t wc2026-backend ./backend
