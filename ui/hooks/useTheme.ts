@@ -1,13 +1,8 @@
 "use client"
-
-/**
- * Theme persistence hook.
- *
- * The hook reads the stored preference on mount, applies the theme to the
- * document root, and keeps localStorage in sync when the user toggles the
- * mode. That keeps the shell and the hydrated React tree aligned on the
- * active color scheme.
- */
+// hooks/useTheme.ts
+// Light/dark theme toggle — persists to localStorage, applies
+// data-theme="light"|"dark" to <html>, defaults to system preference
+// on first visit, falls back to dark if unavailable.
 
 import { useEffect, useState, useCallback } from "react"
 

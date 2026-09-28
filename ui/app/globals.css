@@ -10,8 +10,8 @@
 /* ── Tokens ────────────────────────────────────────────────── */
 :root {
   --font-display: 'Bebas Neue', sans-serif;
-  --font-body: 'Outfit', sans-serif;
-  --font-mono: 'Outfit', sans-serif;
+  --font-body: 'Manrope', sans-serif;
+  --font-mono: 'Manrope', sans-serif;
 
   /* Electric mint — the brand accent */
   --accent: #10d9a0;
@@ -1027,13 +1027,13 @@ code {
    TIMELINE
    ══════════════════════════════════════════════════════════ */
 .timeline-wrap {
-  padding: 10px 14px 12px;
+  padding: 16px;
   margin: 8px;
-  background: var(--glass-bg-inner, rgba(255, 255, 255, .04));
-  border: 1px solid var(--glass-border-inner, rgba(255, 255, 255, .08));
+  background: var(--glass-bg-inner);
+  border: 1px solid var(--glass-border-inner);
   border-radius: var(--r-md);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 .timeline {
@@ -1343,10 +1343,9 @@ code {
    MOMENTUM BAR
    ══════════════════════════════════════════════════════════ */
 .momentum-wrap {
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--amber);
-  border-radius: var(--r-lg);
+  background: var(--glass-bg-inner);
+  border: 1px solid var(--glass-border-inner);
+  border-radius: var(--r-md);
   overflow: hidden;
 }
 
@@ -1354,8 +1353,8 @@ code {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px 10px;
-  border-bottom: 1px solid var(--border);
+  padding: 16px;
+  border-bottom: 1px solid var(--glass-border-inner);
 }
 
 .momentum-title {
@@ -1536,10 +1535,9 @@ code {
    INTEL FEED — Image-1 activity feed style
    ══════════════════════════════════════════════════════════ */
 .intel-wrap-v2 {
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--amber);
-  border-radius: var(--r-lg);
+  background: var(--glass-bg-inner);
+  border: 1px solid var(--glass-border-inner);
+  border-radius: var(--r-md);
   overflow: hidden;
 }
 
@@ -1547,8 +1545,8 @@ code {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px 10px;
-  border-bottom: 1px solid var(--border);
+  padding: 16px;
+  border-bottom: 1px solid var(--glass-border-inner);
   gap: 10px;
 }
 
@@ -1938,11 +1936,10 @@ code {
    REFEREE CARD
    ══════════════════════════════════════════════════════════ */
 .ref-card {
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--text-3);
-  border-radius: var(--r-lg);
-  padding: 12px 14px;
+  background: var(--glass-bg-inner);
+  border: 1px solid var(--glass-border-inner);
+  border-radius: var(--r-md);
+  padding: 16px;
 }
 
 .ref-cross-label {
@@ -2380,7 +2377,7 @@ code {
 /* Prediction panel */
 .pred-panel {
   background: var(--bg-2);
-  border: 1px solid var(--glass-border-nested, var(--border));
+  border: 1px solid var(--glass-border, var(--border));
   border-radius: var(--r-lg);
   padding: 14px;
 }
@@ -2765,7 +2762,7 @@ code {
 /* Bracket */
 .pred-bracket {
   background: var(--bg-2);
-  border: 1px solid var(--glass-border-nested, var(--border));
+  border: 1px solid var(--glass-border, var(--border));
   border-radius: var(--r-lg);
   padding: 13px 14px;
   display: flex;
@@ -3589,10 +3586,10 @@ code {
 
 .stat-center-name {
   font-family: var(--font-mono);
-  font-size: .58rem;
+  font-size: .66rem;
   text-transform: none;
   letter-spacing: normal;
-  color: var(--text-3);
+  color: var(--text-2);
   white-space: nowrap;
 }
 
@@ -3703,16 +3700,17 @@ code {
 .momentum-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border-inner);
 }
 
 .momentum-grid-cell {
-  padding: 14px 16px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--glass-border-inner);
 }
 
 .momentum-grid-cell:last-child {
@@ -3721,10 +3719,10 @@ code {
 
 .momentum-grid-label {
   font-family: var(--font-mono);
-  font-size: .54rem;
+  font-size: .62rem;
   text-transform: none;
   letter-spacing: normal;
-  color: var(--text-3);
+  color: var(--text-2);
   text-align: center;
 }
 
@@ -3757,8 +3755,8 @@ code {
 .intel-entry-v3 {
   display: flex;
   gap: 14px;
-  padding: 16px 18px;
-  border-bottom: 1px solid var(--border);
+  padding: 16px;
+  border-bottom: 1px solid var(--glass-border-inner);
   transition: background .12s;
   align-items: flex-start;
 }
@@ -3857,31 +3855,29 @@ code {
 .intel-entry-via {
   font-family: var(--font-mono);
   font-size: .56rem;
-  color: var(--text-3);
+  color: var(--text-2);
 }
 
 .intel-entry-timestamp {
   font-family: var(--font-mono);
   font-size: .56rem;
-  color: var(--text-3);
+  color: var(--text-2);
   margin-left: auto;
 }
 
 /* ── COUNTERFACTUAL v3 (event card style) ─────────────────── */
 .cf-event-card {
   margin: 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.cf-event-card:last-child {
-  border-bottom: none;
+  background: var(--glass-bg-inner);
+  border: 1px solid var(--glass-border-inner);
+  border-radius: var(--r-md);
 }
 
 .cf-event-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 16px 18px 10px;
+  padding: 16px 16px 10px;
   gap: 12px;
 }
 
@@ -3894,7 +3890,7 @@ code {
   font-size: .58rem;
   text-transform: none;
   letter-spacing: normal;
-  color: var(--text-3);
+  color: var(--text-2);
   margin-bottom: 4px;
 }
 
@@ -3922,13 +3918,13 @@ code {
 .cf-shift-label {
   font-family: var(--font-mono);
   font-size: .56rem;
-  color: var(--text-3);
+  color: var(--text-2);
   text-transform: none;
   letter-spacing: normal;
 }
 
 .cf-event-body {
-  padding: 0 18px 14px;
+  padding: 0 16px 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -3938,10 +3934,10 @@ code {
   font-size: .76rem;
   color: var(--text-2);
   line-height: 1.45;
-  padding: 8px 12px;
-  background: var(--bg-3);
+  padding: 12px;
+  background: var(--glass-bg-inner);
   border-radius: var(--r-sm);
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border-inner);
 }
 
 .cf-narrative-block {
@@ -4151,21 +4147,21 @@ code {
   grid-template-columns: 1fr 1fr;
   gap: 0;
   margin: 8px;
-  width: auto;
-  background: var(--glass-bg-inner, rgba(255, 255, 255, .04));
-  border: 1px solid var(--glass-border-inner, rgba(255, 255, 255, .08));
+  background: var(--glass-bg-inner);
+  border: 1px solid var(--glass-border-inner);
   border-radius: var(--r-md);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   overflow: hidden;
 }
 
 .tactical-stat-cell {
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border);
-  border-right: 1px solid var(--border);
+  padding: 16px;
+  border-bottom: 1px solid var(--glass-border-inner);
+  border-right: 1px solid var(--glass-border-inner);
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 4px;
 }
 
@@ -4179,10 +4175,10 @@ code {
 
 .tactical-stat-cell-label {
   font-family: var(--font-mono);
-  font-size: .56rem;
+  font-size: .64rem;
   text-transform: none;
   letter-spacing: normal;
-  color: var(--text-3);
+  color: var(--text-2);
 }
 
 .tactical-stat-cell-value {
@@ -4193,25 +4189,25 @@ code {
 }
 
 .tactical-fingerprint-block {
-  padding: 14px 18px;
+  padding: 16px;
   margin: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: var(--glass-bg-inner, rgba(255, 255, 255, .04));
-  border: 1px solid var(--glass-border-inner, rgba(255, 255, 255, .08));
+  background: var(--glass-bg-inner);
+  border: 1px solid var(--glass-border-inner);
   border-radius: var(--r-md);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 .tactical-fp-label {
   font-family: var(--font-mono);
-  font-size: .58rem;
+  font-size: .66rem;
   text-transform: none;
   letter-spacing: normal;
-  color: var(--text-3);
+  color: var(--text-2);
 }
 
 .tactical-fp-match {
@@ -7829,8 +7825,8 @@ code {
 /* ── Tokens ────────────────────────────────────────────────── */
 :root {
   --font-display: 'Bebas Neue', sans-serif;
-  --font-body: 'Outfit', sans-serif;
-  --font-mono: 'Outfit', sans-serif;
+  --font-body: 'Manrope', sans-serif;
+  --font-mono: 'Manrope', sans-serif;
 
   /* Electric mint — the brand accent */
   --accent: #10d9a0;
@@ -8846,13 +8842,13 @@ code {
    TIMELINE
    ══════════════════════════════════════════════════════════ */
 .timeline-wrap {
-  padding: 10px 14px 12px;
+  padding: 16px;
   margin: 8px;
-  background: var(--glass-bg-inner, rgba(255, 255, 255, .04));
-  border: 1px solid var(--glass-border-inner, rgba(255, 255, 255, .08));
+  background: var(--glass-bg-inner);
+  border: 1px solid var(--glass-border-inner);
   border-radius: var(--r-md);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 .timeline {
@@ -9162,10 +9158,9 @@ code {
    MOMENTUM BAR
    ══════════════════════════════════════════════════════════ */
 .momentum-wrap {
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--amber);
-  border-radius: var(--r-lg);
+  background: var(--glass-bg-inner);
+  border: 1px solid var(--glass-border-inner);
+  border-radius: var(--r-md);
   overflow: hidden;
 }
 
@@ -9173,8 +9168,8 @@ code {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px 10px;
-  border-bottom: 1px solid var(--border);
+  padding: 16px;
+  border-bottom: 1px solid var(--glass-border-inner);
 }
 
 .momentum-title {
@@ -9355,10 +9350,9 @@ code {
    INTEL FEED — Image-1 activity feed style
    ══════════════════════════════════════════════════════════ */
 .intel-wrap-v2 {
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--amber);
-  border-radius: var(--r-lg);
+  background: var(--glass-bg-inner);
+  border: 1px solid var(--glass-border-inner);
+  border-radius: var(--r-md);
   overflow: hidden;
 }
 
@@ -9366,8 +9360,8 @@ code {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px 10px;
-  border-bottom: 1px solid var(--border);
+  padding: 16px;
+  border-bottom: 1px solid var(--glass-border-inner);
   gap: 10px;
 }
 
@@ -9757,11 +9751,10 @@ code {
    REFEREE CARD
    ══════════════════════════════════════════════════════════ */
 .ref-card {
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--text-3);
-  border-radius: var(--r-lg);
-  padding: 12px 14px;
+  background: var(--glass-bg-inner);
+  border: 1px solid var(--glass-border-inner);
+  border-radius: var(--r-md);
+  padding: 16px;
 }
 
 .ref-cross-label {
@@ -10199,7 +10192,7 @@ code {
 /* Prediction panel */
 .pred-panel {
   background: var(--bg-2);
-  border: 1px solid var(--glass-border-nested, var(--border));
+  border: 1px solid var(--glass-border, var(--border));
   border-radius: var(--r-lg);
   padding: 14px;
 }
@@ -10584,7 +10577,7 @@ code {
 /* Bracket */
 .pred-bracket {
   background: var(--bg-2);
-  border: 1px solid var(--glass-border-nested, var(--border));
+  border: 1px solid var(--glass-border, var(--border));
   border-radius: var(--r-lg);
   padding: 13px 14px;
   display: flex;
@@ -12628,10 +12621,10 @@ code {
 
 .stat-center-name {
   font-family: var(--font-mono);
-  font-size: .58rem;
+  font-size: .66rem;
   text-transform: none;
   letter-spacing: normal;
-  color: var(--text-3);
+  color: var(--text-2);
   white-space: nowrap;
 }
 
@@ -12742,16 +12735,17 @@ code {
 .momentum-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border-inner);
 }
 
 .momentum-grid-cell {
-  padding: 14px 16px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--glass-border-inner);
 }
 
 .momentum-grid-cell:last-child {
@@ -12760,10 +12754,10 @@ code {
 
 .momentum-grid-label {
   font-family: var(--font-mono);
-  font-size: .54rem;
+  font-size: .62rem;
   text-transform: none;
   letter-spacing: normal;
-  color: var(--text-3);
+  color: var(--text-2);
   text-align: center;
 }
 
@@ -12796,8 +12790,8 @@ code {
 .intel-entry-v3 {
   display: flex;
   gap: 14px;
-  padding: 16px 18px;
-  border-bottom: 1px solid var(--border);
+  padding: 16px;
+  border-bottom: 1px solid var(--glass-border-inner);
   transition: background .12s;
   align-items: flex-start;
 }
@@ -12896,31 +12890,29 @@ code {
 .intel-entry-via {
   font-family: var(--font-mono);
   font-size: .56rem;
-  color: var(--text-3);
+  color: var(--text-2);
 }
 
 .intel-entry-timestamp {
   font-family: var(--font-mono);
   font-size: .56rem;
-  color: var(--text-3);
+  color: var(--text-2);
   margin-left: auto;
 }
 
 /* ── COUNTERFACTUAL v3 (event card style) ─────────────────── */
 .cf-event-card {
   margin: 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.cf-event-card:last-child {
-  border-bottom: none;
+  background: var(--glass-bg-inner);
+  border: 1px solid var(--glass-border-inner);
+  border-radius: var(--r-md);
 }
 
 .cf-event-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 16px 18px 10px;
+  padding: 16px 16px 10px;
   gap: 12px;
 }
 
@@ -12933,7 +12925,7 @@ code {
   font-size: .58rem;
   text-transform: none;
   letter-spacing: normal;
-  color: var(--text-3);
+  color: var(--text-2);
   margin-bottom: 4px;
 }
 
@@ -12961,13 +12953,13 @@ code {
 .cf-shift-label {
   font-family: var(--font-mono);
   font-size: .56rem;
-  color: var(--text-3);
+  color: var(--text-2);
   text-transform: none;
   letter-spacing: normal;
 }
 
 .cf-event-body {
-  padding: 0 18px 14px;
+  padding: 0 16px 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -12977,10 +12969,10 @@ code {
   font-size: .76rem;
   color: var(--text-2);
   line-height: 1.45;
-  padding: 8px 12px;
-  background: var(--bg-3);
+  padding: 12px;
+  background: var(--glass-bg-inner);
   border-radius: var(--r-sm);
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border-inner);
 }
 
 .cf-narrative-block {
@@ -13190,21 +13182,21 @@ code {
   grid-template-columns: 1fr 1fr;
   gap: 0;
   margin: 8px;
-  width: auto;
-  background: var(--glass-bg-inner, rgba(255, 255, 255, .04));
-  border: 1px solid var(--glass-border-inner, rgba(255, 255, 255, .08));
+  background: var(--glass-bg-inner);
+  border: 1px solid var(--glass-border-inner);
   border-radius: var(--r-md);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   overflow: hidden;
 }
 
 .tactical-stat-cell {
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border);
-  border-right: 1px solid var(--border);
+  padding: 16px;
+  border-bottom: 1px solid var(--glass-border-inner);
+  border-right: 1px solid var(--glass-border-inner);
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 4px;
 }
 
@@ -13218,10 +13210,10 @@ code {
 
 .tactical-stat-cell-label {
   font-family: var(--font-mono);
-  font-size: .56rem;
+  font-size: .64rem;
   text-transform: none;
   letter-spacing: normal;
-  color: var(--text-3);
+  color: var(--text-2);
 }
 
 .tactical-stat-cell-value {
@@ -13232,25 +13224,25 @@ code {
 }
 
 .tactical-fingerprint-block {
-  padding: 14px 18px;
+  padding: 16px;
   margin: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: var(--glass-bg-inner, rgba(255, 255, 255, .04));
-  border: 1px solid var(--glass-border-inner, rgba(255, 255, 255, .08));
+  background: var(--glass-bg-inner);
+  border: 1px solid var(--glass-border-inner);
   border-radius: var(--r-md);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 .tactical-fp-label {
   font-family: var(--font-mono);
-  font-size: .58rem;
+  font-size: .66rem;
   text-transform: none;
   letter-spacing: normal;
-  color: var(--text-3);
+  color: var(--text-2);
 }
 
 .tactical-fp-match {
@@ -13580,17 +13572,20 @@ code {
 }
 
 .v4-hero-title {
-  font-family: var(--font-display);
-  font-size: 2.2rem;
-  letter-spacing: .04em;
-  line-height: 1;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 2rem;
+  letter-spacing: -.01em;
+  line-height: 1.15;
   color: var(--text-1);
-  margin-bottom: 5px;
+  margin-bottom: 6px;
 }
 
 .v4-hero-sub {
-  font-size: .82rem;
+  font-size: .88rem;
+  font-weight: 400;
   color: var(--text-2);
+  letter-spacing: -.005em;
 }
 
 /* ── Filter tabs ─────────────────────────────────────────── */
@@ -13738,15 +13733,17 @@ code {
 }
 
 .v4-mc-team-name {
-  font-size: .88rem;
+  font-size: .9rem;
   font-weight: 500;
+  letter-spacing: -.005em;
   color: var(--text-1);
   flex: 1;
 }
 
 .v4-mc-team-score {
-  font-family: var(--font-display);
-  font-size: 1.6rem;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 1.4rem;
   line-height: 1;
   color: var(--text-1);
   min-width: 20px;
@@ -13785,10 +13782,11 @@ code {
 }
 
 .v4-mc-kickoff-time {
-  font-family: var(--font-display);
-  font-size: 1.4rem;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 1.15rem;
   color: var(--text-1);
-  letter-spacing: .03em;
+  letter-spacing: -.01em;
 }
 
 .v4-mc-kickoff-label {
@@ -14549,7 +14547,9 @@ code {
   height: 30px;
   width: 30px;
   object-fit: cover;
-
+  /* Source asset is the trophy graphic centered on a solid black square —
+     cover crops in on the trophy instead of showing the black letterboxing
+     on either side, so it reads as a compact badge rather than a banner. */
   border-radius: 6px;
   flex-shrink: 0;
 }
@@ -14594,7 +14594,13 @@ code {
   color: var(--text-3);
 }
 
-
+/* ══════════════════════════════════════════════════════════
+   Outer layout compaction — page/grid/columns only.
+   Does NOT affect inline-styled card internals (StatsPanel,
+   EventsFeed, IntelFeed, LiveProbCard, XGCard, TeamFormCard,
+   TacticalCard) — those need direct file edits, see note below.
+   Paste at end of globals.css
+   ══════════════════════════════════════════════════════════ */
 
 .match-page {
   max-width: 1400px;
@@ -14624,6 +14630,7 @@ code {
   margin-top: 0 !important;
 }
 
+/* Tighten vertical rhythm between stacked cards in any column */
 .match-grid-3>div {
   display: flex;
   flex-direction: column;
@@ -14644,11 +14651,17 @@ code {
   font-size: .9em;
 }
 
+/* Generic card shell tightening — applies to any element using these
+   common wrapper classes across your cards */
+.match-page [style*="border-radius"] {
+  /* no-op: attribute selectors can't override inline styles. */
+}
 
-.match-page [style*="border-radius"] {}
 
-
-
+/* ══════════════════════════════════════════════════════════
+   StatsPanel compaction — overrides for stat-row-v2 classes
+   (must follow the base class definitions)
+   ══════════════════════════════════════════════════════════ */
 
 .stats-panel-v2 {
   font-size: inherit;
@@ -14689,7 +14702,7 @@ code {
 }
 
 .stat-center-name {
-  font-size: .62rem !important;
+  font-size: .7rem !important;
   line-height: 1 !important;
 }
 
@@ -14698,7 +14711,9 @@ code {
   margin-top: 1px !important;
 }
 
-
+/* ══════════════════════════════════════════════════════════
+   StatsPanel — compact row density
+   ══════════════════════════════════════════════════════════ */
 
 .stats-panel-v2 {
   font-size: inherit;
@@ -14741,7 +14756,7 @@ code {
 }
 
 .stat-center-name {
-  font-size: .58rem !important;
+  font-size: .66rem !important;
   line-height: 1 !important;
   letter-spacing: .02em !important;
 }
@@ -14752,19 +14767,27 @@ code {
   width: 100%;
 }
 
-
+/* ══════════════════════════════════════════════════════════
+   Column scroll containment — caps each of the 3 columns to
+   the same height, bottoms align, overflow scrolls internally
+   instead of stretching the page unevenly.
+   Paste at END of globals.css
+   ══════════════════════════════════════════════════════════ */
 
 .match-grid-3 {
   align-items: stretch !important;
+  /* columns match height */
 }
 
 .match-grid-3>div {
   max-height: calc(100vh - 130px);
+  /* adjust 130px if your topbar/navbar height differs */
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
   scrollbar-color: var(--border-bright) transparent;
   padding-right: 2px;
+  /* room for scrollbar so content doesn't jump */
 }
 
 .match-grid-3>div::-webkit-scrollbar {
@@ -14784,26 +14807,35 @@ code {
   background: var(--text-3);
 }
 
+/* Card headers that live near the top of a scrolling column should
+   stay visible while the body scrolls — sticky headers for the cards
+   most likely to have long lists (events, counterfactual feed, form) */
 .match-live-col,
 .ai-tabs,
 .match-grid-3>div>div {
   position: relative;
 }
 
+/* Prevent individual cards from having their own competing scroll —
+   only the outer column scrolls, cards themselves stay natural height */
 .match-grid-3>div>* {
   flex-shrink: 0;
 }
 
 @media (max-width: 1100px) {
 
-
+  /* On narrow/stacked layout, columns shouldn't be height-capped —
+     let the page scroll normally like any mobile page */
   .match-grid-3>div {
     max-height: none;
     overflow-y: visible;
   }
 }
 
-
+/* ══════════════════════════════════════════════════════════
+   Column 3 tabs — Netflix carousel + shared card styles
+   Paste at end of globals.css
+   ══════════════════════════════════════════════════════════ */
 
 .narrative-carousel-wrap {
   display: flex;
@@ -14931,7 +14963,10 @@ code {
   overflow: hidden;
 }
 
-
+/* ══════════════════════════════════════════════════════════
+   Sticky tab bars — .ai-tabs-nav sticks to the top of its
+   scrolling column (.match-grid-3 > div, overflow-y:auto).
+   ══════════════════════════════════════════════════════════ */
 
 .ai-tabs {
   display: flex;
@@ -14953,12 +14988,23 @@ code {
   overflow-x: hidden;
 }
 
+/* The outer column itself no longer needs to scroll if the tab body
+   handles its own scroll — prevents a double-scrollbar situation when
+   a column's only child is an ai-tabs block */
 .match-grid-3>div:has(.ai-tabs) {
   overflow: visible !important;
   max-height: none !important;
 }
 
-
+/* ══════════════════════════════════════════════════════════
+   Modal comment bubbles — separate class from the narrative-page
+   CommentBubbles component's .comment-bubble, because that class's
+   drift keyframes set `transform` directly and would silently
+   override the translate(-50%,-50%) centering needed for grid-cell
+   positioning here. Every keyframe below chains BOTH the centering
+   translate AND the drift offset so they compose instead of conflict.
+   Paste at end of globals.css
+   ══════════════════════════════════════════════════════════ */
 
 .modal-comment-bubble {
   background: var(--bg-2);
@@ -15007,6 +15053,14 @@ code {
   }
 }
 
+/* ══════════════════════════════════════════════════════════
+   Narrative / column heights (!important; must stay late in
+   the cascade)
+   ══════════════════════════════════════════════════════════ */
+
+/* The column gets a bounded height (not max-height) so .ai-tabs's
+   height:100% resolves and .ai-tabs-body scrolls internally.
+   130px = topbar height. */
 
 .match-grid-3>div {
   height: calc(100vh - 130px) !important;
@@ -15014,7 +15068,8 @@ code {
   overflow: hidden !important;
 }
 
-
+/* Col 1 (match-live-col, no .ai-tabs) still needs to scroll itself
+   since it has no internal tab-body to delegate scrolling to */
 .match-grid-3>div:not(:has(.ai-tabs)) {
   overflow-y: auto !important;
   scrollbar-width: thin;
@@ -15042,7 +15097,11 @@ code {
   }
 }
 
-
+/* ── Separate scroller for the narrative spike grid ──────────
+   Its own bounded box + scrollbar, independent of the tab body's
+   scroll, so the arc/detail panel above it stays anchored in view
+   while only the spike list scrolls.
+   ────────────────────────────────────────────────────────── */
 
 .narrative-spike-grid-scroll {
   max-height: 260px;
@@ -15062,6 +15121,7 @@ code {
   border-radius: 3px;
 }
 
+/* ── Hover bubble text fade ── */
 @keyframes bubble-fade-in {
   from {
     opacity: 0;
@@ -15072,7 +15132,17 @@ code {
   }
 }
 
+/* ══════════════════════════════════════════════════════════
+   Light/Dark theme system — paste at the very TOP of globals.css
+   (before any component-specific rules that reference these
+   variables, so they're defined before use — variable declaration
+   order in the cascade doesn't strictly matter for custom properties,
+   but keeping this at the top makes the file easier to reason about).
 
+   Applies to <html data-theme="dark"|"light">. Defaults to dark if
+   no attribute is set (matches the theme this build has used
+   throughout the session).
+   ══════════════════════════════════════════════════════════ */
 
 :root,
 [data-theme="dark"] {
@@ -15109,8 +15179,8 @@ code {
   --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 
   --font-display: "Bebas Neue", "Oswald", sans-serif;
-  --font-mono: "Outfit", sans-serif;
-  --font-body: "Outfit", -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Manrope", sans-serif;
+  --font-body: "Manrope", -apple-system, "Segoe UI", sans-serif;
 
   --r-sm: 6px;
   --r-md: 10px;
@@ -15156,7 +15226,9 @@ code {
   color-scheme: light;
 }
 
-
+/* Smooth transition when toggling — applied broadly but kept light
+   so it doesn't fight with existing hover/transition rules on
+   individual elements */
 body,
 .match-page,
 .ai-tabs,
@@ -15169,6 +15241,7 @@ body {
   color: var(--text-1);
 }
 
+/* Live indicator dot — used throughout (events, momentum, streams) */
 .live-dot {
   display: inline-block;
   width: 7px;
@@ -15193,6 +15266,10 @@ body {
   }
 }
 
+/* ══════════════════════════════════════════════════════════
+   Sticky tab bars — .ai-tabs-nav sticks to the top of its
+   scrolling column (.match-grid-3 > div, overflow-y:auto).
+   ══════════════════════════════════════════════════════════ */
 
 .ai-tabs {
   display: flex;
@@ -15214,12 +15291,23 @@ body {
   overflow-x: hidden;
 }
 
-
+/* The outer column itself no longer needs to scroll if the tab body
+   handles its own scroll — prevents a double-scrollbar situation when
+   a column's only child is an ai-tabs block */
 .match-grid-3>div:has(.ai-tabs) {
   overflow: visible !important;
   max-height: none !important;
 }
 
+/* ══════════════════════════════════════════════════════════
+   Modal comment bubbles — separate class from the narrative-page
+   CommentBubbles component's .comment-bubble, because that class's
+   drift keyframes set `transform` directly and would silently
+   override the translate(-50%,-50%) centering needed for grid-cell
+   positioning here. Every keyframe below chains BOTH the centering
+   translate AND the drift offset so they compose instead of conflict.
+   Paste at end of globals.css
+   ══════════════════════════════════════════════════════════ */
 
 .modal-comment-bubble {
   background: var(--bg-2);
@@ -15268,12 +15356,17 @@ body {
   }
 }
 
+/* ══════════════════════════════════════════════════════════
+   Narrative arc top placement + compressed source strip
+   Paste at end of globals.css
+   ══════════════════════════════════════════════════════════ */
 
 .narrative-arc-top {
   padding: 18px;
   border-bottom: 1px solid var(--border-bright);
 }
 
+/* Compressed source-strip — roughly 40% shorter than the original */
 .source-strip-compact {
   padding: 10px 18px !important;
   gap: 8px !important;
@@ -15310,12 +15403,17 @@ body {
   height: 3px !important;
 }
 
+/* ══════════════════════════════════════════════════════════
+   Narrative arc top placement + compressed source strip
+   Paste at end of globals.css
+   ══════════════════════════════════════════════════════════ */
 
 .narrative-arc-top {
   padding: 18px;
   border-bottom: 1px solid var(--border-bright);
 }
 
+/* Compressed source-strip — roughly 40% shorter than the original */
 .source-strip-compact {
   padding: 10px 18px !important;
   gap: 8px !important;
@@ -15351,8 +15449,9 @@ body {
 .source-strip-compact .source-cell-bar {
   height: 3px !important;
 }
-
-
+/* ══════════════════════════════════════════════════════════
+   MATCH PAGE — rail + unified tabs
+   ══════════════════════════════════════════════════════════ */
 .mp-shell {
   max-width: 1600px;
   margin: 0 auto;
@@ -15375,7 +15474,9 @@ body {
   background: var(--bg-2);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-
+  /* Bound the whole rail to the viewport (matches .mp-side) so the flag
+     list actually gets to use the available height instead of being
+     capped at an arbitrary 60vh regardless of how tall the viewport is. */
   max-height: calc(100vh - 20px);
 }
 
@@ -15395,7 +15496,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-
+  /* flex:1 + min-height:0 (not the more obvious max-height:60vh, which
+     capped this well short of the actual space available) — lets the list
+     fill whatever room is left inside .mp-rail's bounded height between
+     the home icon and the "more" chevron, and only then start scrolling. */
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -15411,7 +15515,12 @@ body {
   justify-content: center;
   width: 34px;
   height: 34px;
-
+  /* flex-shrink:0 is load-bearing — .mp-rail-list is a column flexbox with
+     max-height + overflow-y:auto, and with many items (all FT matches) the
+     content exceeds that max-height. Flexbox shrinks flex-basis (height,
+     the main axis in a column) to fit BEFORE overflow triggers the
+     scrollbar, squashing every circle into an oval. flex-shrink:0 forces
+     the list to actually scroll instead of compressing items. */
   flex-shrink: 0;
   border-radius: 50%;
   border: 2px solid transparent;
@@ -15471,15 +15580,19 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: var(--glass-bg-nested, rgba(0, 0, 0, .20));
-  border: 1px solid var(--glass-border-nested, rgba(255, 255, 255, .05));
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   border-radius: var(--r-lg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   overflow-y: auto;
   position: sticky;
   top: 10px;
-
+  /* Independently-scrolling sidebar, bounded to the viewport, instead of
+     following the page's full scroll length (the tab content column on
+     the right is often much taller) — this is what actually makes a
+     6-section stack (stats/win-prob/xG/events/timeline/group table)
+     "fit in one page" rather than just being individually more compact. */
   max-height: calc(100vh - 20px);
 }
 
@@ -15491,7 +15604,6 @@ body {
   .mp-body {
     grid-template-columns: 1fr;
   }
-
   .mp-side {
     position: static;
     max-height: none;
@@ -15502,7 +15614,6 @@ body {
   .mp-shell {
     flex-direction: column;
   }
-
   .mp-rail {
     position: static;
     width: 100%;
@@ -15510,19 +15621,19 @@ body {
     flex-direction: row;
     overflow-x: auto;
   }
-
   .mp-rail-list {
     flex-direction: row;
     flex: initial;
   }
 }
 
+/* Unified tab strip — same visual language as .ai-tabs, wider nav row */
 .mp-tabs {
-  background: var(--glass-bg-nested, rgba(0, 0, 0, .20));
-  border: 1px solid var(--glass-border-nested, rgba(255, 255, 255, .05));
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   border-radius: var(--r-lg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -15570,6 +15681,9 @@ body {
   flex-shrink: 0;
 }
 
+/* ══════════════════════════════════════════════════════════
+   MATCH PAGE — compact cards in the narrow .mp-side column
+   ══════════════════════════════════════════════════════════ */
 .mp-side {
   gap: 8px;
 }
@@ -15590,6 +15704,10 @@ body {
   font-size: .5rem;
 }
 
+/* ══════════════════════════════════════════════════════════
+   MATCH PAGE — denser side column: section headers, timeline
+   and group-table padding (scoped to .mp-side)
+   ══════════════════════════════════════════════════════════ */
 .mp-side .stats-section-header {
   padding: 4px 14px 2px !important;
 }
@@ -15610,10 +15728,14 @@ body {
   padding: 5px 12px;
 }
 
-
+/* ══════════════════════════════════════════════════════════
+   MATCH PAGE — cards: rounded floating cards, gradient hero,
+   pill tab bar (overrides the rules above)
+   ══════════════════════════════════════════════════════════ */
 
 :root {
-
+  /* Dashboard-card top corners — large/pronounced per the layered-sheet
+     reference (24-32px), bottom stays flat (see .mp-body below). */
   --r-2xl: 28px;
   --r-pill: 999px;
 }
@@ -15651,7 +15773,8 @@ body {
   border: 1px solid var(--border-bright);
 }
 
-
+/* Side column is a plain section inside .mp-body, with a right-hand
+   divider separating it from the tab column. */
 .mp-side {
   gap: 0;
   border-right: 1px solid var(--border);
@@ -15662,6 +15785,7 @@ body {
   border-top: 1px solid var(--border);
 }
 
+/* Pill tab bar, spread evenly across the row. */
 .mp-tabs-nav {
   background: var(--bg-3);
   border-radius: var(--r-pill);
@@ -15693,18 +15817,27 @@ body {
   display: none;
 }
 
+/* ══════════════════════════════════════════════════════════
+   MATCH PAGE — team-colored hero. The gradient is set inline by
+   ScoreHeader.tsx (per-match colors); this block hides the tint
+   overlay and raises text contrast.
+   ══════════════════════════════════════════════════════════ */
 
+/* Transparent header over the page-wide colored background (see below);
+   no tint overlay or card edge. */
 .score-header-v3-team-colored::before,
 .score-header-v3-team-colored::after {
   display: none;
 }
 
 .score-header-v3-team-colored {
-
+  /* Overrides the opaque background from the base .score-header-v3 rule. */
   background: transparent;
   border-bottom: none;
 }
 
+/* !important: .score-team-v3.home/.away .score-team-name-v3 (3 classes)
+   outranks this selector. */
 .score-header-v3-team-colored .score-team-name-v3 {
   color: #fff !important;
   text-shadow: 0 1px 4px rgba(0, 0, 0, .35);
@@ -15729,6 +15862,13 @@ body {
   color: rgba(255, 255, 255, .5);
 }
 
+/* Layered surface, matching the reference: the header's content
+   (score/status/progress bar) stays exactly where it was, but the header
+   reserves extra blank space below it — still painted by the page-wide
+   colored background, not a card of its own — for the dashboard surface
+   to overlap UP into. Net visible gap between the progress bar and the
+   dashboard card = 110px reserved − 40px overlap = a clearly visible ~70px
+   band of color, with the card's rounded top corners resting on top of it. */
 .score-header-v3-team-colored {
   padding-bottom: 110px;
 }
@@ -15738,7 +15878,10 @@ body {
   z-index: 1;
 }
 
-
+/* .mp-body is the single dashboard surface everything below the header
+   lives inside — one elevated card (not two separately-carded columns),
+   large rounded top corners, flat bottom (nothing sits below it), pulled
+   up to overlap the header's reserved color band. */
 .mp-body {
   background: var(--bg-2);
   border-radius: var(--r-2xl) var(--r-2xl) 0 0;
@@ -15750,7 +15893,10 @@ body {
   z-index: 2;
 }
 
-
+/* Page-wide hero background: ScoreHeader.tsx sets --page-hero-layer (a
+   scrim over the home/away color split) on <html> while a match page is
+   mounted; other pages fall back to `none`. Fixed attachment sizes the
+   gradient to the viewport. */
 body {
   background-image: var(--page-hero-layer, none);
   background-color: var(--bg-page);
@@ -15760,7 +15906,7 @@ body {
 
 @media (max-width: 1100px) {
 
-
+  /* .mp-side/.mp-tabs stack below this width: bottom divider instead of right. */
   .mp-side {
     border-right: none;
     border-bottom: 1px solid var(--border);
@@ -15769,12 +15915,16 @@ body {
   }
 }
 
-
+/* ══════════════════════════════════════════════════════════
+   MATCH PAGE — team identity, edge-to-edge glass rail
+   ══════════════════════════════════════════════════════════ */
 
 .score-team-name-v3 {
   font-size: 2.4rem;
 }
 
+/* Rail pinned to the viewport edge on desktop (min-width:701px); the
+   max-width:700px rule above makes it a horizontal strip on mobile. */
 @media (min-width: 701px) {
   .mp-rail {
     position: fixed;
@@ -15788,13 +15938,15 @@ body {
     border: none;
     border-right: 1px solid var(--glass-border, var(--border-bright));
     background: var(--glass-bg, var(--bg-2));
-
+    /* "Liquid glass": blurs/tints whatever's behind it (the page-wide hero
+       gradient, match content as it scrolls under the rail) rather than
+       sitting on a flat opaque panel. */
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     z-index: 40;
   }
 
-
+  /* Reserve the fixed rail's width so content doesn't render under it. */
   .mp-shell {
     padding-left: 84px;
   }
@@ -15802,24 +15954,100 @@ body {
 
 [data-theme="dark"] {
   --glass-bg: rgba(17, 21, 32, .45);
+  --glass-bg-strong: rgba(17, 21, 32, .62);
   --glass-border: rgba(255, 255, 255, .10);
+  --glass-blur: blur(20px) saturate(180%);
+  --glass-bg-inner: rgba(255, 255, 255, .05);
+  --glass-border-inner: rgba(255, 255, 255, .06);
 }
 
 [data-theme="light"] {
   --glass-bg: rgba(255, 255, 255, .40);
+  --glass-bg-strong: rgba(255, 255, 255, .6);
   --glass-border: rgba(255, 255, 255, .55);
+  --glass-blur: blur(20px) saturate(180%);
+  --glass-bg-inner: rgba(255, 255, 255, .35);
+  --glass-border-inner: rgba(0, 0, 0, .06);
 }
 
-[data-theme="dark"] {
-  --glass-bg-nested: rgba(0, 0, 0, .20);
-  --glass-border-nested: rgba(255, 255, 255, .05);
-  --glass-bg-inner: rgba(255, 255, 255, .04);
-  --glass-border-inner: rgba(255, 255, 255, .08);
+/* ══════════════════════════════════════════════════════════
+   HOME DASHBOARD — glassmorphism: frosted panels over a static
+   colored wash (scoped to .v4-home)
+   ══════════════════════════════════════════════════════════ */
+
+/* Static, theme-aware wash from --home/--away/--accent for backdrop-filter
+   to blur. */
+.v4-home {
+  position: relative;
+  background:
+    radial-gradient(circle at 12% -10%, rgba(79, 134, 247, 0.30), transparent 42%),
+    radial-gradient(circle at 88% 5%, rgba(240, 84, 84, 0.22), transparent 40%),
+    radial-gradient(circle at 50% 115%, rgba(16, 217, 160, 0.16), transparent 55%);
+  border-radius: 24px;
 }
 
-[data-theme="light"] {
-  --glass-bg-nested: rgba(255, 255, 255, .25);
-  --glass-border-nested: rgba(0, 0, 0, .06);
-  --glass-bg-inner: rgba(255, 255, 255, .45);
-  --glass-border-inner: rgba(0, 0, 0, .07);
+[data-theme="light"] .v4-home {
+  background:
+    radial-gradient(circle at 12% -10%, rgba(79, 134, 247, 0.16), transparent 42%),
+    radial-gradient(circle at 88% 5%, rgba(240, 84, 84, 0.12), transparent 40%),
+    radial-gradient(circle at 50% 115%, rgba(5, 150, 105, 0.10), transparent 55%);
+}
+
+.v4-home-hero,
+.v4-home-tab,
+.v4-match-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.v4-home-hero {
+  border-radius: 22px;
+  padding: 28px 30px;
+}
+
+.v4-home-tab {
+  border-radius: 999px;
+}
+
+.v4-home-tab.active {
+  background: var(--accent-dim);
+  border-color: var(--accent-glow);
+}
+
+.v4-match-card {
+  border-radius: 18px;
+  padding: 18px 20px;
+}
+
+/* ══════════════════════════════════════════════════════════
+   MATCH PAGE — glassmorphism. .mp-body is the single dashboard
+   surface over --page-hero-layer; its children paint no background,
+   so frosting .mp-body frosts the whole surface. */
+.mp-body {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-bottom: none;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+/* Tab pill bar + rail also get the frosted treatment instead of the
+   flat --bg-3/--bg-4 they had — --glass-bg-strong (a bit more opaque
+   than --glass-bg) keeps the pill row legible sitting on top of the
+   already-glass .mp-body behind it. */
+.mp-tabs-nav {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.ai-tab-btn {
+  background: var(--glass-bg);
+}
+
+.ai-tab-btn:hover {
+  background: var(--glass-bg-strong);
 }

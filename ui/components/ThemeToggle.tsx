@@ -1,35 +1,48 @@
 "use client"
-
-/**
- * Theme toggle button.
- *
- * The button defers rendering until the client has mounted so it can avoid a
- * flash of the wrong icon while the persisted theme is being read.
- */
+// components/ThemeToggle.tsx
+// Sliding pill switch — drop into NavBar (or anywhere) to toggle theme.
 
 import { useTheme } from "@/hooks/useTheme"
 
 export function ThemeToggle() {
     const { theme, toggleTheme, mounted } = useTheme()
 
-    if (!mounted) return <div style={{ width: 30, height: 30 }} />
+    // Avoid a flash of wrong state before the client has determined the
+    // real theme on first mount
+    if (!mounted) return <div style={{ width: 46, height: 24 }} />
+
+    const isDark = theme === "dark"
 
     return (
         <button
             onClick={toggleTheme}
-            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+            aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
+            title={`Switch to ${isDark ? "light" : "dark"} mode`}
+            role="switch"
+            aria-checked={isDark}
             style={{
-                width: 30, height: 30, borderRadius: "50%",
-                background: "var(--bg-3)", border: "1px solid var(--border)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: "pointer", fontSize: "1rem", transition: "all .15s",
-                color: "var(--text-2)",
+                width: 46, height: 24, borderRadius: 999, padding: 3,
+                display: "flex", alignItems: "center",
+                justifyContent: isDark ? "flex-end" : "flex-start",
+                background: isDark ? "var(--bg-4)" : "var(--accent-dim)",
+                border: `1px solid ${isDark ? "var(--border-bright)" : "var(--accent-glow)"}`,
+                cursor: "pointer", transition: "background .2s ease, border-color .2s ease",
+                flexShrink: 0,
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = "var(--bg-4)"; e.currentTarget.style.color = "var(--text-1)" }}
-            onMouseLeave={e => { e.currentTarget.style.background = "var(--bg-3)"; e.currentTarget.style.color = "var(--text-2)" }}
         >
-            {theme === "dark" ? "☀️" : "🌙"}
+            <span
+                style={{
+                    width: 18, height: 18, borderRadius: "50%",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: isDark ? "var(--text-1)" : "var(--accent)",
+                    color: isDark ? "var(--bg-2)" : "#04211a",
+                    fontSize: ".62rem", lineHeight: 1,
+                    transition: "transform .2s ease, background .2s ease",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                }}
+            >
+                {isDark ? "🌙" : "☀️"}
+            </span>
         </button>
     )
 }
