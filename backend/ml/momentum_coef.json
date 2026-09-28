@@ -1,0 +1,27 @@
+{
+  "intercept": -2.7654340567867686,
+  "coef": {
+    "xg15_for": -0.31387100680124663,
+    "xg15_against": -0.01666649840222914,
+    "shots15_for": 0.07298157902381759,
+    "shots15_against": -0.027302588358571897,
+    "xg_for": 0.24231883750271307,
+    "xg_against": -0.14154366367222102,
+    "score_diff": -0.08871806306891807,
+    "red_diff": -0.4871188023829252,
+    "minute_norm": -0.027230850808829823
+  },
+  "features": [
+    "xg15_for",
+    "xg15_against",
+    "shots15_for",
+    "shots15_against",
+    "xg_for",
+    "xg_against",
+    "score_diff",
+    "red_diff",
+    "minute_norm"
+  ],
+  "target": "team scores within the next 5 minutes of match time",
+  "trained_on": "ESPN eng.1,esp.1,ger.1,ita.1,fra.1 (1388 matches, 277516 samples)"
+}

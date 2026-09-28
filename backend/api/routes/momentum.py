@@ -1,4 +1,10 @@
-"""Momentum routes for the live match snapshot and SSE stream."""
+"""
+Momentum endpoints.
+
+    GET/POST /matches/{fixture_id}/momentum/trigger  debug: force one cycle (token-gated)
+    GET      /matches/{fixture_id}/momentum          latest snapshot
+    GET      /matches/{fixture_id}/momentum/stream   SSE (pub/sub-backed)
+"""
 
 import json
 import logging
@@ -22,7 +28,7 @@ log = logging.getLogger(__name__)
     dependencies=[Depends(require_trigger_token)],
 )
 async def trigger_momentum(fixture_id: str, request: Request):
-    """Manually run one momentum update cycle."""
+    """Run one momentum update cycle (token-gated)."""
     r = request.app.state.redis
     raw = await r.get(f"match:{fixture_id}:state")
 
@@ -30,7 +36,7 @@ async def trigger_momentum(fixture_id: str, request: Request):
         raise HTTPException(
             status_code=404,
             detail=f"No match state found for fixture {fixture_id}. "
-            "Is the mock producer running?",
+            "Is the match producer running?",
         )
 
     try:
@@ -39,7 +45,8 @@ async def trigger_momentum(fixture_id: str, request: Request):
         return {"status": "error", "stage": "parse_match_state", "error": str(exc)}
 
     try:
-        result = momentum_model.update(state)
+        shots_raw = await r.get(f"match:{fixture_id}:shots")
+        result = momentum_model.update(state, json.loads(shots_raw) if shots_raw else [])
     except Exception as exc:
         return {"status": "error", "stage": "momentum_model.update", "error": str(exc)}
 
@@ -63,7 +70,11 @@ async def trigger_momentum(fixture_id: str, request: Request):
 
 @router.get("/{fixture_id}/momentum")
 async def get_momentum(fixture_id: str, request: Request):
-    """Return the latest momentum snapshot for a fixture."""
+    """Latest momentum snapshot for this fixture.
+
+    Non-live matches return 200 {"status": "not_started"}; a live match
+    without data yet (before the first worker tick) returns 404.
+    """
     r = request.app.state.redis
     raw = await r.get(f"match:{fixture_id}:momentum")
 
@@ -93,7 +104,7 @@ async def get_momentum(fixture_id: str, request: Request):
 
 @router.get("/{fixture_id}/momentum/stream")
 async def momentum_stream(fixture_id: str, request: Request):
-    """Stream momentum updates over pub/sub-backed SSE."""
+    """SSE stream, pub/sub-backed."""
     r = request.app.state.redis
 
     async def generator():

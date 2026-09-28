@@ -1,0 +1,195 @@
+{
+  "train": {
+    "matches": 1388,
+    "samples": 277516,
+    "goal_rate": 0.0644
+  },
+  "held_out_club": {
+    "n": 69440,
+    "goal_rate": 0.0651,
+    "logloss": 0.2386,
+    "logloss_score_clock_only": 0.2399,
+    "logloss_base_rate": 0.2407,
+    "brier": 0.0606,
+    "brier_base_rate": 0.06083,
+    "ece": 0.0039,
+    "reliability": [
+      {
+        "mean_pred": 0.0436,
+        "observed": 0.0356,
+        "n": 6944
+      },
+      {
+        "mean_pred": 0.0533,
+        "observed": 0.056,
+        "n": 6944
+      },
+      {
+        "mean_pred": 0.0565,
+        "observed": 0.055,
+        "n": 6944
+      },
+      {
+        "mean_pred": 0.0587,
+        "observed": 0.0657,
+        "n": 6892
+      },
+      {
+        "mean_pred": 0.0602,
+        "observed": 0.0599,
+        "n": 6996
+      },
+      {
+        "mean_pred": 0.0627,
+        "observed": 0.0613,
+        "n": 6944
+      },
+      {
+        "mean_pred": 0.0654,
+        "observed": 0.066,
+        "n": 6944
+      },
+      {
+        "mean_pred": 0.0691,
+        "observed": 0.0652,
+        "n": 6944
+      },
+      {
+        "mean_pred": 0.0753,
+        "observed": 0.0874,
+        "n": 6944
+      },
+      {
+        "mean_pred": 0.0998,
+        "observed": 0.0985,
+        "n": 6944
+      }
+    ]
+  },
+  "external:wc2022": {
+    "matches": 64,
+    "n": 13464,
+    "goal_rate": 0.0586,
+    "logloss": 0.2226,
+    "logloss_score_clock_only": 0.2226,
+    "logloss_base_rate": 0.2234,
+    "brier": 0.05512,
+    "brier_base_rate": 0.0552,
+    "ece": 0.0101,
+    "reliability": [
+      {
+        "mean_pred": 0.0475,
+        "observed": 0.0453,
+        "n": 1347
+      },
+      {
+        "mean_pred": 0.0537,
+        "observed": 0.0557,
+        "n": 1346
+      },
+      {
+        "mean_pred": 0.0566,
+        "observed": 0.0438,
+        "n": 1346
+      },
+      {
+        "mean_pred": 0.0585,
+        "observed": 0.0371,
+        "n": 1293
+      },
+      {
+        "mean_pred": 0.0597,
+        "observed": 0.0521,
+        "n": 1400
+      },
+      {
+        "mean_pred": 0.0619,
+        "observed": 0.0691,
+        "n": 1346
+      },
+      {
+        "mean_pred": 0.0642,
+        "observed": 0.0728,
+        "n": 1347
+      },
+      {
+        "mean_pred": 0.0676,
+        "observed": 0.078,
+        "n": 1346
+      },
+      {
+        "mean_pred": 0.0727,
+        "observed": 0.0698,
+        "n": 1346
+      },
+      {
+        "mean_pred": 0.0884,
+        "observed": 0.0616,
+        "n": 1347
+      }
+    ]
+  },
+  "external:wc2026": {
+    "matches": 104,
+    "n": 22222,
+    "goal_rate": 0.0656,
+    "logloss": 0.2371,
+    "logloss_score_clock_only": 0.2403,
+    "logloss_base_rate": 0.242,
+    "brier": 0.06062,
+    "brier_base_rate": 0.06127,
+    "ece": 0.0111,
+    "reliability": [
+      {
+        "mean_pred": 0.0422,
+        "observed": 0.0234,
+        "n": 2220
+      },
+      {
+        "mean_pred": 0.0524,
+        "observed": 0.0467,
+        "n": 2225
+      },
+      {
+        "mean_pred": 0.0559,
+        "observed": 0.0513,
+        "n": 2222
+      },
+      {
+        "mean_pred": 0.0583,
+        "observed": 0.0505,
+        "n": 2158
+      },
+      {
+        "mean_pred": 0.0599,
+        "observed": 0.0608,
+        "n": 2286
+      },
+      {
+        "mean_pred": 0.0624,
+        "observed": 0.0666,
+        "n": 2222
+      },
+      {
+        "mean_pred": 0.0655,
+        "observed": 0.0495,
+        "n": 2222
+      },
+      {
+        "mean_pred": 0.0697,
+        "observed": 0.0774,
+        "n": 2222
+      },
+      {
+        "mean_pred": 0.0766,
+        "observed": 0.0977,
+        "n": 2221
+      },
+      {
+        "mean_pred": 0.107,
+        "observed": 0.1313,
+        "n": 2224
+      }
+    ]
+  }
+}

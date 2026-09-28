@@ -1,44 +1,16 @@
 """
-Real-time match momentum refresh worker.
+Momentum background worker.
 
-This background worker continuously computes live momentum signals for active
-fixtures by combining canonical MatchState objects with the momentum model.
+Every 30 seconds, runs the momentum model on every active MatchState,
+writes the result and publishes a pub/sub notification for the SSE layer.
+Per-fixture state is released when a fixture leaves matches:active.
 
-The worker provides a low-latency feature pipeline:
+Redis writes:
+    match:{fixture_id}:momentum   JSON momentum snapshot   TTL 3600s
 
-    Live Match Producer
-            ↓
-    Redis MatchState
-            ↓
-    Momentum Worker
-            ↓
-    Momentum Model
-            ↓
-    Redis Feature Cache + Pub/Sub
-            ↓
-    SSE / Frontend Consumers
-
-
-Responsibilities:
-    - Load active fixture states from Redis.
-    - Maintain stateful momentum calculations across polling cycles.
-    - Generate short-horizon goal probability estimates.
-    - Persist momentum snapshots for downstream consumers.
-    - Broadcast lightweight updates through Redis pub/sub.
-
-Redis storage:
-    match:{fixture_id}:momentum
-        Latest momentum feature snapshot.
-
-Pub/Sub:
-    momentum_update
-        Lightweight real-time update payload for streaming clients.
-
-The worker is designed for continuous async execution with:
-    - concurrent fixture processing
-    - automatic stale-state cleanup
-    - failure isolation between fixtures
-    - lightweight model inference suitable for live systems
+Pub/sub:
+    channel momentum_update
+    payload {fixture_id, home_momentum, away_momentum, goal probs, elapsed}
 """
 
 import asyncio
@@ -49,9 +21,10 @@ import redis.asyncio as aioredis
 
 from api.schemas.schema import MatchState
 from ml import momentum_model
+from monitoring.metrics import WORKER_ERRORS, WORKER_TICK_DURATION, tick_done
 
 log = logging.getLogger(__name__)
-INTERVAL = 30.0
+INTERVAL = 30.0  # seconds between full update cycles
 
 
 async def run(redis_client: aioredis.Redis) -> None:
@@ -59,11 +32,14 @@ async def run(redis_client: aioredis.Redis) -> None:
     log.info("Momentum worker started — updating every 30s")
     while True:
         try:
-            await _update_all(redis_client)
+            with WORKER_TICK_DURATION.labels("momentum").time():
+                await _update_all(redis_client)
+            tick_done("momentum")
         except asyncio.CancelledError:
             log.info("Momentum worker cancelled — shutting down")
-            return
+            raise
         except Exception as exc:
+            WORKER_ERRORS.labels("momentum").inc()
             log.error(f"Momentum worker error: {exc}", exc_info=True)
         await asyncio.sleep(INTERVAL)
 
@@ -71,10 +47,6 @@ async def run(redis_client: aioredis.Redis) -> None:
 async def _update_all(r: aioredis.Redis) -> None:
     """Process all fixtures currently in the matches:active set."""
     fixture_ids = list(await r.smembers("matches:active"))
-
-    active = {str(fid) for fid in fixture_ids}
-    for known in [k for k in list(momentum_model.states) if str(k) not in active]:
-        momentum_model.clear_state(known)
 
     if not fixture_ids:
         return
@@ -89,8 +61,7 @@ async def _update_all(r: aioredis.Redis) -> None:
 
 
 async def _update_fixture(r: aioredis.Redis, fid_str: str) -> None:
-    """Read MatchState → momentum_model.update() (pure CPU, <1ms) → write +
-    publish."""
+    """Read MatchState → momentum_model.update() → write and publish."""
     raw = await r.get(f"match:{fid_str}:state")
     if not raw:
         return
@@ -101,9 +72,9 @@ async def _update_fixture(r: aioredis.Redis, fid_str: str) -> None:
         log.warning(f"[{fid_str}] MatchState parse error: {exc}")
         return
 
-    result = momentum_model.update(state)
+    shots_raw = await r.get(f"match:{fid_str}:shots")
+    result = momentum_model.update(state, json.loads(shots_raw) if shots_raw else [])
     if result is None:
-        momentum_model.clear_state(state.fixture_id)
         return
 
     result_json = json.dumps(result)
