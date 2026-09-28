@@ -1,63 +1,72 @@
+"""
+Counterfactual, prediction and live-probability endpoints.
+
+    GET      /matches/{id}/counterfactual          latest CF result
+    GET      /matches/{id}/counterfactual/feed     full history (up to 20)
+    GET      /matches/{id}/counterfactual/stream   SSE (pub/sub-backed)
+    GET/POST /matches/{id}/counterfactual/trigger  force one cycle (token-gated)
+    GET      /matches/{id}/prediction              per-match W/D/L + tournament path
+    GET      /matches/{id}/live-prob               in-play W/D/L (ml/in_play.py)
+"""
+
 import asyncio
 import json
 import logging
-import math
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 
 from agents import counterfactual_agent
 from api.routes._security import require_trigger_token
+from api.routes._sse import next_message, subscription
 from api.schemas.event_types import COMPLETED_STATUSES
 from api.schemas.schema import MatchState
+from api.tournament_state import red_counts
 from ml.in_play import inplay_wdl
 from ml.odds_api_client import get_oddsapi_client
-from ml.prior_builder import build_prior_table, elo_to_wdl
-from ml.wc_2026_config import TEAM_BY_NAME
+from ml.prior_builder import match_wdl
+from ml.tournament_sim import LiveMatch, live_ko_advance
+from ml.wc_2026_config import FIXTURE_BY_ID
 
 router = APIRouter()
 log = logging.getLogger(__name__)
 
 TTL_LIVE = 3_600
-TTL_COMPLETED = 2_592_000
-FEED_MAX = 19
+TTL_COMPLETED = 2_592_000  # 30 days
+FEED_MAX = 19  # up to 20 entries
 
 
 def _ttl_for(status_short: str) -> int:
     return TTL_COMPLETED if status_short in COMPLETED_STATUSES else TTL_LIVE
 
 
-def _ci(p: float, n: int = 500):
-    margin = 1.96 * math.sqrt(p * (1 - p) / n)
-    return round(max(0.0, p - margin), 4), round(min(1.0, p + margin), 4)
-
-
 async def _pre_match_wdl(state: MatchState, odds_table):
-    priors = build_prior_table(odds_table)
-    key = (state.home_name, state.away_name)
-    rev_key = (state.away_name, state.home_name)
+    """(p_home, p_draw, p_away, source); the shared pre-match prior."""
+    fx = FIXTURE_BY_ID.get(state.fixture_id) or {}
+    wdl = match_wdl(
+        state.home_name,
+        state.away_name,
+        host_side=fx.get("host_side"),
+        odds_table=odds_table,
+    )
+    quoted = bool(odds_table) and (
+        (state.home_name, state.away_name) in odds_table
+        or (state.away_name, state.home_name) in odds_table
+    )
+    return (*wdl, "market_odds" if quoted else "elo")
 
-    if key in priors:
-        p_win, p_draw, p_loss = priors[key]
-        source = "market_odds" if odds_table.get(key) else "elo"
-    elif rev_key in priors:
-        p_l, p_d, p_w = priors[rev_key]
-        p_win, p_draw, p_loss = p_w, p_d, p_l
-        source = "market_odds" if odds_table.get(rev_key) else "elo"
-    else:
-        h = TEAM_BY_NAME.get(state.home_name)
-        a = TEAM_BY_NAME.get(state.away_name)
-        p_win, p_draw, p_loss = (
-            elo_to_wdl(h.elo, a.elo) if h and a else (0.40, 0.25, 0.35)
-        )
-        source = "elo"
-    return p_win, p_draw, p_loss, source
+
+def _point(p: float) -> dict:
+    # A model prior is a point estimate: no sampling interval exists.
+    return {"p": round(p, 4), "ci_lo": round(p, 4), "ci_hi": round(p, 4)}
+
+
+# ── Per-match pre-tournament prediction ────────────────────────────────────
 
 
 @router.get("/{fixture_id}/prediction")
 async def get_match_prediction(fixture_id: str, request: Request):
-    """Per-match pre-tournament W/D/L probabilities from Betfair/Elo prior,
-    plus current tournament path implications from the MC simulation."""
+    """Pre-match W/D/L (market odds or Elo) plus tournament-path odds."""
     r = request.app.state.redis
     state_raw = await r.get(f"match:{fixture_id}:state")
 
@@ -88,21 +97,9 @@ async def get_match_prediction(fixture_id: str, request: Request):
         "status_short": state.status_short,
         "elapsed": state.elapsed,
         "match_odds": {
-            "home_win": {
-                "p": round(p_win, 4),
-                "ci_lo": _ci(p_win)[0],
-                "ci_hi": _ci(p_win)[1],
-            },
-            "draw": {
-                "p": round(p_draw, 4),
-                "ci_lo": _ci(p_draw)[0],
-                "ci_hi": _ci(p_draw)[1],
-            },
-            "away_win": {
-                "p": round(p_loss, 4),
-                "ci_lo": _ci(p_loss)[0],
-                "ci_hi": _ci(p_loss)[1],
-            },
+            "home_win": _point(p_win),
+            "draw": _point(p_draw),
+            "away_win": _point(p_loss),
         },
         "source": source,
         "home_tournament": home_tournament,
@@ -110,12 +107,12 @@ async def get_match_prediction(fixture_id: str, request: Request):
     }
 
 
+# ── In-play live probability ──────────────────────────────────────────────
+
+
 @router.get("/{fixture_id}/live-prob")
 async def get_live_prob(fixture_id: str, request: Request):
-    """In-play W/D/L for the CURRENT match minute/score/reds, backed by
-    ml/in_play.py — the same model the counterfactual agent conditions on.
-
-    """
+    """In-play W/D/L for the current minute, score and reds (ml/in_play.py)."""
     r = request.app.state.redis
     state_raw = await r.get(f"match:{fixture_id}:state")
     if not state_raw:
@@ -127,16 +124,7 @@ async def get_live_prob(fixture_id: str, request: Request):
     odds_table = await odds_client.get_all_odds()
     p_win, p_draw, p_loss, source = await _pre_match_wdl(state, odds_table)
 
-    red_h = sum(
-        1
-        for ev in state.events
-        if ev.type in ("red", "yellow_red") and ev.team_name == state.home_name
-    )
-    red_a = sum(
-        1
-        for ev in state.events
-        if ev.type in ("red", "yellow_red") and ev.team_name == state.away_name
-    )
+    red_h, red_a = red_counts(state)
 
     minute = state.elapsed or 0
     wdl = inplay_wdl(
@@ -146,7 +134,19 @@ async def get_live_prob(fixture_id: str, request: Request):
         state.away_score,
         red_h,
         red_a,
+        extra=state.elapsed_extra,
     )
+    # Knockout ties: probability of going through, extra time and pens included.
+    fx = FIXTURE_BY_ID.get(state.fixture_id) or {}
+    home_advance = None
+    if fx.get("stage", "group") != "group" and state.status_short not in COMPLETED_STATUSES:
+        home_advance = round(
+            live_ko_advance(
+                (p_win, p_draw, p_loss),
+                LiveMatch(minute, state.home_score, state.away_score, red_h, red_a, state.elapsed_extra),
+            ),
+            4,
+        )
 
     return {
         "fixture_id": int(fixture_id),
@@ -155,12 +155,16 @@ async def get_live_prob(fixture_id: str, request: Request):
         "home_win": round(wdl[0], 4),
         "draw": round(wdl[1], 4),
         "away_win": round(wdl[2], 4),
+        "home_advance": home_advance,
         "pre_match_source": source,
     }
 
 
-async def _pending_response(r, fixture_id: str) -> dict:
+# ── Counterfactual narrator ────────────────────────────────────────────────
 
+
+async def _pending_response(r, fixture_id: str) -> dict:
+    """200 with status "pending" when no counterfactual exists yet (not a 404)."""
     state_raw = await r.get(f"match:{fixture_id}:state")
     match_status = None
     if state_raw:
@@ -190,8 +194,7 @@ async def get_counterfactual(fixture_id: str, request: Request):
 
 @router.get("/{fixture_id}/counterfactual/feed")
 async def get_counterfactual_feed(fixture_id: str, request: Request):
-    """Full counterfactual history for this match — up to 20 entries,
-    newest first."""
+    """Counterfactual history for this match (up to 20), newest first."""
     r = request.app.state.redis
     feed_raw = await r.lrange(f"match:{fixture_id}:counterfactual:feed", 0, FEED_MAX)
     if not feed_raw:
@@ -201,14 +204,16 @@ async def get_counterfactual_feed(fixture_id: str, request: Request):
 
 @router.get("/{fixture_id}/counterfactual/stream")
 async def counterfactual_stream(fixture_id: str, request: Request):
+    """SSE, pub/sub-backed.
 
+    "calculating" messages carry their own payload and are forwarded as
+    "counterfactual_calculating" events; results use re-fetch-on-change.
+    """
     r = request.app.state.redis
 
     async def generator():
-        pubsub = r.pubsub()
-        await pubsub.subscribe("counterfactual_update")
         last_raw: str | None = None
-        try:
+        async with subscription(r, "counterfactual_update") as q:
             raw = await r.get(f"match:{fixture_id}:counterfactual:latest")
             if raw is not None:
                 last_raw = raw
@@ -222,18 +227,12 @@ async def counterfactual_stream(fixture_id: str, request: Request):
             while True:
                 if await request.is_disconnected():
                     break
-                try:
-                    msg = await pubsub.get_message(
-                        ignore_subscribe_messages=True, timeout=10.0
-                    )
-                except Exception:
-                    msg = None
-
+                msg = await next_message(q, 10.0)
                 if msg is None:
                     continue
 
                 try:
-                    payload = json.loads(msg["data"])
+                    payload = json.loads(msg)
                 except Exception:
                     continue
 
@@ -241,7 +240,7 @@ async def counterfactual_stream(fixture_id: str, request: Request):
                     continue
 
                 if payload.get("status") == "calculating":
-
+                    # Own payload IS the info — no key to re-fetch.
                     yield {
                         "event": "counterfactual_calculating",
                         "data": json.dumps(payload),
@@ -252,9 +251,6 @@ async def counterfactual_stream(fixture_id: str, request: Request):
                 if raw is not None and raw != last_raw:
                     last_raw = raw
                     yield {"event": "counterfactual_update", "data": raw}
-        finally:
-            await pubsub.unsubscribe("counterfactual_update")
-            await pubsub.aclose()
 
     return EventSourceResponse(generator(), ping=15)
 
@@ -265,7 +261,10 @@ async def counterfactual_stream(fixture_id: str, request: Request):
     dependencies=[Depends(require_trigger_token)],
 )
 async def trigger_counterfactual(fixture_id: str, request: Request):
-    """Force one counterfactual cycle when the fixture has new uncovered events."""
+    """Force one counterfactual cycle for an uncovered goal / red card.
+
+    Token-gated and idempotent: covered events return {"status": "skipped"}.
+    """
     r = request.app.state.redis
     state_raw = await r.get(f"match:{fixture_id}:state")
 

@@ -1,15 +1,17 @@
 """
-Counterfactual worker.
+Counterfactual background worker.
 
-Background process that monitors match events and generates counterfactual
-analysis when meaningful changes occur (goals, cards, or other triggers).
+Runs the counterfactual agent on active fixtures and backfills completed
+ones (a capped number per tick).
 
-The worker uses persisted Redis match state and event history instead of
-temporary in-memory state, ensuring deterministic replay after restarts and
-preventing duplicate simulations of the same event.
-
-Completed fixtures are processed less frequently because their match outcome
-is final and only limited historical probability updates may still be needed.
+Design:
+    - Coverage is rebuilt from the persisted Redis feed before a fixture is
+      first processed, so a restart never re-simulates analysed events.
+    - Completed matches (FT/AET/PEN) backfill every trigger type; events
+      that can't move the bracket get a template entry.
+    - Per-fixture memory is released when a fixture leaves matches:active.
+    - Feed rewrites are a MULTI/EXEC transaction.
+    - Replay restarts are detected and reset agent state.
 """
 
 import asyncio
@@ -19,19 +21,24 @@ import logging
 import redis.asyncio as aioredis
 
 from agents import counterfactual_agent
+from agents.llm_queue import Priority, llm_priority
+from api.tournament_state import results_before
 from api.schemas.event_types import COMPLETED_STATUSES, TRIGGER_TYPES
 from api.schemas.schema import MatchState
+from monitoring.metrics import WORKER_ERRORS, WORKER_TICK_DURATION, tick_done
 
 log = logging.getLogger(__name__)
 INTERVAL = 30.0
 
 PROCESSABLE = {"1H", "HT", "2H", "ET", "P", "FT", "AET", "PEN"}
-TTL_LIVE = 3_600
-TTL_COMPLETED = 2_592_000
-FEED_MAX = 19
+TTL_LIVE = 3_600  # 1 hour — match in progress
+TTL_COMPLETED = 2_592_000  # 30 days — match history
+FEED_MAX = 19  # up to 20 entries (0-indexed ltrim)
+BACKFILL_PER_TICK = 1  # completed fixtures without a feed, per tick
 
 _prev_elapsed: dict[str, int] = {}
-_seeded: set[str] = set()
+_seeded: set[str] = set()  # fixtures whose coverage was restored this process
+_backfilled: set[str] = set()  # completed fixtures already attempted this process
 
 
 def _ttl_for(status_short: str) -> int:
@@ -39,16 +46,18 @@ def _ttl_for(status_short: str) -> int:
 
 
 async def run(redis_client: aioredis.Redis) -> None:
-    """Continuously update counterfactual feeds for active fixtures."""
     log.info("Counterfactual worker started — every 30s (restart-safe coverage)")
     loop = asyncio.get_running_loop()
     while True:
         try:
-            await _update_all(redis_client, loop)
+            with WORKER_TICK_DURATION.labels("counterfactual").time():
+                await _update_all(redis_client, loop)
+            tick_done("counterfactual")
         except asyncio.CancelledError:
             log.info("Counterfactual worker cancelled")
-            return
+            raise
         except Exception as exc:
+            WORKER_ERRORS.labels("counterfactual").inc()
             log.error(f"CF worker error: {exc}", exc_info=True)
         await asyncio.sleep(INTERVAL)
 
@@ -56,9 +65,8 @@ async def run(redis_client: aioredis.Redis) -> None:
 async def _update_all(r: aioredis.Redis, loop) -> None:
     active = set(await r.smembers("matches:active"))
     completed_ids = await r.smembers("matches:completed")
-    fixture_ids = await r.smembers("matches:active")
 
-    active = set(fixture_ids)
+    # Release memory for fixtures that left the active set.
     for stale in [fid for fid in list(_prev_elapsed) if fid not in active]:
         _prev_elapsed.pop(stale, None)
         _seeded.discard(stale)
@@ -67,10 +75,19 @@ async def _update_all(r: aioredis.Redis, loop) -> None:
         except (TypeError, ValueError):
             pass
 
+    # Backfill completed fixtures this worker never saw while active
+    # (same as intel_worker).
     fixtures_to_process = set(active)
-    for cid in completed_ids:
+    backfill = 0
+    # A match with no trigger events never gets a feed; _backfilled keeps it
+    # from taking the slot every tick.
+    for cid in sorted(set(completed_ids) - active - _backfilled):
+        if backfill >= BACKFILL_PER_TICK:
+            break
+        _backfilled.add(cid)
         if not await r.exists(f"match:{cid}:counterfactual:feed"):
             fixtures_to_process.add(cid)
+            backfill += 1
 
     if not fixtures_to_process:
         return
@@ -99,7 +116,7 @@ async def _seed_coverage_from_feed(
         try:
             e = json.loads(raw)
             team_id = e.get("event_team_id")
-            if team_id is None:
+            if team_id is None:  # entries without event_team_id
                 team_id = 1 if e.get("event_team") == state.home_name else 2
             sigs.add(
                 counterfactual_agent.event_sig(
@@ -115,7 +132,6 @@ async def _seed_coverage_from_feed(
 
 
 async def _update_fixture(r: aioredis.Redis, fid: str, loop) -> None:
-    """Update one fixture's counterfactual feed if it is still processable."""
     state_raw = await r.get(f"match:{fid}:state")
     if not state_raw:
         return
@@ -131,6 +147,7 @@ async def _update_fixture(r: aioredis.Redis, fid: str, loop) -> None:
 
     completed = state.status_short in COMPLETED_STATUSES
 
+    # Completed matches with nothing sim-worthy: don't even wake the agent.
     if completed and not any(ev.type in TRIGGER_TYPES for ev in state.events):
         return
 
@@ -139,6 +156,8 @@ async def _update_fixture(r: aioredis.Redis, fid: str, loop) -> None:
     current_elapsed = state.elapsed or 0
     prev_elapsed = _prev_elapsed.get(fid, current_elapsed)
 
+    # Replay restart detection (a no-op for live data, where elapsed only
+    # increases).
     if prev_elapsed - current_elapsed > 10:
         log.info(
             f"[{fid}] Replay restart — elapsed dropped from {prev_elapsed}' "
@@ -153,13 +172,22 @@ async def _update_fixture(r: aioredis.Redis, fid: str, loop) -> None:
     ttl = _ttl_for(state.status_short)
 
     if completed:
-
-        results = await counterfactual_agent.update_all(state, loop)
+        # update() only ever surfaces ONE (the most-recently-added,
+        # regardless of minute) uncovered trigger per call and is
+        # MIN_GAP-throttled — for a completed match that means it could get
+        # stuck offering a low-priority yellow-card event forever while the
+        # real goals never get their turn, and even in the best case only
+        # one event backfills per ~30s tick before the fixture ages out of
+        # matches:active. update_all() exists precisely for this: analyse
+        # every uncovered trigger for the match in a single pass.
+        pinned = await results_before(r, state.kickoff_time)
+        with llm_priority(Priority.BACKGROUND):
+            results = await counterfactual_agent.update_all(state, loop, results=pinned)
         if not results:
             return
 
         pipe = r.pipeline(transaction=True)
-        for res in results:
+        for res in results:  # oldest-first in; each lpush -> newest-first out
             pipe.lpush(f"match:{fid}:counterfactual:feed", json.dumps(res))
         pipe.ltrim(f"match:{fid}:counterfactual:feed", 0, FEED_MAX)
         pipe.expire(f"match:{fid}:counterfactual:feed", ttl)
@@ -181,7 +209,9 @@ async def _update_fixture(r: aioredis.Redis, fid: str, loop) -> None:
             )
         return
 
-    result = await counterfactual_agent.update(state, loop)
+    pinned = await results_before(r, state.kickoff_time)
+    with llm_priority(Priority.LIVE):
+        result = await counterfactual_agent.update(state, loop, results=pinned)
     if result is None:
         return
 
