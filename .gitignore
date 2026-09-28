@@ -28,7 +28,10 @@ weaviate-data/
 data/weaviate/
 volumes/weaviate/
 neo4j_data/
-backend/data/
+backend/data/*
+!backend/data/wc2026/
 # build/archive artifacts
 *.zip
 *.tsbuildinfo
+
+backend/.cache/

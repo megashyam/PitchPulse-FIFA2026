@@ -20,17 +20,17 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
 
-      # The backend is ruff-clean, so any new lint error fails the build.
+      # Hard gate: the backend is ruff-clean, so any new lint error fails CI.
       - name: Lint (ruff)
         run: ruff check .
 
-      # Integration tests skip, rather than fail, when an external service
-      # (Redis, Weaviate, Neo4j, odds provider, LLM) is unavailable.
       - name: Test (pytest)
         env:
           PYTHONPATH: .

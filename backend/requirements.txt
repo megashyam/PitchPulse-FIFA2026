@@ -32,20 +32,11 @@ prometheus-fastapi-instrumentator>=7.0,<8.0
 # LANGSMITH_API_KEY is unset; see agents/langsmith_tracing.py.
 langsmith>=0.1,<1.0
 
+
+# Match-intel narration graph (agents/intel_graph.py)
+langgraph>=1.0,<2.0
+
 # Optional: Google Trends signal (mock fallback used automatically if absent)
 pytrends>=4.9,<5.0
 
-# Dev / test (see backend/tests/)
-pytest>=8.0,<9.0
-pytest-asyncio>=0.23,<2.0
-ruff>=0.4,<1.0
-
-# Offline generation eval (optional, not required to run the app — see
-# agents/eval_generation_ragas.py). RAGAS itself is framework-agnostic; these
-# langchain packages are thin LLM/embeddings wrappers RAGAS's judge needs,
-# not the LangChain orchestration framework the rest of agents/ avoids.
-ragas>=0.2,<1.0
-langchain-core>=0.3,<1.0
-langchain-ollama>=0.2,<1.0
-langchain-openai>=0.2,<1.0
-langchain-huggingface>=0.1,<1.0
+# Dev, test and offline-eval dependencies live in requirements-dev.txt.

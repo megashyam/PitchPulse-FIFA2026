@@ -1,0 +1,16 @@
+# Dev / test / offline evals — not needed to run the app.
+# Install: pip install -r requirements-dev.txt
+-r requirements.txt
+
+pytest>=8.0,<9.0
+pytest-asyncio>=0.23,<2.0
+ruff>=0.4,<1.0
+fakeredis[lua]>=2.23,<3.0
+
+# Offline generation eval (agents/eval_generation_ragas.py). RAGAS's judge
+# needs these thin LLM/embeddings wrappers.
+ragas>=0.2,<1.0
+langchain-core>=0.3,<1.0
+langchain-ollama>=0.2,<1.0
+langchain-openai>=0.2,<1.0
+langchain-huggingface>=0.1,<1.0
