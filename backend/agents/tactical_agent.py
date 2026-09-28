@@ -1,17 +1,14 @@
 """
-Runtime tactical fingerprint retrieval for the Match dashboard.
+Tactical-fingerprint matcher for the match dashboard's TacticalCard.
 
-Converts live match statistics (possession, shots, pass accuracy) into a
-natural-language tactical descriptor, embeds the descriptor, and performs
-vector similarity search against historical tactical profiles stored in
-Weaviate.
+Live stats have no per-zone PPDA, so matching works in two steps:
+    1. Retrieve candidate profiles for the team's style band with a
+       team-agnostic descriptor (team names would bias BM25 toward that
+       team's own history).
+    2. Re-rank by possession closeness and report the gap in points.
 
-The matched historical fingerprint provides contextual insights such as
-similar playing styles, PPDA metrics, possession patterns, and pressing
-profiles.
-
-If tactical profiles are unavailable or Weaviate is not ready, the agent
-returns None and the dashboard falls back to live statistical indicators.
+No "% match" is reported: Weaviate's fusion score is a rank signal, not a
+similarity. Returns None when Weaviate is empty or unavailable.
 """
 
 import asyncio
@@ -26,15 +23,10 @@ from ml.executors import EMBED_EXECUTOR
 log = logging.getLogger(__name__)
 
 
-def _describe(team: str, opp: str, stats: TeamStats, minute: int) -> str:
-    """
-    Build a descriptor in the SAME register as the indexer's fingerprint text,
-    so embeddings land in a comparable region of vector space.
+def _describe(stats: TeamStats) -> str:
+    """Descriptor in the indexer's fingerprint register.
 
-    We infer a pseudo-PPDA band from live possession + shot volume: dominant,
-    high-possession teams with shot pressure read as a high press; deep,
-    low-possession teams read as a low block. This is a proxy — the whole point
-    of the match is to map it onto a real historical fingerprint.
+    Infers a pseudo-PPDA band from live possession and shot volume.
     """
     poss = stats.possession if stats.possession > 0 else 50.0
     shots = stats.shots_total
@@ -51,22 +43,20 @@ def _describe(team: str, opp: str, stats: TeamStats, minute: int) -> str:
         band = "high PPDA"
 
     return (
-        f"{team} vs {opp} · pressing fingerprint\n"
+        f"pressing fingerprint\n"
         f"Style: {style} ({band}).\n"
-        f"Possession {poss:.0f}%, {shots} shots, pass accuracy {pass_acc:.0f}% "
-        f"at minute {minute}. Territorial control reflects pressing approach."
+        f"Possession {poss:.0f}%, {shots} shots, pass accuracy {pass_acc:.0f}%."
     )
 
 
 async def match_team(
     state: MatchState,
-    side: str,
+    side: str,  # "home" | "away"
     loop: asyncio.AbstractEventLoop,
     top_k: int = 3,
+    pool: int = 12,
 ) -> Optional[dict]:
-    """
-    Returns the best historical fingerprint match for one team, or None.
-    """
+    """Best historical fingerprint match for one team, or None."""
     wv = get_weaviate_client()
     if not wv.ready:
         return None
@@ -76,8 +66,7 @@ async def match_team(
     else:
         team, opp, stats = state.away_name, state.home_name, state.away_stats
 
-    minute = state.elapsed or 0
-    descriptor = _describe(team, opp, stats, minute)
+    descriptor = _describe(stats)
 
     model = _get_embed_model()
     vec: List[float] = await loop.run_in_executor(
@@ -85,20 +74,24 @@ async def match_team(
         lambda: model.encode(descriptor, normalize_embeddings=True).tolist(),
     )
 
-    objs = wv.hybrid_search(
+    objs = await asyncio.to_thread(
+        wv.hybrid_search,
         query_vector=vec,
         query_text=descriptor,
-        top_k=top_k,
+        top_k=pool,
         collection=TACTICAL_PROFILES,
         return_objects=True,
     )
     if not objs:
         return None
 
-    best = objs[0]
+    live_poss = stats.possession if stats.possession > 0 else 50.0
 
-    raw = best.get("_score")
-    match_pct = round(min(1.0, max(0.0, float(raw))) * 100) if raw is not None else None
+    def gap(o: dict) -> float:
+        return abs(float(o.get("possession") or 50.0) - live_poss)
+
+    objs = sorted(objs, key=gap)[:top_k]
+    best = objs[0]
 
     return {
         "team": team,
@@ -109,7 +102,7 @@ async def match_team(
             "opponent": best.get("opponent"),
             "competition": best.get("competition"),
             "season": best.get("season"),
-            "match_pct": match_pct,
+            "possession_gap_pp": round(gap(best), 1),
             "ppda": best.get("ppda"),
             "ppda_mid_third": best.get("ppda_mid_third"),
             "ppda_att_third": best.get("ppda_att_third"),
@@ -122,11 +115,7 @@ async def match_team(
                 "team": o.get("team"),
                 "season": o.get("season"),
                 "ppda": o.get("ppda"),
-                "match_pct": (
-                    round(min(1.0, max(0.0, float(o["_score"]))) * 100)
-                    if o.get("_score") is not None
-                    else None
-                ),
+                "possession_gap_pp": round(gap(o), 1),
             }
             for o in objs[1:]
         ],

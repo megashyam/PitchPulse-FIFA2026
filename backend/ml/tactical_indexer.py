@@ -1,52 +1,33 @@
 """
-Offline tactical intelligence indexing pipeline.
+Tactical fingerprint indexer.
 
-This module transforms raw StatsBomb event data into searchable tactical
-fingerprints that power the live match intelligence system.
+Builds one "pressing fingerprint" document per team per match from
+StatsBomb WC open data, embeds it and stores it in the Weaviate
+TacticalProfiles collection. At runtime the TacticalCard matches a live
+team's descriptor against these fingerprints.
 
-Pipeline:
+PPDA (Passes allowed Per Defensive Action) is the standard
+pressing-intensity metric; lower means a more aggressive press.
 
-    StatsBomb Events
-            |
-            |
-    Tactical Feature Extraction
-            |
-            |
-    Pressing Fingerprint
-            |
-            |
-    Sentence Embedding Model
-            |
-            |
-    Weaviate Vector Database
-            |
-            |
-    Runtime Tactical Retrieval
+    PPDA = opponent completed passes / (tackles + interceptions + fouls + blocks)
 
+Both numerator and denominator are restricted to the pressing team's
+attacking 60% of the pitch (StatsBomb x >= 40 on the 120-long pitch). The
+press is also broken down by thirds, so the fingerprint captures where a
+team presses.
 
-Core responsibilities:
-    - Extract team tactical characteristics from historical matches.
-    - Compute pressing metrics such as PPDA and press intensity.
-    - Capture spatial pressing behavior across pitch zones.
-    - Generate natural-language tactical descriptions.
-    - Embed and index tactical profiles for similarity search.
+StatsBomb pitch: 120 long × 80 wide; x runs from the team's own goal (0) to
+the opponent goal (120), in each team's own attacking direction.
 
+Thirds (by x):
+    defensive third : x <  40
+    middle third    : 40 <= x < 80
+    attacking third : x >= 80
 
-Feature engineering:
-
-    PPDA:
-        Measures defensive pressure by comparing opponent passes allowed
-        against defensive actions performed.
-
-    Spatial pressing:
-        Analyzes where teams apply pressure using StatsBomb coordinates:
-
-            Defensive Third | Middle Third | Attacking Third
-
-
-The generated tactical fingerprints bridge offline historical analysis with
-real-time match intelligence by allowing live team states to retrieve similar
-historical tactical profiles.
+Run from backend/:
+    set PYTHONPATH=.
+    python ml/tactical_indexer.py            # index
+    python ml/tactical_indexer.py --check    # report count only
 """
 
 from __future__ import annotations
@@ -56,19 +37,16 @@ import asyncio
 import logging
 from collections import defaultdict
 
-import httpx
 from sentence_transformers import SentenceTransformer
 
 from agents.weaviate_client import (
     get_weaviate_client,
     TACTICAL_PROFILES,
 )
+from ml.statsbomb import COMPETITION_ID, SEASON_IDS, load
 
 log = logging.getLogger(__name__)
 
-SB_BASE = "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
-COMPETITION_ID = 43  # FIFA World Cup
-SEASON_IDS = [106, 3]  # 2022, 2018
 MAX_MATCHES = 500
 
 # Defensive-action event types that count toward PPDA denominator.
@@ -82,29 +60,7 @@ MID_LINE = 40.0
 ATT_LINE = 80.0
 
 
-async def fetch_json(client: httpx.AsyncClient, url: str):
-    r = await client.get(url, timeout=30)
-    r.raise_for_status()
-    return r.json()
-
-
 def _zone(x: float) -> str:
-    """
-    Map StatsBomb pitch coordinates into tactical zones.
-
-    The pitch is divided into three horizontal regions to capture where teams
-    apply defensive pressure.
-
-    Args:
-        x:
-            StatsBomb x-coordinate on a 120-unit pitch.
-
-    Returns:
-        Tactical zone label:
-            - "def" : defensive third
-            - "mid" : middle third
-            - "att" : attacking third
-    """
     if x < MID_LINE:
         return "def"
     if x < ATT_LINE:
@@ -113,19 +69,7 @@ def _zone(x: float) -> str:
 
 
 def _is_tackle(ev: dict) -> bool:
-    """
-    Determine whether a StatsBomb event represents a successful tackle.
-
-    StatsBomb stores tackles as Duel events with a tackle subtype. This
-    helper normalizes that representation for defensive-action counting.
-
-    Args:
-        ev:
-            Raw StatsBomb event dictionary.
-
-    Returns:
-        True if the event is a tackle defensive action, otherwise False.
-    """
+    """A Duel event counts as a defensive action only if it's a tackle."""
     if (ev.get("type") or {}).get("name") != "Duel":
         return False
     dtype = (ev.get("duel") or {}).get("type") or {}
@@ -133,24 +77,7 @@ def _is_tackle(ev: dict) -> bool:
 
 
 def _safe_ppda(passes: float, actions: float) -> float:
-    """
-    Compute PPDA while handling matches with no defensive actions.
-
-    PPDA:
-        opponent completed passes / defensive actions
-
-    Lower PPDA values indicate more aggressive pressing.
-
-    Args:
-        passes:
-            Number of opponent completed passes allowed inside the press zone.
-
-        actions:
-            Number of defensive actions performed inside the press zone.
-
-    Returns:
-        Calculated PPDA value capped at 50 for undefined cases.
-    """
+    """PPDA with a guard. No defensive actions → treat as very passive (cap 50)."""
     if actions <= 0:
         return 50.0
     return round(passes / actions, 2)
@@ -164,61 +91,25 @@ def build_fingerprints(
     season: str,
     match_id: str,
 ) -> list[dict]:
+    """Up to two fingerprint dicts (one per team), ready to embed and insert.
+
+    For team T pressing opponent O:
+        numerator    O's completed passes starting in T's attacking 60%
+                     (O-frame x' sits at T-frame x = 120 - x')
+        denominator  T's defensive actions at T-frame x >= 40
     """
-    Generate tactical fingerprint documents for both teams in a match.
-
-    Each fingerprint summarizes a team's tactical identity using:
-
-        - PPDA pressing intensity
-        - spatial pressing distribution
-        - possession profile
-        - shot volume
-        - expected goals
-        - pressure activity
-
-
-    For each team:
-        The opponent's completed passes in the team's pressing zones form the
-        PPDA numerator, while defensive actions form the denominator.
-
-
-    Args:
-        events:
-            Ordered StatsBomb event stream for a match.
-
-        home:
-            Home team name.
-
-        away:
-            Away team name.
-
-        competition:
-            Competition identifier.
-
-        season:
-            Season identifier.
-
-        match_id:
-            Unique match identifier.
-
-
-    Returns:
-        List of tactical fingerprint documents containing:
-
-            properties:
-                Metadata and numerical tactical features.
-
-            embed_text:
-                Natural-language representation used for vector embedding.
-    """
-
+    # Per-team accumulators
+    # opp_passes_by_zone[T][zone] = opponent completed passes T allowed in that
+    #   T-frame zone; def_actions_by_zone[T][zone] = T's defensive actions there.
     opp_passes = {home: defaultdict(float), away: defaultdict(float)}
     def_actions = {home: defaultdict(float), away: defaultdict(float)}
 
+    # Also track simple team identity stats for the descriptor text.
     poss_events = {home: 0, away: 0}
     shots = {home: 0, away: 0}
     xg = {home: 0.0, away: 0.0}
-
+    # Pressure events in the press region — not part of canonical PPDA, but a
+    # strong signal of pressing *effort* (work that doesn't force a turnover).
     pressures = {home: 0, away: 0}
 
     def opponent(t: str) -> str:
@@ -234,11 +125,14 @@ def build_fingerprints(
 
         poss_events[team_name] += 1
 
+        # ── Opponent passes → numerator for the *pressing* team ──────────────
         if etype == "Pass":
+            # completed pass = no outcome key (StatsBomb marks only failures)
             completed = (ev.get("pass") or {}).get("outcome") is None
             if completed and x is not None:
                 presser = opponent(team_name)
-
+                # This pass is by `team_name` building up; in the presser's
+                # frame the pass sits at x_press = 120 - x.
                 x_press = PITCH_X - x
                 if x_press >= PRESS_LINE:
                     opp_passes[presser][_zone(x_press)] += 1.0
@@ -249,10 +143,12 @@ def build_fingerprints(
             if sx is not None:
                 xg[team_name] += float(sx)
 
+        # ── Defensive actions → denominator for the acting team ─────────────
         is_def_action = etype in DEF_ACTION_TYPES or _is_tackle(ev)
         if is_def_action and x is not None and x >= PRESS_LINE:
             def_actions[team_name][_zone(x)] += 1.0
 
+        # ── Pressure events (effort signal, not in PPDA) ────────────────────
         if etype == "Pressure" and x is not None and x >= PRESS_LINE:
             pressures[team_name] += 1
 
@@ -267,16 +163,22 @@ def build_fingerprints(
         a_mid = def_actions[team]["mid"]
         a_att = def_actions[team]["att"]
 
+        # Overall PPDA over the full press region (x >= 40)
         ppda_overall = _safe_ppda(p_mid + p_att, a_mid + a_att)
         ppda_mid = _safe_ppda(p_mid, a_mid)
         ppda_att = _safe_ppda(p_att, a_att)
-
+        # Defensive-third PPDA is not part of the standard metric; report a
+        # nominal high value so the fingerprint vector still has the slot.
         ppda_def = 50.0
 
         possession = (
             round(poss_events[team] / total_events * 100, 1) if total_events else 50.0
         )
 
+        # press_intensity: blends inverse-PPDA (turnover-forcing press) with
+        # raw pressure volume (pressing effort). 0–1, higher = more intense.
+        #   inverse-PPDA term: 4.0 PPDA ≈ 1.0, 20+ PPDA ≈ ~0.2
+        #   pressure term: ~150 pressures in press region ≈ 1.0
         ppda_term = min(1.0, 8.0 / max(ppda_overall, 1.0))
         pressure_term = min(1.0, pressures[team] / 150.0)
         press_intensity = round(0.7 * ppda_term + 0.3 * pressure_term, 3)
@@ -325,65 +227,43 @@ def build_fingerprints(
 
 
 async def _index_all() -> int:
-    """
-    Execute the complete tactical indexing pipeline.
-
-    Workflow:
-
-        1. Load StatsBomb historical matches.
-        2. Extract tactical fingerprints.
-        3. Generate semantic embeddings.
-        4. Insert vectors into Weaviate.
-
-
-    Returns:
-        Number of successfully inserted tactical profile documents.
-
-
-    This function is reusable from:
-        - CLI execution
-        - application startup background indexing
-    """
+    """Index every fingerprint without prompting; returns the number inserted."""
     wv = get_weaviate_client()
     if not wv.ready:
         log.error("Weaviate not ready — is the Docker container up on :8080?")
         return 0
 
     log.info("Loading all-MiniLM-L6-v2 embedding model...")
-    model = SentenceTransformer("all-MiniLM-L6-v2")
+    model = await asyncio.to_thread(SentenceTransformer, "all-MiniLM-L6-v2")
     log.info("Embedding model ready")
 
     all_docs: list[dict] = []
 
-    async with httpx.AsyncClient(
-        headers={"User-Agent": "wc2026-tactical-indexer/1.0"},
-        follow_redirects=True,
-    ) as http:
-        matches = []
-        for sid in SEASON_IDS:
-            try:
-                ms = await fetch_json(
-                    http, f"{SB_BASE}/matches/{COMPETITION_ID}/{sid}.json"
-                )
-                matches.extend(ms)
-                log.info(f"Season {sid}: {len(ms)} matches")
-            except Exception as e:
-                log.warning(f"Season {sid} failed: {e}")
+    matches = []
+    for sid in SEASON_IDS:
+        try:
+            ms = await asyncio.to_thread(load, f"matches/{COMPETITION_ID}/{sid}.json")
+            matches.extend(ms)
+            log.info(f"Season {sid}: {len(ms)} matches")
+        except Exception as e:
+            log.warning(f"Season {sid} failed: {e}")
 
-        log.info(f"Processing up to {MAX_MATCHES} of {len(matches)} matches...")
-        for i, m in enumerate(matches[:MAX_MATCHES]):
-            match_id = str(m["match_id"])
-            home = m["home_team"]["home_team_name"]
-            away = m["away_team"]["away_team_name"]
-            season = str(m.get("season", {}).get("season_name", ""))
-            comp = m.get("competition", {}).get("competition_name", "WC")
-            try:
-                events = await fetch_json(http, f"{SB_BASE}/events/{match_id}.json")
-                docs = build_fingerprints(events, home, away, comp, season, match_id)
-                all_docs.extend(docs)
-                log.info(f"  [{i+1:2d}] {home} vs {away}: {len(docs)} fingerprints")
-            except Exception as e:
-                log.warning(f"  [{i+1:2d}] {home} vs {away}: failed — {e}")
+    log.info(f"Processing up to {MAX_MATCHES} of {len(matches)} matches...")
+    for i, m in enumerate(matches[:MAX_MATCHES]):
+        match_id = str(m["match_id"])
+        home = m["home_team"]["home_team_name"]
+        away = m["away_team"]["away_team_name"]
+        season = str(m.get("season", {}).get("season_name", ""))
+        comp = m.get("competition", {}).get("competition_name", "WC")
+        try:
+            events = await asyncio.to_thread(load, f"events/{match_id}.json")
+            docs = await asyncio.to_thread(
+                build_fingerprints, events, home, away, comp, season, match_id
+            )
+            all_docs.extend(docs)
+            log.info(f"  [{i+1:2d}] {home} vs {away}: {len(docs)} fingerprints")
+        except Exception as e:
+            log.warning(f"  [{i+1:2d}] {home} vs {away}: failed — {e}")
 
     log.info(f"\nTotal fingerprints to index: {len(all_docs)}")
     if not all_docs:
@@ -391,6 +271,13 @@ async def _index_all() -> int:
         return 0
 
     log.info("Embedding and inserting into TacticalProfiles...")
+    inserted = await asyncio.to_thread(_embed_and_insert, wv, model, all_docs)
+    log.info(f"\nDone — {wv.get_count(TACTICAL_PROFILES)} fingerprints in Weaviate")
+    return inserted
+
+
+def _embed_and_insert(wv, model, all_docs: list[dict]) -> int:
+    """Blocking encode + REST inserts; run in a thread from _index_all."""
     inserted = 0
     batch = 50
     for i in range(0, len(all_docs), batch):
@@ -408,33 +295,19 @@ async def _index_all() -> int:
             )
             inserted += int(ok)
         log.info(f"  Inserted {inserted}/{len(all_docs)}")
-
-    log.info(f"\nDone — {wv.get_count(TACTICAL_PROFILES)} fingerprints in Weaviate")
     return inserted
 
 
 async def ensure_indexed() -> None:
-    """
-    Ensure tactical knowledge base availability.
-
-    Performs a safe startup check:
-
-        - Skip if Weaviate is unavailable.
-        - Skip if tactical profiles already exist.
-        - Automatically build the index when empty.
-
-
-    Designed for production startup usage where missing historical vectors
-    should recover automatically without crashing the application.
-    """
+    """Index at startup if TacticalProfiles is empty. Never prompts or raises."""
     try:
-        wv = get_weaviate_client()
-        if not wv.ready:
+        wv = await asyncio.to_thread(get_weaviate_client)
+        if not await asyncio.to_thread(lambda: wv.ready):
             log.info(
                 "Tactical auto-index: Weaviate not ready yet, skipping this attempt"
             )
             return
-        existing = wv.get_count(TACTICAL_PROFILES)
+        existing = await asyncio.to_thread(wv.get_count, TACTICAL_PROFILES)
         if existing > 0:
             log.info(
                 f"Tactical auto-index: {existing} fingerprints already indexed, skipping"
@@ -452,19 +325,6 @@ async def ensure_indexed() -> None:
 
 
 async def main(check_only: bool = False) -> None:
-    """
-    Command-line entry point for tactical profile indexing.
-
-    Args:
-        check_only:
-            If True, reports existing Weaviate document count without
-            modifying the collection.
-
-    Supports:
-        - manual indexing
-        - collection inspection
-        - controlled re-indexing
-    """
     wv = get_weaviate_client()
     if not wv.ready:
         log.error("Weaviate not ready — is the Docker container up on :8080?")

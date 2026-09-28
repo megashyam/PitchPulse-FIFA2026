@@ -1,35 +1,12 @@
 """
-Tactical fingerprint refresh worker.
+Tactical fingerprint background worker.
 
-This background worker maintains analytical tactical profiles for football
-fixtures by periodically computing tactical fingerprints from canonical
-MatchState data.
+Every 120 seconds, refreshes the tactical fingerprint match for every
+fixture in matches:active, so matches appear as soon as the TacticalProfiles
+index is populated. Fingerprints drift slowly, hence the longer interval.
 
-Unlike live event streams that require low-latency updates, tactical features
-change gradually throughout a match. Therefore, this worker operates on a
-slower cadence and focuses on consistency and cache convergence.
-
-Pipeline:
-
-    MatchState (Redis)
-          ↓
-    Tactical Feature Computation
-          ↓
-    Tactical Fingerprint Cache
-          ↓
-    API / Analytical Consumers
-
-
-Responsibilities:
-    - Refresh tactical fingerprints for active fixtures.
-    - Backfill completed fixtures missing tactical analysis.
-    - Coordinate asynchronous tactical computation.
-    - Ensure Redis tactical caches converge as analytical indexes become
-      available.
-
-The worker separates expensive analytical enrichment from live match updates,
-allowing real-time systems to remain responsive while deeper tactical analysis
-runs independently.
+Redis writes:
+    match:{fixture_id}:tactical   JSON fingerprint match result   TTL 600s
 """
 
 import asyncio
@@ -38,53 +15,33 @@ import logging
 import redis.asyncio as aioredis
 
 from api.routes.tactical import compute_and_cache
+from api.schemas.event_types import COMPLETED_STATUSES
 from api.schemas.schema import MatchState
+from monitoring.metrics import WORKER_ERRORS, WORKER_TICK_DURATION, tick_done
 
 log = logging.getLogger(__name__)
 INTERVAL = 120.0
 
 
 async def run(redis_client: aioredis.Redis) -> None:
-    """
-    Start the long-running tactical refresh worker.
-
-    Periodically scans fixtures requiring tactical analysis and refreshes their
-    tactical fingerprints.
-
-    The worker runs independently from live event pipelines because tactical
-    features are slower-moving analytical signals rather than real-time events.
-
-    Failures are isolated per cycle so transient computation or storage issues
-    do not terminate the background process.
-    """
     log.info("Tactical worker started — refreshing every 120s")
     loop = asyncio.get_running_loop()
     while True:
         try:
-            await _update_all(redis_client, loop)
+            with WORKER_TICK_DURATION.labels("tactical").time():
+                await _update_all(redis_client, loop)
+            tick_done("tactical")
         except asyncio.CancelledError:
             log.info("Tactical worker cancelled")
-            return
+            raise
         except Exception as exc:
+            WORKER_ERRORS.labels("tactical").inc()
             log.error(f"Tactical worker error: {exc}", exc_info=True)
         await asyncio.sleep(INTERVAL)
 
 
 async def _update_all(r: aioredis.Redis, loop) -> None:
-    """
-    Identify fixtures requiring tactical computation and process them.
-
-    Processes:
-        - active fixtures requiring continuous tactical refreshes
-        - completed fixtures missing tactical cache entries
-
-    Completed fixtures are included only when no cached tactical fingerprint
-    exists, allowing eventual consistency without repeatedly recomputing
-    expensive analytical features.
-
-    Fixtures are processed concurrently to support multiple simultaneous
-    matches.
-    """
+    """Process matches:active, plus completed fixtures with no cached fingerprint."""
     active_ids = set(await r.smembers("matches:active"))
     completed_ids = await r.smembers("matches:completed")
 
@@ -107,19 +64,6 @@ async def _update_all(r: aioredis.Redis, loop) -> None:
 
 
 async def _update_fixture(r: aioredis.Redis, fid: str, loop) -> None:
-    """
-    Compute and cache tactical features for a single fixture.
-
-    Pipeline:
-        1. Load canonical MatchState from Redis.
-        2. Validate fixture state.
-        3. Skip fixtures that have not started.
-        4. Generate tactical fingerprint.
-        5. Persist analytical results into cache.
-
-    The function delegates feature generation to the tactical computation
-    layer and focuses on orchestration, validation, and lifecycle management.
-    """
     raw = await r.get(f"match:{fid}:state")
     if not raw:
         return
@@ -130,7 +74,12 @@ async def _update_fixture(r: aioredis.Redis, fid: str, loop) -> None:
         log.warning(f"[{fid}] tactical MatchState parse error: {exc}")
         return
 
+    # NS matches have no live possession/pass data yet to build a descriptor
+    # from — skip until kickoff.
     if state.status_short == "NS":
+        return
+    # Completed fixtures are computed once and cached for 30 days.
+    if state.status_short in COMPLETED_STATUSES and await r.exists(f"match:{fid}:tactical"):
         return
 
     result = await compute_and_cache(r, fid, state, loop)

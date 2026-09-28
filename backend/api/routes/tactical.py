@@ -1,10 +1,12 @@
 """
-Tactical fingerprint routes.
+Tactical fingerprint endpoints.
 
-These endpoints expose the cached match for a fixture and a token-gated
-manual refresh path. The tactical fingerprint is slow-moving and backed by
-Weaviate, so the route reads from Redis first and only recomputes when a
-worker or explicit trigger asks for a refresh.
+    GET      /matches/{id}/tactical          latest tactical fingerprint match
+    GET/POST /matches/{id}/tactical/trigger  force a fresh match (token-gated)
+
+compute_and_cache() is shared with api/workers/tactical_worker.py, which
+retries every fixture periodically, so matches appear once indexing
+(ml/tactical_indexer.ensure_indexed) finishes.
 """
 
 import asyncio
@@ -23,19 +25,26 @@ from api.schemas.schema import MatchState
 router = APIRouter()
 log = logging.getLogger(__name__)
 
-CACHE_TTL = 600
+CACHE_TTL = 600  # 10 min — fingerprints drift slowly within a match
+CACHE_TTL_COMPLETED = 30 * 86_400  # a finished match never changes
+
+
+def _indexed_count(wv) -> int:
+    return wv.get_count(TACTICAL_PROFILES) if wv.ready else 0
 
 
 async def compute_and_cache(r, fixture_id: str, state: MatchState, loop) -> dict:
-    """Compute fresh tactical matches for both teams and cache the result."""
+    """Compute and cache fingerprint matches for both teams."""
     home_match, away_match = await asyncio.gather(
         tactical_agent.match_team(state, "home", loop),
         tactical_agent.match_team(state, "away", loop),
     )
 
     if home_match is None and away_match is None:
+        # Distinguish WHY, so the frontend can show something more useful
+        # than a permanent "run the indexer yourself" instruction.
         wv = get_weaviate_client()
-        indexed_count = wv.get_count(TACTICAL_PROFILES) if wv.ready else 0
+        indexed_count = await asyncio.to_thread(_indexed_count, wv)
         reason = (
             "weaviate_unavailable"
             if not wv.ready
@@ -57,18 +66,22 @@ async def compute_and_cache(r, fixture_id: str, state: MatchState, loop) -> dict
         "away_name": state.away_name,
         "home": home_match,
         "away": away_match,
-        "source": "TacticalProfiles · cosine match",
+        "source": "TacticalProfiles · style band + nearest possession",
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    await r.setex(f"match:{fixture_id}:tactical", CACHE_TTL, json.dumps(result))
+    ttl = CACHE_TTL_COMPLETED if state.status_short in COMPLETED_STATUSES else CACHE_TTL
+    await r.setex(f"match:{fixture_id}:tactical", ttl, json.dumps(result))
     log.info(f"[{fixture_id}] Tactical fingerprint cached")
     return {"status": "written", "result": result}
 
 
 @router.get("/{fixture_id}/tactical")
 async def get_tactical(fixture_id: str, request: Request):
-    """Return the cached tactical fingerprint for a fixture."""
+    """Cached tactical fingerprint match for this fixture.
+
+    Not-started matches return 200 {"status": "not_started"}.
+    """
     r = request.app.state.redis
     raw = await r.get(f"match:{fixture_id}:tactical")
     if not raw:
@@ -88,7 +101,7 @@ async def get_tactical(fixture_id: str, request: Request):
             except Exception:
                 pass
         wv = get_weaviate_client()
-        indexed_count = wv.get_count(TACTICAL_PROFILES) if wv.ready else 0
+        indexed_count = await asyncio.to_thread(_indexed_count, wv)
         message = (
             "TacticalProfiles is still being indexed in the background "
             "(this takes a few minutes on first run) — check back shortly."
@@ -96,6 +109,10 @@ async def get_tactical(fixture_id: str, request: Request):
             else "No tactical fingerprint yet — the background worker refreshes "
             "this every ~2 minutes."
         )
+        # 200, not 404: this is the normal state right after kickoff (worker
+        # hasn't had its first successful tick yet) or during first-run
+        # indexing — both self-resolve, and a 404 always shows as a red
+        # console error regardless of how the frontend handles it.
         return {
             "fixture_id": int(fixture_id),
             "status": "pending",
@@ -110,7 +127,7 @@ async def get_tactical(fixture_id: str, request: Request):
     dependencies=[Depends(require_trigger_token)],
 )
 async def trigger_tactical(fixture_id: str, request: Request):
-    """Force an immediate tactical refresh for a fixture."""
+    """Force an immediate tactical refresh for this fixture."""
     r = request.app.state.redis
     state_raw = await r.get(f"match:{fixture_id}:state")
     if not state_raw:
