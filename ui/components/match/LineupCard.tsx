@@ -1,77 +1,18 @@
 "use client"
 // components/match/LineupCard.tsx
-// Horizontal pitch layout — home left / away right, like Image 2.
-//
-// New: player headshots. The backend now supplies a `photo` URL per player
-// (API-Sports media, live lineups only — the "estimated" fallback has no
-// real player identities to attach an image to). Each dot tries to render
-// the photo clipped into the circle; on load failure it falls back to the
-// original solid-circle + number rendering automatically (per-player, not
-// per-team) since the circle is always drawn underneath the image.
+// Compact vertical formation widget for the narrow left stats column.
+// One team at a time (tab toggle) — a horizontal pitch doesn't fit this
+// width, so players are grouped into positional lines (attackers at top,
+// GK at the bottom) and centered in wrapping rows instead.
 
 import { useEffect, useState } from "react"
 import { Flag } from "@/components/Flag"
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
-interface Player { number: number; name: string; position: string; grid?: string; photo?: string | null }
-interface TeamLineup { team: string; formation: string; startingXI: Player[]; coach?: string }
-interface LineupData { home: TeamLineup; away: TeamLineup; source: "zafronix" | "api-sports" | "statsbomb_proxy" | "estimated" }
-
-// (H_POS, ROLES tables unchanged from the original)
-const H_POS: Record<string, [number, number][]> = {
-    "4-3-3": [
-        [5, 50],
-        [30, 10], [30, 33], [30, 67], [30, 90],
-        [58, 18], [58, 50], [58, 82],
-        [82, 10], [82, 50], [82, 90],
-    ],
-    "4-4-2": [
-        [5, 50],
-        [28, 10], [28, 33], [28, 67], [28, 90],
-        [58, 10], [58, 35], [58, 65], [58, 90],
-        [80, 33], [80, 67],
-    ],
-    "4-2-3-1": [
-        [5, 50],
-        [28, 10], [28, 33], [28, 67], [28, 90],
-        [50, 30], [50, 70],
-        [68, 15], [68, 50], [68, 85],
-        [84, 50],
-    ],
-    "3-5-2": [
-        [5, 50],
-        [28, 20], [28, 50], [28, 80],
-        [52, 5], [58, 28], [58, 50], [58, 72], [52, 95],
-        [80, 30], [80, 70],
-    ],
-    "5-3-2": [
-        [5, 50],
-        [26, 5], [26, 27], [26, 50], [26, 73], [26, 95],
-        [58, 20], [58, 50], [58, 80],
-        [80, 30], [80, 70],
-    ],
-    "4-1-4-1": [
-        [5, 50],
-        [28, 10], [28, 33], [28, 67], [28, 90],
-        [44, 50],
-        [65, 10], [65, 35], [65, 65], [65, 90],
-        [84, 50],
-    ],
-    "3-4-3": [
-        [5, 50],
-        [28, 20], [28, 50], [28, 80],
-        [56, 10], [56, 37], [56, 63], [56, 90],
-        [82, 10], [82, 50], [82, 90],
-    ],
-    "3-4-2-1": [
-        [5, 50],
-        [28, 20], [28, 50], [28, 80],
-        [54, 10], [54, 37], [54, 63], [54, 90],
-        [72, 30], [72, 70],
-        [84, 50],
-    ],
-}
+interface Player { number: number; name: string; position: string; line?: "G" | "D" | "M" | "F"; grid?: string; photo?: string | null }
+interface TeamLineup { team: string; formation: string; startingXI: Player[]; coach?: string | null }
+interface LineupData { home: TeamLineup; away: TeamLineup; source: "espn" | "api-sports" | "zafronix_squad" | "unavailable"; projected?: boolean }
 
 const ROLES: Record<string, string[]> = {
     "4-3-3": ["GK", "LB", "CB", "CB", "RB", "LCM", "CM", "RCM", "LW", "ST", "RW"],
@@ -84,123 +25,74 @@ const ROLES: Record<string, string[]> = {
     "3-4-2-1": ["GK", "CB", "CB", "CB", "LM", "LCM", "RCM", "RM", "SS", "SS", "ST"],
 }
 
+const DEF_ROLES = new Set(["CB", "LB", "RB", "LWB", "RWB"])
+const MID_ROLES = new Set(["CDM", "CM", "LCM", "RCM", "LM", "RM", "CAM"])
+
+type Line = "ATT" | "MID" | "DEF" | "GK"
+const LINE_ORDER: Line[] = ["ATT", "MID", "DEF", "GK"]
+const LINE_LABEL: Record<Line, string> = { ATT: "Attack", MID: "Midfield", DEF: "Defence", GK: "Goalkeeper" }
+
+function lineOf(role: string): Line {
+    if (role === "GK") return "GK"
+    if (DEF_ROLES.has(role)) return "DEF"
+    if (MID_ROLES.has(role)) return "MID"
+    return "ATT"
+}
+
 function shortName(n: string): string {
     if (!n) return ""
     const p = n.trim().split(" ")
     return p.length === 1 ? n : p[p.length - 1]
 }
 
-const VW = 200, VH = 100
-const R = 5.5   // dot radius
-const NFS = 3.0  // number font size
-const LFS = 2.8  // label font size
+const LINE_OF_CODE: Record<string, Line> = { G: "GK", D: "DEF", M: "MID", F: "ATT" }
 
-interface PlayerDotProps {
-    x: number; y: number
-    num: string; trimmed: string
-    player?: Player
-    fill: string; stroke: string; numColor: string
-    idKey: string
+function groupByLine(lineup: TeamLineup): Record<Line, { player?: Player; role: string; idx: number }[]> {
+    // Confirmed ESPN lineups tag each player's line; use it directly so any
+    // formation (4-1-3-2, 3-4-2-1, ...) renders from real positions.
+    if (lineup.startingXI.length && lineup.startingXI.every(p => p.line)) {
+        const groups: Record<Line, { player?: Player; role: string; idx: number }[]> = { ATT: [], MID: [], DEF: [], GK: [] }
+        lineup.startingXI.forEach((p, i) => groups[LINE_OF_CODE[p.line!]].push({ player: p, role: p.position, idx: i }))
+        return groups
+    }
+    const roles = ROLES[lineup.formation] ?? ROLES["4-3-3"]
+    const groups: Record<Line, { player?: Player; role: string; idx: number }[]> = { ATT: [], MID: [], DEF: [], GK: [] }
+    roles.forEach((role, i) => {
+        groups[lineOf(role)].push({ player: lineup.startingXI[i], role, idx: i })
+    })
+    return groups
 }
 
-function PlayerDot({ x, y, num, trimmed, player, fill, stroke, numColor, idKey }: PlayerDotProps) {
+function PlayerChip({ entry, accent, idKey }: {
+    entry: { player?: Player; role: string; idx: number }
+    accent: string
+    idKey: string
+}) {
     const [imgFailed, setImgFailed] = useState(false)
+    const { player, role, idx } = entry
     const hasPhoto = !!player?.photo && !imgFailed
-    const clipId = `pd-clip-${idKey}`
+    const num = player ? player.number : idx + 1
+    const label = player ? shortName(player.name) : role
 
     return (
-        <g>
-
-            <circle cx={x} cy={y} r={R + 1} fill="rgba(0,0,0,0.25)" />
-            {/* Base circle — always present, doubles as the fallback when the
-                photo fails to load or isn't available */}
-            <circle cx={x} cy={y} r={R} fill={fill} stroke={stroke} strokeWidth={1} />
-
-            {hasPhoto && (
-                <>
-                    <clipPath id={clipId}>
-                        <circle cx={x} cy={y} r={R - 0.4} />
-                    </clipPath>
-                    <image
-                        href={player!.photo!}
-                        x={x - R} y={y - R}
-                        width={R * 2} height={R * 2}
-                        clipPath={`url(#${clipId})`}
-                        preserveAspectRatio="xMidYMid slice"
+        <div className="lineup-chip" key={idKey}>
+            <div className="lineup-avatar" style={{ borderColor: accent }}>
+                {hasPhoto ? (
+                    <img
+                        src={player!.photo!}
+                        alt={player!.name}
+                        className="lineup-avatar-img"
                         onError={() => setImgFailed(true)}
                     />
-                </>
-            )}
-
-            {/* Number: centered when there's no photo, small corner badge
-                when a photo is showing (so the face stays visible). */}
-            {hasPhoto ? (
-                <>
-                    <circle cx={x + R - 1.4} cy={y + R - 1.4} r={2.1} fill={fill} stroke={stroke} strokeWidth={0.5} />
-                    <text x={x + R - 1.4} y={y + R - 1.3}
-                        textAnchor="middle" dominantBaseline="middle"
-                        fontSize={1.9} fontWeight="bold" fill={numColor} fontFamily="monospace">
-                        {num}
-                    </text>
-                </>
-            ) : (
-                <text x={x} y={y + 0.5}
-                    textAnchor="middle" dominantBaseline="middle"
-                    fontSize={NFS} fontWeight="bold" fill={numColor} fontFamily="monospace">
-                    {num}
-                </text>
-            )}
-
-
-            {trimmed && (
-                <text x={x} y={y + R + 3.5}
-                    textAnchor="middle" dominantBaseline="hanging"
-                    fontSize={LFS} fill="rgba(255,255,255,0.9)"
-                    fontFamily="Arial, sans-serif">
-                    {trimmed}
-                </text>
-            )}
-        </g>
-    )
-}
-
-interface DotsProps {
-    lineup: TeamLineup
-    isHome: boolean
-    fill: string
-    stroke: string
-    numColor: string
-    lbl: string
-}
-
-function Dots({ lineup, isHome, fill, stroke, numColor, lbl }: DotsProps) {
-    const pos = H_POS[lineup.formation] ?? H_POS["4-3-3"]
-    const roles = ROLES[lineup.formation] ?? ROLES["4-3-3"]
-
-    return (
-        <>
-            {pos.map((p, i) => {
-                const baseX = (p[0] / 100) * (VW / 2)
-                const baseY = (p[1] / 100) * VH
-                const x = isHome ? baseX : (VW - baseX)
-                const y = baseY
-                const player = lineup.startingXI[i]
-                const num = player ? String(player.number) : String(i + 1)
-                const name_ = player ? shortName(player.name) : (roles[i] ?? "")
-                const trimmed = name_.length > 9 ? name_.slice(0, 8) + "." : name_
-
-                return (
-                    <PlayerDot
-                        key={i}
-                        x={x} y={y}
-                        num={num} trimmed={trimmed}
-                        player={player}
-                        fill={fill} stroke={stroke} numColor={numColor}
-                        idKey={`${lbl}-${i}`}
-                    />
-                )
-            })}
-        </>
+                ) : (
+                    <span className="lineup-avatar-num" style={{ color: accent }}>{num}</span>
+                )}
+                {hasPhoto && (
+                    <span className="lineup-avatar-badge" style={{ background: accent }}>{num}</span>
+                )}
+            </div>
+            <span className="lineup-chip-name">{label}</span>
+        </div>
     )
 }
 
@@ -209,6 +101,7 @@ interface Props { fixtureId: string; homeTeam: string; awayTeam: string }
 export function LineupCard({ fixtureId, homeTeam, awayTeam }: Props) {
     const [data, setData] = useState<LineupData | null>(null)
     const [loading, setLoading] = useState(true)
+    const [activeTeam, setActiveTeam] = useState<"home" | "away">("home")
 
     useEffect(() => {
         if (!fixtureId) return
@@ -223,187 +116,249 @@ export function LineupCard({ fixtureId, homeTeam, awayTeam }: Props) {
         return () => clearInterval(t)
     }, [fixtureId])
 
-    const home: TeamLineup = data?.home ?? { team: homeTeam, formation: "4-3-3", startingXI: [] }
-    const away: TeamLineup = data?.away ?? { team: awayTeam, formation: "4-4-2", startingXI: [] }
-    const isLive = data?.source === "api-sports"
-    const isReal = data?.source === "api-sports" || data?.source === "zafronix"
-    const isZafronix = data?.source === "zafronix"
-    const isProxy = data?.source === "statsbomb_proxy"
+    const home: TeamLineup = data?.home ?? { team: homeTeam, formation: "", startingXI: [] }
+    const away: TeamLineup = data?.away ?? { team: awayTeam, formation: "", startingXI: [] }
+    const isConfirmed = data?.source === "espn" || data?.source === "api-sports"
+    const isProjected = data?.source === "zafronix_squad"
     const homeAbbr = homeTeam.slice(0, 3).toUpperCase()
     const awayAbbr = awayTeam.slice(0, 3).toUpperCase()
-    const photoCount = [...home.startingXI, ...away.startingXI].filter(p => p.photo).length
+
+    const active = activeTeam === "home" ? home : away
+    const activeName = activeTeam === "home" ? homeTeam : awayTeam
+    const accent = activeTeam === "home" ? "var(--home)" : "var(--away)"
+    const groups = groupByLine(active)
+    const totalPlayers = home.startingXI.length + away.startingXI.length
+
+    const sourceLabel = isConfirmed ? "confirmed" : isProjected ? "projected XI" : loading ? "loading…" : null
 
     return (
-        <div>
-
-            <div style={{
-                display: "grid", gridTemplateColumns: "1fr auto 1fr",
-                alignItems: "center", padding: "10px 14px 8px",
-                borderBottom: "1px solid var(--border)", gap: 6,
-                background: "var(--bg-3)",
-            }}>
-
-                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                    <Flag team={homeTeam} size="sm" />
-                    <span style={{
-                        fontFamily: "var(--font-mono)", fontSize: ".72rem",
-                        fontWeight: 700, color: "var(--home)"
-                    }}>
-                        {homeAbbr}
-                    </span>
-                    <span style={{
-                        fontFamily: "var(--font-mono)", fontSize: ".68rem",
-                        color: "var(--text-2)", background: "var(--bg-2)",
-                        padding: "2px 8px", borderRadius: 4, border: "1px solid var(--border)"
-                    }}>
-                        {home.formation}
-                    </span>
-                </div>
-
-
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                    <span style={{
-                        fontFamily: "var(--font-mono)", fontSize: ".6rem",
-                        textTransform: "uppercase", letterSpacing: ".12em",
-                        color: "var(--text-3)"
-                    }}>
-                        Formation
-                    </span>
-                    {isLive && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                            <span className="live-dot" style={{ width: 5, height: 5 }} />
-                            <span style={{
-                                fontFamily: "var(--font-mono)", fontSize: ".54rem",
-                                color: "var(--amber)", textTransform: "uppercase"
-                            }}>live</span>
-                        </div>
-                    )}
-                    {isZafronix && (
-                        <span style={{
-                            fontFamily: "var(--font-mono)", fontSize: ".54rem",
-                            color: "var(--c-data)", textTransform: "uppercase"
-                        }}>2026 squad</span>
-                    )}
-                    {isProxy && (
-                        <span style={{
-                            fontFamily: "var(--font-mono)", fontSize: ".54rem",
-                            color: "var(--c-ai)", textTransform: "uppercase"
-                        }}>historical proxy</span>
-                    )}
-                    {loading && (
-                        <span style={{
-                            fontFamily: "var(--font-mono)", fontSize: ".54rem",
-                            color: "var(--text-3)"
-                        }}>loading…</span>
-                    )}
-                </div>
-
-
-                <div style={{ display: "flex", alignItems: "center", gap: 7, justifyContent: "flex-end" }}>
-                    <span style={{
-                        fontFamily: "var(--font-mono)", fontSize: ".68rem",
-                        color: "var(--text-2)", background: "var(--bg-2)",
-                        padding: "2px 8px", borderRadius: 4, border: "1px solid var(--border)"
-                    }}>
-                        {away.formation}
-                    </span>
-                    <span style={{
-                        fontFamily: "var(--font-mono)", fontSize: ".72rem",
-                        fontWeight: 700, color: "var(--away)"
-                    }}>
-                        {awayAbbr}
-                    </span>
-                    <Flag team={awayTeam} size="sm" />
-                </div>
-            </div>
-
-            {/* Pitch — natural landscape orientation (home left, away
-                right). Previously rotated 90° to fit a narrow column; now
-                that this card gets a full-width tab pane, the horizontal
-                layout has plenty of room and reads more like a real
-                match-engine formation view. */}
-            <div style={{
-                background: "#1a5c30",
-                position: "relative",
-                overflow: "hidden",
-                aspectRatio: `${VW} / ${VH}`,
-                width: "100%",
-                maxWidth: 900,
-                margin: "0 auto",
-            }}>
-                <svg
-                    viewBox={`0 0 ${VW} ${VH}`}
-                    style={{ display: "block", width: "100%", height: "100%" }}
-                    xmlns="http://www.w3.org/2000/svg"
+        <div className="lineup-sidebar">
+            <div className="lineup-tabs">
+                <button
+                    className={`lineup-tab-btn${activeTeam === "home" ? " active" : ""}`}
+                    onClick={() => setActiveTeam("home")}
+                    style={activeTeam === "home" ? { color: "var(--home)", borderColor: "var(--home)" } : undefined}
                 >
-
-                    <rect x="1" y="1" width={VW - 2} height={VH - 2}
-                        fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="0.6" />
-
-                    <line x1={VW / 2} y1="1" x2={VW / 2} y2={VH - 1}
-                        stroke="rgba(255,255,255,0.2)" strokeWidth="0.7" />
-
-                    <circle cx={VW / 2} cy={VH / 2} r="11"
-                        fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="0.6" />
-                    <circle cx={VW / 2} cy={VH / 2} r="0.8" fill="rgba(255,255,255,0.3)" />
-
-                    <rect x="1" y="28" width="18" height="44"
-                        fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
-                    <rect x="1" y="36" width="7" height="28"
-                        fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="0.4" />
-
-                    <rect x={VW - 19} y="28" width="18" height="44"
-                        fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
-                    <rect x={VW - 8} y="36" width="7" height="28"
-                        fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="0.4" />
-
-                    {[0, 1, 2, 3].map(i => (
-                        <rect key={i} x={i * 50} y="0" width="50" height={VH}
-                            fill={i % 2 === 0 ? "rgba(0,0,0,0.06)" : "transparent"} />
-                    ))}
-
-                    <Dots lineup={home} isHome={true}
-                        fill="#ffffff" stroke="rgba(0,0,0,0.25)"
-                        numColor="#111" lbl={homeAbbr} />
-                    <Dots lineup={away} isHome={false}
-                        fill="#1a1a2e" stroke="rgba(255,255,255,0.4)"
-                        numColor="#fff" lbl={awayAbbr} />
-                </svg>
+                    <Flag team={homeTeam} size="sm" />
+                    {homeAbbr}
+                </button>
+                <button
+                    className={`lineup-tab-btn${activeTeam === "away" ? " active" : ""}`}
+                    onClick={() => setActiveTeam("away")}
+                    style={activeTeam === "away" ? { color: "var(--away)", borderColor: "var(--away)" } : undefined}
+                >
+                    <Flag team={awayTeam} size="sm" />
+                    {awayAbbr}
+                </button>
             </div>
 
-
-            <div style={{
-                padding: "6px 14px", borderTop: "1px solid var(--border)",
-                fontFamily: "var(--font-mono)", fontSize: ".58rem",
-                color: "var(--text-3)", textAlign: "center",
-                background: "var(--bg-3)"
-            }}>
-                {isLive
-                    ? `Live lineups via API-Sports · ${home.startingXI.length + away.startingXI.length} players${photoCount ? ` · ${photoCount} photos` : ""}`
-                    : isZafronix
-                        ? `2026 tournament squads via Zafronix WC API · ${home.startingXI.length + away.startingXI.length} players${photoCount ? ` · ${photoCount} photos` : ""}`
-                        : isProxy
-                            ? `Historical proxy lineup (StatsBomb) — not this match's confirmed XI · ${home.startingXI.length + away.startingXI.length} players${photoCount ? ` · ${photoCount} photos` : ""}`
-                            : "Lineups not confirmed · formation estimated"}
+            <div className="lineup-meta">
+                <span className="lineup-meta-formation">{active.formation}</span>
+                {sourceLabel && <span className="lineup-meta-source">{sourceLabel}</span>}
             </div>
 
+            <div className="lineup-stack">
+                {LINE_ORDER.map(line => (
+                    groups[line].length > 0 && (
+                        <div className="lineup-line" key={line}>
+                            <span className="lineup-line-label">{LINE_LABEL[line]}</span>
+                            <div className="lineup-line-row">
+                                {groups[line].map(entry => (
+                                    <PlayerChip
+                                        key={entry.idx}
+                                        entry={entry}
+                                        accent={accent}
+                                        idKey={`${activeTeam}-${entry.idx}`}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )
+                ))}
+            </div>
 
-            {(home.coach || away.coach) && (
-                <div style={{
-                    display: "grid", gridTemplateColumns: "1fr auto 1fr",
-                    padding: "8px 14px", borderTop: "1px solid var(--border)",
-                    alignItems: "center", gap: 8
-                }}>
-                    <span style={{ fontSize: ".72rem", color: "var(--text-2)" }}>{home.coach ?? "—"}</span>
-                    <span style={{
-                        fontFamily: "var(--font-mono)", fontSize: ".56rem",
-                        textTransform: "uppercase", letterSpacing: ".08em", color: "var(--text-3)"
-                    }}>
-                        Coach
-                    </span>
-                    <span style={{ fontSize: ".72rem", color: "var(--text-2)", textAlign: "right" }}>{away.coach ?? "—"}</span>
+            {active.coach && (
+                <div className="lineup-coach">
+                    <span className="lineup-coach-label">Coach</span>
+                    <span className="lineup-coach-name">{active.coach}</span>
                 </div>
             )}
+
+            <div className="lineup-footer">
+                {isConfirmed
+                    ? `Confirmed XI via ${data?.source === "espn" ? "ESPN" : "API-Sports"} · ${totalPlayers} players`
+                    : isProjected
+                        ? `Projected from the 2026 squad — not the confirmed XI`
+                        : "Lineups not available"}
+            </div>
+
+            <style jsx global>{`
+                .lineup-sidebar {
+                    background: var(--glass-bg-inner);
+                    border: 1px solid var(--glass-border-inner);
+                    border-radius: var(--r-md);
+                    backdrop-filter: var(--glass-blur);
+                    -webkit-backdrop-filter: var(--glass-blur);
+                    margin: 8px;
+                    overflow: hidden;
+                    flex-shrink: 0;
+                }
+                .lineup-tabs {
+                    display: flex;
+                    border-bottom: 1px solid var(--glass-border-inner);
+                }
+                .lineup-tab-btn {
+                    flex: 1;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 6px;
+                    padding: 10px 6px;
+                    background: transparent;
+                    border: none;
+                    border-bottom: 2px solid transparent;
+                    font-family: var(--font-mono);
+                    font-size: .68rem;
+                    font-weight: 700;
+                    color: var(--text-3);
+                    cursor: pointer;
+                    transition: color .12s, border-color .12s;
+                }
+                .lineup-tab-btn.active {
+                    background: var(--glass-bg-inner);
+                }
+                .lineup-meta {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    padding: 8px 12px;
+                    border-bottom: 1px solid var(--glass-border-inner);
+                }
+                .lineup-meta-formation {
+                    font-family: var(--font-mono);
+                    font-size: .68rem;
+                    font-weight: 700;
+                    color: var(--text-1);
+                }
+                .lineup-meta-source {
+                    font-family: var(--font-mono);
+                    font-size: .56rem;
+                    color: var(--text-2);
+                }
+                .lineup-stack {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                    padding: 14px 12px;
+                    background: #1b4d2e;
+                }
+                .lineup-line {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                }
+                .lineup-line-label {
+                    font-family: var(--font-mono);
+                    font-size: .5rem;
+                    text-transform: none;
+                    letter-spacing: normal;
+                    color: rgba(255, 255, 255, .55);
+                    text-align: center;
+                }
+                .lineup-line-row {
+                    display: flex;
+                    flex-direction: row;
+                    flex-wrap: wrap;
+                    justify-content: center;
+                    gap: 10px;
+                }
+                .lineup-chip {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 3px;
+                    width: 46px;
+                }
+                .lineup-avatar {
+                    position: relative;
+                    width: 40px;
+                    height: 40px;
+                    flex-shrink: 0;
+                    border-radius: 50%;
+                    border: 1.5px solid;
+                    background: var(--bg-3);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    overflow: hidden;
+                }
+                .lineup-avatar-img {
+                    width: 40px;
+                    height: 40px;
+                    object-fit: cover;
+                    border-radius: 50%;
+                    display: block;
+                }
+                .lineup-avatar-num {
+                    font-family: var(--font-mono);
+                    font-size: .74rem;
+                    font-weight: 700;
+                }
+                .lineup-avatar-badge {
+                    position: absolute;
+                    bottom: -2px;
+                    right: -2px;
+                    min-width: 14px;
+                    height: 14px;
+                    padding: 0 2px;
+                    border-radius: 7px;
+                    border: 1px solid var(--bg-1, #0b0f19);
+                    font-family: var(--font-mono);
+                    font-size: .48rem;
+                    font-weight: 700;
+                    color: #fff;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .lineup-chip-name {
+                    width: 100%;
+                    font-size: .56rem;
+                    color: rgba(255, 255, 255, .85);
+                    text-align: center;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+                .lineup-coach {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 6px;
+                    padding: 8px 12px;
+                    border-top: 1px solid var(--glass-border-inner);
+                    font-size: .68rem;
+                }
+                .lineup-coach-label {
+                    font-family: var(--font-mono);
+                    font-size: .52rem;
+                    text-transform: none;
+                    letter-spacing: normal;
+                    color: var(--text-3);
+                }
+                .lineup-coach-name {
+                    color: var(--text-2);
+                }
+                .lineup-footer {
+                    padding: 8px 12px;
+                    border-top: 1px solid var(--glass-border-inner);
+                    font-family: var(--font-mono);
+                    font-size: .54rem;
+                    color: var(--text-2);
+                    text-align: center;
+                }
+            `}</style>
         </div>
     )
 }
