@@ -1,14 +1,10 @@
 """
+Pre-match briefing endpoints.
 
-Match briefing API routes for generated narrative summaries.
-
-Provides endpoints to retrieve the latest briefing, access briefing history,
-and trigger on-demand briefing generation for a fixture.
-
-Briefings are generated through the RAG-backed briefing agent and stored in
-Redis with lifecycle-aware TTL handling. Trigger generation is protected by
-a token dependency and only produces a new briefing when the fixture state
-has changed, preventing unnecessary model/API usage.
+    GET      /briefing          latest briefing
+    GET      /briefing/feed     full history for this match
+    GET/POST /briefing/trigger  generate one if match status changed since the
+                                last generation (token-gated)
 """
 
 import json
@@ -27,7 +23,7 @@ log = logging.getLogger(__name__)
 
 TTL_LIVE = 86_400
 TTL_COMPLETED = 2_592_000
-FEED_CAP = 9
+FEED_CAP = 9  # up to 10 briefings per match — kickoff/HT/FT plus room
 
 
 def _ttl_for(status_short: str) -> int:
@@ -36,7 +32,7 @@ def _ttl_for(status_short: str) -> int:
 
 @router.get("/{fixture_id}/briefing")
 async def get_briefing(fixture_id: str, request: Request):
-    """Latest briefing — backward-compatible single-value shape."""
+    """Latest briefing."""
     r = request.app.state.redis
     raw = await r.lindex(f"match:{fixture_id}:briefing:feed", 0)
     if not raw:
@@ -52,7 +48,7 @@ async def get_briefing(fixture_id: str, request: Request):
 
 @router.get("/{fixture_id}/briefing/feed")
 async def get_briefing_feed(fixture_id: str, request: Request):
-    """Full briefing history for this match — newest first."""
+    """Full briefing history for this match, newest first."""
     r = request.app.state.redis
     raw = await r.lrange(f"match:{fixture_id}:briefing:feed", 0, FEED_CAP)
     entries = [json.loads(e) for e in raw]
@@ -65,8 +61,7 @@ async def get_briefing_feed(fixture_id: str, request: Request):
     dependencies=[Depends(require_trigger_token)],
 )
 async def trigger_briefing(fixture_id: str, request: Request):
-    """Generates a new briefing ONLY if match status has changed since the
-    last generation for this fixture. Safe to poll periodically."""
+    """Generate a briefing only if match status changed since the last one."""
     r = request.app.state.redis
     state_raw = await r.get(f"match:{fixture_id}:state")
 
@@ -92,6 +87,7 @@ async def trigger_briefing(fixture_id: str, request: Request):
     text, model_label = await briefing_agent.generate(
         home_name=state.home_name,
         away_name=state.away_name,
+        fixture_id=state.fixture_id,
     )
 
     result = {
@@ -101,7 +97,8 @@ async def trigger_briefing(fixture_id: str, request: Request):
         "match_status": current_status,
         "briefing": text,
         "model": model_label,
-        "source": "Weaviate RAG + Groq",
+        "source": "kickoff facts (ESPN, Elo, head-to-head)"
+        + ("" if model_label == "template" else " + Groq"),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "status": "generated",
     }

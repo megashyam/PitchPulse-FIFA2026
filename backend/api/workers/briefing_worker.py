@@ -1,21 +1,13 @@
 """
-Briefing worker.
+Pre-match briefing background worker.
 
-Background process responsible for automatically generating pre-match
-briefings.
+Generates a briefing for each fixture with status NS, kickoff within 3h
+and no NS briefing yet. Uses the same Redis protocol as briefing_routes:
+    - skips when last_status == "NS" is already recorded
+    - LPUSH + LTRIM match:{id}:briefing:feed with the route's entry shape
+    - records last_status so route /trigger calls see it
 
-Flow:
-    Redis match state
-        ↓
-    Check kickoff window + status
-        ↓
-    briefing_agent.generate()
-        ↓
-    Store result in Redis feed
-        ↓
-    HTTP briefing routes read the same data
-
-This keeps automatic generation and manual API triggers consistent.
+kickoff_time comes from ESPN in UTC.
 """
 
 import asyncio
@@ -27,6 +19,7 @@ import redis.asyncio as aioredis
 
 from agents import briefing_agent
 from api.schemas.schema import MatchState
+from monitoring.metrics import WORKER_ERRORS, WORKER_TICK_DURATION, tick_done
 
 log = logging.getLogger(__name__)
 
@@ -39,21 +32,22 @@ TTL_LIVE = 86_400
 
 
 async def run(redis_client: aioredis.Redis) -> None:
-    """Continuously scan active fixtures for briefing generation."""
     log.info("Briefing worker started — auto-trigger on NS + kickoff < 3h")
     while True:
         try:
-            await _scan(redis_client)
+            with WORKER_TICK_DURATION.labels("briefing").time():
+                await _scan(redis_client)
+            tick_done("briefing")
         except asyncio.CancelledError:
             log.info("Briefing worker cancelled")
-            return
+            raise
         except Exception as exc:
+            WORKER_ERRORS.labels("briefing").inc()
             log.error(f"Briefing worker error: {exc}", exc_info=True)
         await asyncio.sleep(INTERVAL)
 
 
 async def _scan(r: aioredis.Redis) -> None:
-    """Inspect active fixtures and trigger briefings when they are due."""
     fixture_ids = await r.smembers("matches:active")
     if not fixture_ids:
         return
@@ -65,7 +59,6 @@ async def _scan(r: aioredis.Redis) -> None:
 
 
 async def _maybe_brief(r: aioredis.Redis, fid: str) -> None:
-    """Generate a briefing for one fixture if it is in the pre-match window."""
     state_raw = await r.get(f"match:{fid}:state")
     if not state_raw:
         return
@@ -89,6 +82,8 @@ async def _maybe_brief(r: aioredis.Redis, fid: str) -> None:
     if delta < timedelta(0) or delta > KICKOFF_WINDOW:
         return  # already kicked off, or too far out
 
+    # Same milestone gate as the route: if an NS briefing was already
+    # generated (by the route OR a previous worker pass), don't regenerate.
     last_status = await r.get(f"match:{fid}:briefing:last_status")
     if last_status == "NS":
         return
@@ -103,6 +98,7 @@ async def _maybe_brief(r: aioredis.Redis, fid: str) -> None:
         home_name=state.home_name,
         away_name=state.away_name,
         loop=loop,
+        fixture_id=state.fixture_id,
     )
 
     entry = {
@@ -112,7 +108,8 @@ async def _maybe_brief(r: aioredis.Redis, fid: str) -> None:
         "match_status": "NS",
         "briefing": text,
         "model": model_label,
-        "source": ("Weaviate RAG + Groq 70B" if "RAG" in model_label else "Groq 70B"),
+        "source": "kickoff facts (ESPN, Elo, head-to-head)"
+        + ("" if model_label == "template" else " + Groq"),
         "auto_triggered": True,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "status": "generated",
