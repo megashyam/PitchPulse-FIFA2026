@@ -1,36 +1,20 @@
 """
-Live match intelligence generation pipeline.
+Match intelligence agent.
 
-Transforms raw match telemetry into context-aware AI narratives by combining:
+Per 30s cycle:
+    1. Score narratability.
+    2. Pick the narration type and build the RAG query.
+    3. Run agents.intel_graph: retrieve top-5 docs → generate (Ollama or
+       Groq) → grounding check → one retry → template fallback.
+    4. Update per-match state to prevent repetition.
 
-1. Event detection:
-   Identifies high-impact moments such as goals, cards, and tactical shifts.
+Triggers (priority order):
+    event_reaction  uncovered goal / red card since the last narrated minute
+    xg_divergence   a team's xG well above its goals
+    tactical        every 5 match minutes, or on a momentum shift
 
-2. Statistical analysis:
-   Scores narrative importance using momentum changes, xG divergence,
-   match state, and time sensitivity.
-
-3. Retrieval-Augmented Generation (RAG):
-   Uses semantic search over historical football knowledge to provide relevant
-   context before generating analyst-style commentary.
-
-4. LLM generation:
-   Produces concise live narratives with template fallbacks when inference
-   services are unavailable.
-
-Architecture:
-- Match-level state is maintained to prevent duplicate narratives.
-- Context hashing avoids repeated analysis of unchanged game states.
-- Sentence-transformer embeddings are generated asynchronously using a
-  dedicated executor to avoid blocking live workers.
-- Weaviate hybrid search combines semantic and lexical retrieval.
-- LLM output is validated with deterministic template fallbacks.
-
-The pipeline supports:
-- Live event reactions
-- Tactical momentum updates
-- xG-based statistical narratives
-- Full-time match summaries
+Timing is match-minute based, so cadence is independent of replay speed.
+Goals and red cards bypass the 25s rate limit.
 """
 
 import asyncio
@@ -42,42 +26,44 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
-from agents.ollama_client import generate_with_source
-from agents.weaviate_client import (
-    get_weaviate_client,
-    NARRATIVE_ARCS,
-    TACTICAL_PROFILES,
-)
-from ml.embedding_model import get_embed_model as _get_embed_model
-from ml.executors import EMBED_EXECUTOR
+from agents.grounding import _allowed_teams
+from agents.intel_graph import NarrationSpec, narrate
+from agents.weaviate_client import NARRATIVE_ARCS, TACTICAL_PROFILES
 from ml.in_play import inplay_wdl
 from ml.odds_api_client import get_oddsapi_client
-from ml.prior_builder import build_prior_table, elo_to_wdl
-from ml.wc_2026_config import TEAM_BY_NAME
+from ml.prior_builder import match_wdl
+from ml.wc_2026_config import FIXTURE_BY_ID, TEAM_BY_NAME
+from api.match_timeline import around, at_minute
+from api.schemas.event_types import GOAL_TYPES, RED_TYPES
 from api.schemas.schema import MatchState
 
 log = logging.getLogger(__name__)
 
 
+# ── Per-fixture state ─────────────────────────────────────────────────────
+
+
 @dataclass
 class MatchIntelState:
-    """
-    Per-match memory used to maintain narrative continuity.
-
-    Tracks generated events, previous context, momentum history, and timing
-    constraints to prevent duplicate or low-value narratives.
-    """
-
+    # Signatures of events already narrated: "elapsed:type:team_id"
     covered_events: set = field(default_factory=set)
+    # Match minute of the last generated narrative (NOT real-world time)
     last_narrated_minute: int = 0
+    # Hash of the context that produced the last narrative — dedup guard
     last_context_hash: str = ""
+    # Rolling momentum history for delta calculation
     momentum_history: deque = field(default_factory=lambda: deque(maxlen=10))
+    # Wall-clock time of last narrative — 25s guard against rapid-fire
     last_narrative_time: float = 0.0
     MIN_INTERVAL_SECS: float = 25.0
+    # How many match minutes between periodic tactical narratives
     PERIODIC_INTERVAL_MINS: int = 5
 
 
 _intel_states: Dict[int, MatchIntelState] = {}
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────
 
 
 def _uncovered_key_events(
@@ -98,12 +84,7 @@ def _uncovered_key_events(
 
 
 def _context_hash(state: MatchState, momentum: Optional[dict], extra: str = "") -> str:
-    """
-    Generate a compact fingerprint of the current match state.
-
-    Used as a deduplication mechanism. If scoreline, momentum, and recent
-    events have not changed, the pipeline skips unnecessary generation.
-    """
+    """Hash of key match facts; `extra` makes forced periodic ticks unique."""
     minute = state.elapsed or 0
     scoreline = f"{state.home_score}-{state.away_score}"
     mom = ""
@@ -118,39 +99,32 @@ def _context_hash(state: MatchState, momentum: Optional[dict], extra: str = "") 
     return hashlib.md5(key.encode()).hexdigest()[:8]
 
 
+# ── Score ─────────────────────────────────────────────────────────────────
+
+
 def _score(
     state: MatchState,
     intel_state: MatchIntelState,
     momentum: Optional[dict],
 ) -> float:
-    """
-    Calculate narrative priority score.
-
-    Higher scores indicate moments worth generating an AI insight for.
-
-    Signals:
-    - Goals and red cards
-    - Momentum swings
-    - xG vs scoreline mismatch
-    - High-pressure match phases
-
-    Returns zero when the current context has already been analyzed.
-    """
     minute = state.elapsed or 0
     score = 0.0
 
+    # Key events since last narrated minute
     for ev in _uncovered_key_events(state, intel_state):
         if ev.type in ("goal", "own_goal", "penalty_goal"):
             score += 0.40
         elif ev.type in ("red", "yellow_red"):
             score += 0.35
 
+    # Momentum delta
     if momentum and len(intel_state.momentum_history) >= 2:
         delta = abs(
             momentum["home"]["momentum_score"] - intel_state.momentum_history[0]
         )
         score += min(0.30, delta * 2.5)
 
+    # xG divergence
     h_div = abs(state.home_stats.expected_goals - state.home_score)
     a_div = abs(state.away_stats.expected_goals - state.away_score)
     max_div = max(h_div, a_div)
@@ -159,12 +133,15 @@ def _score(
     elif max_div > 0.4:
         score += 0.10
 
+    # Time sensitivity
     if (40 <= minute <= 46) or (85 <= minute <= 95) or state.status_short == "ET":
         score += 0.10
 
+    # Context hash guard — nothing has changed, nothing to say
     if _context_hash(state, momentum) == intel_state.last_context_hash:
         return 0.0
 
+    # Rate limit — goals/reds always bypass, other types respect 25s gap
     has_key_event = bool(_uncovered_key_events(state, intel_state))
     if not has_key_event:
         if (
@@ -176,35 +153,38 @@ def _score(
     return round(score, 3)
 
 
+# ── Narration type ────────────────────────────────────────────────────────
+
+
+def event_query(state: MatchState, ev) -> Tuple[str, Optional[str]]:
+    """RAG query and NarrativeArcs event_type filter for one goal / red card.
+
+    Uses the score just after the event, not the current score.
+    """
+    _, after = around(state, ev)
+    query = (
+        f"{ev.type} minute {ev.elapsed} "
+        f"score {after.home_score}-{after.away_score} "
+        f"WC {state.home_name} {state.away_name} "
+        f"tournament bracket implications"
+    )
+    ev_filter = "goal" if ev.type in GOAL_TYPES else "red_card" if ev.type in RED_TYPES else None
+    return query, ev_filter
+
+
 def _narration_type_and_query(
     state: MatchState,
     intel_state: MatchIntelState,
     momentum: Optional[dict],
 ) -> Tuple[str, str]:
-    """
-    Classify the narrative type and construct the RAG retrieval query.
-
-    Priority:
-    1. Event reaction (goals/cards)
-    2. Statistical anomaly (xG divergence)
-    3. Tactical momentum analysis
-
-    Returns:
-        Narrative category and semantic search query.
-    """
     minute = state.elapsed or 0
 
+    # Priority 1: uncovered key event
     key_evs = _uncovered_key_events(state, intel_state)
     if key_evs:
-        ev = key_evs[-1]
-        query = (
-            f"{ev.type} minute {ev.elapsed} "
-            f"score {state.home_score}-{state.away_score} "
-            f"WC {state.home_name} {state.away_name} "
-            f"tournament bracket implications"
-        )
-        return "event_reaction", query
+        return "event_reaction", event_query(state, key_evs[-1])[0]
 
+    # Priority 2: xG divergence
     h_div = abs(state.home_stats.expected_goals - state.home_score)
     a_div = abs(state.away_stats.expected_goals - state.away_score)
     if max(h_div, a_div) > 0.6:
@@ -221,22 +201,25 @@ def _narration_type_and_query(
         )
         return "xg_divergence", query
 
+    # Priority 3: tactical
     if momentum:
         dom = (
             state.home_name
             if momentum["home"]["momentum_score"] > 0.5
             else state.away_name
         )
-        poss = momentum["home"]["ewma_possession"]
-        press = momentum["home"]["ewma_pressure"]
     else:
-        dom, poss, press = state.home_name, 50.0, 0.15
+        dom = state.home_name
+    poss = state.home_stats.possession or 50.0
 
     query = (
-        f"{dom} possession {poss:.0f}% shot pressure {press:.3f} "
+        f"{dom} possession {poss:.0f}% "
         f"WC tactical dominance high press minute {minute}"
     )
     return "tactical", query
+
+
+# ── Prompt / template ─────────────────────────────────────────────────────
 
 
 def _build_prompt(
@@ -245,19 +228,6 @@ def _build_prompt(
     rag_docs: List[str],
     wp: Optional[dict] = None,
 ) -> str:
-    """
-    Build the LLM instruction prompt using live match context.
-
-    Combines:
-    - Scoreline
-    - xG
-    - possession
-    - momentum metrics
-    - retrieved historical context
-
-    The prompt is designed to produce concise analyst-style commentary rather
-    than generic match summaries.
-    """
     minute = state.elapsed or 0
     score_line = (
         f"{state.home_name} {state.home_score}–{state.away_score} {state.away_name}"
@@ -276,10 +246,10 @@ def _build_prompt(
         h = momentum["home"]
         a = momentum["away"]
         mom_line = (
-            f"Home momentum {h['momentum_score']:.0%}, "
-            f"goal prob {h['goal_prob_5min']:.1%}. "
-            f"Away momentum {a['momentum_score']:.0%}, "
-            f"goal prob {a['goal_prob_5min']:.1%}."
+            f"Last 15 minutes: {state.home_name} {h['shots_15min']} shots "
+            f"(xG {h['xg_15min']:.2f}), {state.away_name} {a['shots_15min']} shots "
+            f"(xG {a['xg_15min']:.2f}). Model chance of a goal in the next 5 "
+            f"minutes: {h['goal_prob_5min']:.0%} vs {a['goal_prob_5min']:.0%}."
         )
     else:
         mom_line = ""
@@ -295,7 +265,8 @@ def _build_prompt(
         f"[INST] You are a football intelligence analyst providing live WC 2026 "
         f"analysis. The match is happening RIGHT NOW. "
         f"Minute {minute}. {score_line}. "
-        f"xG: {state.home_stats.expected_goals:.2f} vs {state.away_stats.expected_goals:.2f}. "
+        f"xG (shot-model estimate): {state.home_stats.expected_goals:.2f} vs "
+        f"{state.away_stats.expected_goals:.2f}. "
         f"Possession: {state.home_stats.possession:.0f}% vs {state.away_stats.possession:.0f}%. "
         f"{mom_line}{wp_line}"
         f"{rag_section}\n\n"
@@ -320,12 +291,12 @@ def _build_template(
     score_line = f"{state.home_score}–{state.away_score}"
 
     if narration_type == "event_reaction":
-
+        # Find the most recent goal/card to describe
         for ev in reversed(state.events):
             if ev.type in ("goal", "own_goal", "penalty_goal"):
                 return (
-                    f"{ev.team_name} score at {ev.elapsed}' to make it {score_line}. "
-                    f"xG at time of goal: {state.home_stats.expected_goals:.2f} "
+                    f"{_sentence(_describe(ev))} at {ev.elapsed}'; it is {score_line}. "
+                    f"Match xG so far: {state.home_stats.expected_goals:.2f} "
                     f"({state.home_name}) vs {state.away_stats.expected_goals:.2f} "
                     f"({state.away_name}). "
                     f"Possession at {minute}': {state.home_stats.possession:.0f}% "
@@ -336,7 +307,7 @@ def _build_template(
                     f"{ev.team_name} reduced to 10 men at {ev.elapsed}'. "
                     f"Score {score_line} at {minute}'. "
                     f"Numerical advantage could be decisive with "
-                    f"{90 - minute} minutes remaining."
+                    f"{max(0, (120 if minute > 90 else 90) - minute)} minutes remaining."
                 )
 
     if narration_type == "xg_divergence":
@@ -355,6 +326,7 @@ def _build_template(
             f"the scoreline has not yet captured."
         )
 
+    # tactical
     if not momentum:
         return (
             f"Match at {minute}' — {state.home_name} {score_line} {state.away_name}. "
@@ -372,10 +344,12 @@ def _build_template(
     return (
         f"{dom} holding {m['momentum_score']:.0%} momentum at {minute}' "
         f"({dom} {dom_score}–{sub_score} {sub}). "
-        f"Goal probability {m['goal_prob_5min']:.1%} in next 5 minutes. "
-        f"Shot pressure EWMA {m['ewma_pressure']:.3f}, "
-        f"pass accuracy {m['ewma_pass_acc']:.0f}%."
+        f"{m['shots_15min']} shots worth {m['xg_15min']:.2f} xG in the last 15 minutes; "
+        f"model chance of a goal in the next 5 minutes {m['goal_prob_5min']:.0%}."
     )
+
+
+# ── Main entry point ──────────────────────────────────────────────────────
 
 
 async def update(
@@ -383,20 +357,6 @@ async def update(
     momentum: Optional[dict],
     loop: asyncio.AbstractEventLoop,
 ) -> Optional[dict]:
-    """
-    Generate the next live match intelligence update.
-
-    Pipeline:
-    1. Update match memory and momentum history.
-    2. Determine whether the current state warrants narration.
-    3. Generate embedding for semantic retrieval.
-    4. Retrieve relevant historical football context.
-    5. Generate LLM narrative or fallback template.
-    6. Persist state to prevent duplicate insights.
-
-    Returns:
-        Structured intelligence object or None if no update is required.
-    """
     fid = state.fixture_id
     if fid not in _intel_states:
         _intel_states[fid] = MatchIntelState()
@@ -408,11 +368,15 @@ async def update(
     is_live = state.status_short in ("1H", "2H", "ET", "P")
     elapsed = state.elapsed or 0
 
+    # ── Decide whether to generate ────────────────────────────────────────
     score = _score(state, intel_state, momentum)
     has_key_event = bool(_uncovered_key_events(state, intel_state))
 
+    # Baseline: first narrative of this cycle once match is underway
     force_baseline = is_live and intel_state.last_narrated_minute == 0 and elapsed >= 5
 
+    # Periodic: every PERIODIC_INTERVAL_MINS match minutes since last narrative.
+    # Uses MATCH minutes (not real seconds) so it fires correctly at any replay speed.
     minutes_since = elapsed - intel_state.last_narrated_minute
     force_periodic = (
         is_live
@@ -428,61 +392,46 @@ async def update(
     ):
         return None
 
+    # ── Narration type + query ────────────────────────────────────────────
     narration_type, query_text = _narration_type_and_query(state, intel_state, momentum)
 
-    model = _get_embed_model()
-    query_vector: List[float] = await loop.run_in_executor(
-        EMBED_EXECUTOR,
-        lambda: model.encode(query_text, normalize_embeddings=True).tolist(),
-    )
-
-    wv = get_weaviate_client()
-    rag_collection = (
-        TACTICAL_PROFILES if narration_type == "tactical" else NARRATIVE_ARCS
-    )
+    # ── Retrieve → generate → ground → retry/template (agents.intel_graph) ─
+    # LLM for key events (always), periodic (always), and high scores;
+    # template for low-score tactical fills.
+    use_llm = has_key_event or force_periodic or score > 0.50
+    rag_collection = TACTICAL_PROFILES if narration_type == "tactical" else NARRATIVE_ARCS
     event_filter = None
     if narration_type == "event_reaction":
         key_evs = _uncovered_key_events(state, intel_state)
         if key_evs:
-            ev = key_evs[-1]
-            if ev.type in ("goal", "own_goal", "penalty_goal"):
-                event_filter = "goal"
-            elif ev.type in ("red", "yellow_red"):
-                event_filter = "red_card"
+            event_filter = event_query(state, key_evs[-1])[1]
+    wp = await _win_prob_now(state) if use_llm else None
 
-    rag_docs = wv.hybrid_search(
-        query_vector=query_vector,
-        query_text=query_text,
-        top_k=5,
-        event_filter=event_filter,
+    out = await narrate(NarrationSpec(
+        kind="colour",
+        state=state,
+        query=query_text,
         collection=rag_collection,
-    )
-
-    use_llm = has_key_event or force_periodic or score > 0.50
-    if use_llm:
-        wp = await _win_prob_now(state)
-        prompt = _build_prompt(state, momentum, rag_docs, wp)
-        narrative, via = await generate_with_source(prompt)
-        if narrative and _grounding_violation(narrative, state, rag_docs):
-            log.warning(
-                f"[{state.fixture_id}] colour narrative failed grounding check — discarding"
-            )
-            narrative = ""
-        if not narrative:
-            narrative = _build_template(state, momentum, narration_type)
-            via = "template"
-    else:
-        narrative = _build_template(state, momentum, narration_type)
-        via = "template"
+        event_filter=event_filter,
+        build_prompt=lambda docs: _build_prompt(state, momentum, docs, wp),
+        template=lambda: _build_template(state, momentum, narration_type),
+        ref_minutes=(elapsed,),
+        use_llm=use_llm,
+    ))
+    narrative, via, rag_docs = out["narrative"], out["via"], out["rag_docs"]
 
     if not narrative:
         return None
 
+    # ── Update state ──────────────────────────────────────────────────────
+    # Use elapsed as the extra seed for periodic ticks so hash is unique
+    # even with identical match state (prevents SSE diff-check suppression).
     extra = str(elapsed) if force_periodic else ""
     intel_state.last_context_hash = _context_hash(state, momentum, extra=extra)
     intel_state.last_narrative_time = time.time()
     intel_state.last_narrated_minute = elapsed
 
+    # Cover all events up to now — they won't re-trigger
     for ev in state.events:
         if ev.elapsed <= elapsed:
             intel_state.covered_events.add(f"{ev.elapsed}:{ev.type}:{ev.team_id}")
@@ -506,75 +455,46 @@ async def update(
     }
 
 
-GOAL_TYPES = ("goal", "own_goal", "penalty_goal")
-RED_TYPES = ("red", "yellow_red")
-SIGNIFICANT_TYPES = GOAL_TYPES + RED_TYPES
-
-
-def _score_at(state: MatchState, upto_minute: int) -> Tuple[int, int]:
-    """Running (home, away) score at/through a given match minute."""
-    hs = as_ = 0
-    for e in sorted(state.events, key=lambda x: x.elapsed):
-        if e.elapsed > upto_minute:
-            break
-        if e.type in ("goal", "penalty_goal"):
-            if e.team_name == state.home_name:
-                hs += 1
-            else:
-                as_ += 1
-        elif e.type == "own_goal":
-            if e.team_name == state.home_name:
-                as_ += 1
-            else:
-                hs += 1
-    return hs, as_
 
 
 async def _pre_match_wdl(state: MatchState) -> Tuple[float, float, float]:
-
+    """Pre-match W/D/L; the shared prior behind GET /live-prob."""
+    odds_table = None
     try:
-        odds_client = get_oddsapi_client()
-        odds_table = await odds_client.get_all_odds()
-        priors = build_prior_table(odds_table)
-        key = (state.home_name, state.away_name)
-        rev_key = (state.away_name, state.home_name)
-        if key in priors:
-            return priors[key]
-        if rev_key in priors:
-            p_l, p_d, p_w = priors[rev_key]
-            return p_w, p_d, p_l
+        odds_table = await get_oddsapi_client().get_all_odds()
     except Exception as exc:
-        log.debug(f"[{state.fixture_id}] pre-match odds lookup failed: {exc}")
-    h = TEAM_BY_NAME.get(state.home_name)
-    a = TEAM_BY_NAME.get(state.away_name)
-    return elo_to_wdl(h.elo, a.elo) if h and a else (0.40, 0.25, 0.35)
+        log.debug(f"[{state.fixture_id}] odds lookup failed: {exc}")
+    fx = FIXTURE_BY_ID.get(state.fixture_id) or {}
+    return match_wdl(
+        state.home_name, state.away_name, host_side=fx.get("host_side"), odds_table=odds_table
+    )
 
 
-def _reds_at(state: MatchState, upto_minute: int) -> Tuple[int, int]:
-    rh = sum(
-        1
-        for e in state.events
-        if e.type in RED_TYPES
-        and e.elapsed <= upto_minute
-        and e.team_name == state.home_name
-    )
-    ra = sum(
-        1
-        for e in state.events
-        if e.type in RED_TYPES
-        and e.elapsed <= upto_minute
-        and e.team_name == state.away_name
-    )
-    return rh, ra
+def _sentence(text: str) -> str:
+    """Upper-case the first letter only; str.capitalize() lowercases names."""
+    return text[:1].upper() + text[1:]
+
+
+def _describe(ev) -> str:
+    """"goal by Player (Team)"; own goals name the conceding side correctly."""
+    who = f"{ev.player_name} ({ev.team_name})" if ev.player_name else ev.team_name
+    if ev.type == "own_goal":
+        return f"own goal by {who}"
+    if ev.type in RED_TYPES:
+        return f"red card for {who}"
+    return f"{'penalty ' if ev.type == 'penalty_goal' else ''}goal by {who}"
 
 
 async def _win_prob_now(state: MatchState) -> Optional[dict]:
-
+    """Current in-play win probability (same model as GET /live-prob)."""
     try:
         pre_wdl = await _pre_match_wdl(state)
         minute = state.elapsed or 0
-        rh, ra = _reds_at(state, minute)
-        wdl = inplay_wdl(pre_wdl, minute, state.home_score, state.away_score, rh, ra)
+        now = at_minute(state, minute, state.elapsed_extra or 99)
+        wdl = inplay_wdl(
+            pre_wdl, minute, state.home_score, state.away_score, now.red_home, now.red_away,
+            extra=state.elapsed_extra,
+        )
         return {"home": wdl[0], "draw": wdl[1], "away": wdl[2]}
     except Exception as exc:
         log.debug(f"[{state.fixture_id}] win-prob calc failed: {exc}")
@@ -582,26 +502,20 @@ async def _win_prob_now(state: MatchState) -> Optional[dict]:
 
 
 async def _win_prob_swing(state: MatchState, ev) -> Optional[dict]:
-
+    """Win-probability swing, before vs after, for the side the event helped."""
     try:
         pre_wdl = await _pre_match_wdl(state)
-        hs_before, as_before = _score_at(state, ev.elapsed - 1)
-        hs_after, as_after = _score_at(state, ev.elapsed)
-        rh_before, ra_before = _reds_at(state, ev.elapsed - 1)
-        rh_after, ra_after = _reds_at(state, ev.elapsed)
-
-        wdl_before = inplay_wdl(
-            pre_wdl, ev.elapsed, hs_before, as_before, rh_before, ra_before
-        )
-        wdl_after = inplay_wdl(
-            pre_wdl, ev.elapsed, hs_after, as_after, rh_after, ra_after
-        )
+        before, after = around(state, ev)
+        wdl_before = inplay_wdl(pre_wdl, ev.elapsed, *before, extra=ev.extra)
+        wdl_after = inplay_wdl(pre_wdl, ev.elapsed, *after, extra=ev.extra)
 
         if ev.type in RED_TYPES:
-            beneficiary_is_home = ev.team_name != state.home_name
+            # a red card hurts the carded player's team, benefiting the opponent
+            beneficiary_is_home = ev.team_id != 1
         else:
-
-            beneficiary_is_home = hs_after > hs_before
+            # around() credits the opponent on an own goal, so the side whose
+            # score rose is the beneficiary in every case.
+            beneficiary_is_home = after.home_score > before.home_score
 
         p_before = wdl_before[0] if beneficiary_is_home else wdl_before[2]
         p_after = wdl_after[0] if beneficiary_is_home else wdl_after[2]
@@ -612,20 +526,11 @@ async def _win_prob_swing(state: MatchState, ev) -> Optional[dict]:
         return None
 
 
-def _allowed_teams(state: MatchState, rag_docs: List[str]) -> set:
+def _grounding_violation(narrative: str, state: MatchState, rag_docs: List[str]) -> bool:
+    """True if the narrative names a WC team not playing and not in the RAG docs.
 
-    allowed = {state.home_name, state.away_name}
-    for doc in rag_docs:
-        for name in TEAM_BY_NAME:
-            if name in doc:
-                allowed.add(name)
-    return allowed
-
-
-def _grounding_violation(
-    narrative: str, state: MatchState, rag_docs: List[str]
-) -> bool:
-
+    Team-only guard used by the RAGAS eval; production uses agents.grounding.
+    """
     allowed = _allowed_teams(state, rag_docs)
     for name in TEAM_BY_NAME:
         if name in allowed:
@@ -636,23 +541,24 @@ def _grounding_violation(
 
 
 def _event_template(state: MatchState, ev, completed: bool) -> str:
-    hs, as_ = _score_at(state, ev.elapsed)
+    hs, as_ = around(state, ev)[1][:2]
     totals = (
-        f"Match totals: xG {state.home_stats.expected_goals:.2f} "
+        f"Match totals: model xG {state.home_stats.expected_goals:.2f} "
         f"({state.home_name}) vs {state.away_stats.expected_goals:.2f} "
         f"({state.away_name}), possession {state.home_stats.possession:.0f}%/"
         f"{state.away_stats.possession:.0f}%."
     )
     if ev.type in GOAL_TYPES:
-        return f"{ev.team_name} score at {ev.elapsed}' to make it {hs}\u2013{as_}. {totals}"
+        return f"{_sentence(_describe(ev))} at {ev.elapsed}' makes it {hs}\u2013{as_}. {totals}"
     remaining = max(0, 90 - ev.elapsed)
     tail = (
         "Down to ten for the rest of the match."
         if completed
         else f"{remaining} minutes to play a man down."
     )
+    who = f"{ev.player_name} sent off \u2014 " if ev.player_name else ""
     return (
-        f"{ev.team_name} reduced to 10 men at {ev.elapsed}' "
+        f"{who}{ev.team_name} reduced to 10 men at {ev.elapsed}' "
         f"(score {hs}\u2013{as_}). {tail}"
     )
 
@@ -664,8 +570,7 @@ def _event_prompt(
     completed: bool,
     wp: Optional[dict] = None,
 ) -> str:
-    hs, as_ = _score_at(state, ev.elapsed)
-    kind = "red card" if ev.type in RED_TYPES else "goal"
+    hs, as_ = around(state, ev)[1][:2]
     rag = ""
     if rag_docs:
         rag = (
@@ -687,9 +592,10 @@ def _event_prompt(
     )
     return (
         f"[INST] You are a football intelligence analyst, not a commentator. "
-        f"At minute {ev.elapsed}', a moment shifted the game: {ev.team_name} \u2014 {kind}. "
-        f"The new score is {hs}\u2013{as_}. "
-        f"Current match totals: xG {state.home_stats.expected_goals:.2f} vs {state.away_stats.expected_goals:.2f}, "
+        f"At minute {ev.elapsed}', a moment shifted the game: {_describe(ev)}. "
+        f"The score after it: {state.home_name} {hs}\u2013{as_} {state.away_name}. "
+        f"Current match totals: xG (shot-model estimate) "
+        f"{state.home_stats.expected_goals:.2f} vs {state.away_stats.expected_goals:.2f}, "
         f"possession {state.home_stats.possession:.0f}% vs {state.away_stats.possession:.0f}%."
         f"{wp_line}"
         f" {tense}{rag}\n\n"
@@ -704,81 +610,42 @@ def _event_prompt(
     )
 
 
+def event_spec(state: MatchState, ev, wp: Optional[dict], use_llm: bool = True) -> NarrationSpec:
+    """Graph inputs for one goal / red-card narration (shared with the RAGAS eval)."""
+    completed = state.status_short in ("FT", "AET", "PEN")
+    query, ev_filter = event_query(state, ev)
+    return NarrationSpec(
+        kind="event",
+        state=state,
+        query=query,
+        collection=NARRATIVE_ARCS,
+        event_filter=ev_filter,
+        build_prompt=lambda docs: _event_prompt(state, ev, docs, completed, wp),
+        template=lambda: _event_template(state, ev, completed),
+        ref_minutes=(ev.elapsed, state.elapsed),
+        use_llm=use_llm,
+    )
+
+
 async def analyze_event(
     state: MatchState,
     ev,
     loop: asyncio.AbstractEventLoop,
     use_llm: bool = True,
 ) -> dict:
-    """
-    Generate intelligence for a specific high-impact match event.
-
-    Unlike live rolling updates, this method anchors the narrative to the
-    exact event timestamp, allowing complete historical reconstruction of a
-    match timeline.
-
-    Used for:
-    - Goals
-    - Red cards
-    - Completed match event feeds
-    """
-    completed = state.status_short in ("FT", "AET", "PEN")
-    query = (
-        f"{ev.type} minute {ev.elapsed} score {state.home_score}-{state.away_score} "
-        f"WC {state.home_name} {state.away_name} tournament bracket implications"
-    )
-
-    rag_docs: List[str] = []
-    try:
-        model = _get_embed_model()
-        qv = await loop.run_in_executor(
-            EMBED_EXECUTOR,
-            lambda: model.encode(query, normalize_embeddings=True).tolist(),
-        )
-        wv = get_weaviate_client()
-        ev_filter = "goal" if ev.type in GOAL_TYPES else "red_card"
-        rag_docs = wv.hybrid_search(
-            query_vector=qv,
-            query_text=query,
-            top_k=5,
-            event_filter=ev_filter,
-            collection=NARRATIVE_ARCS,
-        )
-    except Exception as exc:
-        log.debug(f"[{state.fixture_id}] event RAG failed: {exc}")
-
+    """One intel entry for a specific goal / red card, stamped at its minute."""
     wp = await _win_prob_swing(state, ev)
-
-    narrative = ""
-    via = "template"
-    if use_llm:
-        try:
-            narrative, source = await generate_with_source(
-                _event_prompt(state, ev, rag_docs, completed, wp)
-            )
-        except Exception as exc:
-            log.debug(f"[{state.fixture_id}] event LLM failed: {exc}")
-            narrative = ""
-        if narrative and _grounding_violation(narrative, state, rag_docs):
-            log.warning(
-                f"[{state.fixture_id}] event narrative failed grounding check — discarding"
-            )
-            narrative = ""
-        if narrative:
-            via = source
-    if not narrative:
-        narrative = _event_template(state, ev, completed)
-        via = "template"
+    out = await narrate(event_spec(state, ev, wp, use_llm))
 
     return {
         "fixture_id": state.fixture_id,
         "minute": ev.elapsed,
         "narration_type": "event_reaction",
-        "narrative": narrative,
+        "narrative": out["narrative"],
         "score": 0.4,
-        "rag_docs_used": len(rag_docs),
+        "rag_docs_used": len(out["rag_docs"]),
         "rag_collection": NARRATIVE_ARCS,
-        "via": via,
+        "via": out["via"],
         "event_sig": f"{ev.elapsed}:{ev.type}:{ev.team_id}",
         "win_prob_shift": wp,
         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -816,7 +683,7 @@ def _ft_summary_prompt(state: MatchState, rag_docs: List[str]) -> str:
         f"[INST] You are a sharp FIFA World Cup analyst writing the post-match "
         f"wrap for {state.home_name} vs {state.away_name}, which finished "
         f"{state.home_score}\u2013{state.away_score}. "
-        f"Match totals: xG {state.home_stats.expected_goals:.2f} vs "
+        f"Match totals: xG (shot-model estimate) {state.home_stats.expected_goals:.2f} vs "
         f"{state.away_stats.expected_goals:.2f}, possession "
         f"{state.home_stats.possession:.0f}% vs {state.away_stats.possession:.0f}%, "
         f"pass accuracy {state.home_stats.pass_accuracy:.0f}% vs "
@@ -835,11 +702,9 @@ async def analyze_full_time_summary(
     loop: asyncio.AbstractEventLoop,
     use_llm: bool = True,
 ) -> dict:
-    """
-    Generate a final match analysis after completion.
+    """Full-time wrap-up for a completed match, generated at most once.
 
-    Handles matches without major events (such as 0-0 draws) by producing a
-    statistics-driven summary using xG, possession, and historical context.
+    Keyed at minute 90 with a stable event_sig; covers matches with no goals.
     """
     query = (
         f"full time {state.home_name} {state.away_name} "
@@ -847,43 +712,17 @@ async def analyze_full_time_summary(
         f"xG possession tournament"
     )
 
-    rag_docs: List[str] = []
-    try:
-        model = _get_embed_model()
-        qv = await loop.run_in_executor(
-            EMBED_EXECUTOR,
-            lambda: model.encode(query, normalize_embeddings=True).tolist(),
-        )
-        wv = get_weaviate_client()
-        rag_docs = wv.hybrid_search(
-            query_vector=qv,
-            query_text=query,
-            top_k=5,
-            collection=NARRATIVE_ARCS,
-        )
-    except Exception as exc:
-        log.debug(f"[{state.fixture_id}] FT summary RAG failed: {exc}")
-
-    narrative = ""
-    via = "template"
-    if use_llm:
-        try:
-            narrative, source = await generate_with_source(
-                _ft_summary_prompt(state, rag_docs)
-            )
-        except Exception as exc:
-            log.debug(f"[{state.fixture_id}] FT summary LLM failed: {exc}")
-            narrative = ""
-        if narrative and _grounding_violation(narrative, state, rag_docs):
-            log.warning(
-                f"[{state.fixture_id}] FT summary failed grounding check — discarding"
-            )
-            narrative = ""
-        if narrative:
-            via = source
-    if not narrative:
-        narrative = _ft_summary_template(state)
-        via = "template"
+    out = await narrate(NarrationSpec(
+        kind="ft_summary",
+        state=state,
+        query=query,
+        collection=NARRATIVE_ARCS,
+        build_prompt=lambda docs: _ft_summary_prompt(state, docs),
+        template=lambda: _ft_summary_template(state),
+        ref_minutes=(state.elapsed or 90,),
+        use_llm=use_llm,
+    ))
+    narrative, via = out["narrative"], out["via"]
 
     return {
         "fixture_id": state.fixture_id,
@@ -891,7 +730,7 @@ async def analyze_full_time_summary(
         "narration_type": "tactical",
         "narrative": narrative,
         "score": 0.5,
-        "rag_docs_used": len(rag_docs),
+        "rag_docs_used": len(out["rag_docs"]),
         "rag_collection": NARRATIVE_ARCS,
         "via": via,
         "event_sig": f"ft_summary:{state.home_score}:{state.away_score}",
@@ -900,12 +739,7 @@ async def analyze_full_time_summary(
 
 
 def clear_state(fixture_id: int) -> None:
-    """
-    Remove cached intelligence state for a match.
-
-    Used when replaying fixtures or restarting workers to ensure narratives are
-    regenerated from a clean state.
-    """
+    """Wipe per-match state (intel_worker, on replay restart)."""
     if fixture_id in _intel_states:
         del _intel_states[fixture_id]
         log.info(f"[{fixture_id}] Intel state cleared")

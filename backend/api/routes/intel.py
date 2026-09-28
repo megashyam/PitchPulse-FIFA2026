@@ -1,10 +1,9 @@
 """
-api/routes/intel.py
-====================
-GET /matches/{id}/intel                       — latest feed (last 30 entries)
-GET /matches/{id}/intel/stream                — SSE (pub/sub-backed, H8)
-GET/POST /matches/{id}/intel/trigger          — debug: force one cycle
-                                                 (token-gated, H5)
+Match intelligence endpoints.
+
+    GET      /matches/{id}/intel          latest feed (last 30 entries)
+    GET      /matches/{id}/intel/stream   SSE (pub/sub-backed)
+    GET/POST /matches/{id}/intel/trigger  debug: force one cycle (token-gated)
 """
 
 import asyncio
@@ -26,7 +25,11 @@ log = logging.getLogger(__name__)
 
 @router.get("/{fixture_id}/intel")
 async def get_intel_feed(fixture_id: str, request: Request):
-    """Last 30 narrative entries for this fixture, newest first."""
+    """Last 30 narrative entries for this fixture, newest first.
+
+    Entries ahead of the current match minute are dropped (stale replay).
+    Not-started matches return 200 {"status": "not_started"}.
+    """
     r = request.app.state.redis
     feed_raw = await r.lrange(f"match:{fixture_id}:intel:feed", 0, 29)
 
@@ -50,7 +53,8 @@ async def get_intel_feed(fixture_id: str, request: Request):
                     }
             except Exception:
                 pass
-
+        # Live or completed but nothing generated yet: narration needs ~5
+        # match minutes or a goal / red card. 200, not 404.
         return {
             "fixture_id": int(fixture_id),
             "status": "pending",
@@ -59,12 +63,15 @@ async def get_intel_feed(fixture_id: str, request: Request):
             "message": "No AI narration yet — appears at minute 5 or after a goal/red card.",
         }
 
-    current_elapsed = 999
+    current_elapsed = 999  # permissive default if state unavailable
     state_raw = await r.get(f"match:{fixture_id}:state")
     if state_raw:
         try:
             state = MatchState.model_validate_json(state_raw)
-
+            # Completed matches: never filter by elapsed. A finished match's
+            # elapsed often reads 0/null, which would wrongly drop every
+            # real entry (all at minute ~90) as "stale" — the exact bug
+            # behind intel showing empty for FT matches despite valid data.
             if state.status_short in COMPLETED_STATUSES:
                 current_elapsed = 999
             else:
@@ -119,7 +126,7 @@ async def _emit_ok_factory(r, fixture_id: str):
 
 @router.get("/{fixture_id}/intel/stream")
 async def intel_stream(fixture_id: str, request: Request):
-    """Pub/sub-backed SSE stream for the fixture intel feed."""
+    """SSE, pub/sub-backed, with the same staleness guard as the REST route."""
     r = request.app.state.redis
     emit_ok = await _emit_ok_factory(r, fixture_id)
 
@@ -144,7 +151,11 @@ async def intel_stream(fixture_id: str, request: Request):
     dependencies=[Depends(require_trigger_token)],
 )
 async def trigger_intel(fixture_id: str, request: Request):
-    """Debug endpoint for running a full intel cycle on demand."""
+    """Run one full intel cycle for this fixture, as intel_worker does.
+
+    Covers event reactions, live colour and the FT wrap-up. Token-gated;
+    returns per-section status.
+    """
     r = request.app.state.redis
     state_raw = await r.get(f"match:{fixture_id}:state")
 
@@ -176,6 +187,7 @@ async def trigger_intel(fixture_id: str, request: Request):
     new_entries: list[dict] = []
     section_status: dict[str, str] = {}
 
+    # ── Section 1: per-event history for uncovered goals/reds ─────────────
     sig_events = [
         ev
         for ev in sorted(state.events, key=lambda e: e.elapsed)
@@ -195,6 +207,7 @@ async def trigger_intel(fixture_id: str, request: Request):
         + (f" — {len(event_errors)} FAILED: {event_errors}" if event_errors else "")
     )
 
+    # ── Section 2: live tactical/xG colour ─────────────────────────────────
     if is_live:
         momentum_raw = await r.get(f"match:{fixture_id}:momentum")
         momentum = json.loads(momentum_raw) if momentum_raw else None
@@ -211,6 +224,7 @@ async def trigger_intel(fixture_id: str, request: Request):
     else:
         section_status["colour"] = "skipped (match not live)"
 
+    # ── Section 3: FT wrap-up if completed with no narration at all ───────
     if completed and not new_entries and not have_event_sigs:
         try:
             new_entries.append(

@@ -1,0 +1,1131 @@
+{
+  "generator": "mistral:7b-instruct-q4_K_M via agents.ollama_client.generate_with_source",
+  "prompt": "agents.match_intel_agent._event_prompt, live Weaviate retrieval, Elo prior",
+  "judge": "RAGAS 0.4.3 Faithfulness, openai/gpt-oss-120b on Groq (independent of the generator)",
+  "context": "the prompt's data section: event, score, model xG, possession, win-prob shift, first two retrieved precedent docs",
+  "population": {
+    "events": 324,
+    "generated": 324,
+    "via": {
+      "ollama": 324
+    },
+    "grounding_violation_rate": 0.0123
+  },
+  "sample": {
+    "n": 117,
+    "planned_n": 120,
+    "seed": 42,
+    "rule": "simple random sample of generated events (first n of the planned sample)",
+    "unscorable_nan": 0
+  },
+  "ci": "cluster bootstrap over fixtures, 2000 resamples, 95% percentile",
+  "faithfulness_raw_llm": {
+    "n": 117,
+    "mean": 0.6835,
+    "ci95": [
+      0.6393,
+      0.728
+    ],
+    "share_below_1": 0.8205,
+    "share_at_or_below_0.5": 0.2564
+  },
+  "faithfulness_after_grounding_guard": {
+    "n": 116,
+    "mean": 0.684,
+    "ci95": [
+      0.6395,
+      0.7284
+    ],
+    "share_below_1": 0.819,
+    "share_at_or_below_0.5": 0.2586
+  },
+  "by_event_type": {
+    "goal": {
+      "n": 112,
+      "mean": 0.6805,
+      "ci95": [
+        0.6324,
+        0.7249
+      ],
+      "share_below_1": 0.8214,
+      "share_at_or_below_0.5": 0.2679
+    },
+    "red_card": {
+      "n": 5,
+      "mean": 0.75,
+      "ci95": [
+        0.6333,
+        0.8917
+      ],
+      "share_below_1": 0.8,
+      "share_at_or_below_0.5": 0.0
+    }
+  },
+  "by_precedent_docs": {
+    "2": {
+      "n": 117,
+      "mean": 0.6835,
+      "ci95": [
+        0.6393,
+        0.728
+      ],
+      "share_below_1": 0.8205,
+      "share_at_or_below_0.5": 0.2564
+    }
+  },
+  "rows": [
+    {
+      "id": "760430:76:goal:2",
+      "match": "Iraq vs Norway",
+      "event_type": "goal",
+      "minute": 76,
+      "response": "The 76' goal by Leo \u00d8stigard for Norway in the FIFA World Cup match against Iraq has shifted the game significantly. The score has moved from 1-3 to 2-3 in favor of Norway, with a win probability shift from 87% to 99%. This moment marks a turning point in the match, as it moves the possession balance further in favor of Norway and increases their chances of winning.",
+      "grounding_violation": false,
+      "faithfulness": 0.6666666666666666
+    },
+    {
+      "id": "760417:45:goal:1",
+      "match": "United States vs Paraguay",
+      "event_type": "goal",
+      "minute": 45,
+      "response": "At minute 45', a goal by Folarin Balogun shifted the game in favor of the United States, leaving Paraguay struggling to keep up with their possession at 35%. The match so far has seen the United States having 65% of events, and their win probability has increased from 93% to 99%, indicating a significant advantage in the game. This moment represents a significant turning point in the match, as Paraguay will need to improve their performance quickly if they hope to come back from behind.",
+      "grounding_violation": false,
+      "faithfulness": 0.75
+    },
+    {
+      "id": "760455:36:goal:1",
+      "match": "Jordan vs Algeria",
+      "event_type": "goal",
+      "minute": 36,
+      "response": "At minute 36', a goal by Nizar Al-Rashdan (Jordan) shifted the game, making it 1-0 in favor of Jordan against Algeria. The current match totals show that Jordan has an xG of 0.52 and Algeria has an xG of 2.47, with possession at 28% for Jordan and 72% for Algeria. This moment caused a significant win probability shift, with Jordan's chances of winning increasing from 25% to 57%. The historical precedent is the FIFA World Cup 2022 match between Tunisia and France, where a goal at minute 57",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760450:61:goal:2",
+      "match": "Uruguay vs Cape Verde",
+      "event_type": "goal",
+      "minute": 61,
+      "response": "At minute 61', H\u00e9lio Varela scored a goal for Cape Verde to level the score at 2-2 against Uruguay in the World Cup match between these two countries. This moment shifted the game as it was the first time that the scoreline had been equal since Portugal led 1-0 early on. The shot-model estimate of xG for Cape Verde increased from 0.89 to 2.43, indicating that the goal was considered a significant contribution to their chances of winning. Additionally, the win probability shifted in favor of Cape Verde by 2%, bringing their chances of victory to 12%.",
+      "grounding_violation": false,
+      "faithfulness": 0.5
+    },
+    {
+      "id": "760449:31:goal:2",
+      "match": "Tunisia vs Japan",
+      "event_type": "goal",
+      "minute": 31,
+      "response": "1. At minute 31', Ayase Ueda's goal shifted the game in Japan's favor, giving them a commanding 2-0 lead over Tunisia. The xG difference increased from 0.10 to 2.34, indicating that Japan was dominating possession with 62% compared to Tunisia's 38%.\n2. This moment also led to a significant win probability shift, with Japan's chances increasing from 84% to 96%, suggesting that the goal had a substantial impact on the outcome of the match.",
+      "grounding_violation": false,
+      "faithfulness": 0.8888888888888888
+    },
+    {
+      "id": "760437:45:goal:2",
+      "match": "England vs Croatia",
+      "event_type": "goal",
+      "minute": 45,
+      "response": "At minute 45', a goal by Petar Musa shifted the game in favor of Croatia, making it 2-2. The current match totals show that England has an xG of 3.68 and Croatia has an xG of 1.00. Additionally, possession is currently split evenly between the two teams with 52% for England and 48% for Croatia. The win probability shift for Croatia was 6% to 23%, indicating that their chances of winning the match increased significantly after the goal.",
+      "grounding_violation": false,
+      "faithfulness": 0.8888888888888888
+    },
+    {
+      "id": "760432:90:goal:2",
+      "match": "France vs Senegal",
+      "event_type": "goal",
+      "minute": 90,
+      "response": "At minute 90', Senegal scored a goal to take France's lead to 2-1. The scoreline shift was significant as it marked the first time in the match that France had fallen behind. Additionally, Senegal had been leading in possession throughout the game, with France having only 53% of the events so far. This moment likely impacted France's confidence and ability to control the game going forward.",
+      "grounding_violation": false,
+      "faithfulness": 0.0
+    },
+    {
+      "id": "760505:42:goal:1",
+      "match": "Mexico vs England",
+      "event_type": "goal",
+      "minute": 42,
+      "response": "At minute 42', a goal by Juli\u00e1n Qui\u00f1ones (Mexico) shifted the game to 1-2 in favor of England. The scoreline after this moment was 2.34 xG for Mexico and 1.69 xG for England, with possession at 67% for Mexico and 33% for England. This match had finished. In terms of historical precedent, there are two matches that may be relevant: FIFA World Cup 2022, Saudi Arabia vs Mexico (minute 51) and FIFA World Cup 2022, Saudi Arabia vs Mexico (minute 46). The impact of this moment was a significant shift in win probability",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760429:41:goal:1",
+      "match": "Saudi Arabia vs Uruguay",
+      "event_type": "goal",
+      "minute": 41,
+      "response": "At minute 41', Abdulelah Al-Amri scored a goal for Saudi Arabia against Uruguay, taking the lead 1-0. The shift in possession from 33% to 67% in favor of Uruguay was significant, as they had been controlling more events in the match so far. However, this moment did not necessarily result in a catastrophic loss for Uruguay, as their win probability only decreased by 28%. Therefore, while this moment may have impacted the game, it did not drastically change the outcome.",
+      "grounding_violation": false,
+      "faithfulness": 0.5
+    },
+    {
+      "id": "760513:10:goal:1",
+      "match": "Argentina vs Switzerland",
+      "event_type": "goal",
+      "minute": 10,
+      "response": "At minute 10', a goal by Alexis Mac Allister shifted the game in favor of Argentina, leaving Switzerland struggling to keep up. The score now stands at 1-0 in favor of Argentina. The historical precedent for this moment is the FIFA World Cup 2018 match between Switzerland and Costa Rica, where Switzerland scored a goal in the 87th minute to take a commanding 2-1 lead. The win probability shift for this match was significant, with Switzerland's chances of winning increasing from 62% to 83%.",
+      "grounding_violation": false,
+      "faithfulness": 0.7777777777777778
+    },
+    {
+      "id": "760483:19:goal:2",
+      "match": "Jordan vs Argentina",
+      "event_type": "goal",
+      "minute": 19,
+      "response": "At minute 19', a goal by Giovani Lo Celso shifted the game in favor of Argentina, leading Jordan 0-1. The match so far has seen Argentina holding 73% of possession while Jordan has had only 27%. This goal caused a significant win-probability shift from 73% to 92%, indicating that the outcome of the match is now heavily in favor of the South American team.",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760420:17:penalty_goal:2",
+      "match": "Qatar vs Switzerland",
+      "event_type": "goal",
+      "minute": 17,
+      "response": "1. The penalty goal by Breel Embolo at minute 17' shifted the game in favor of Switzerland, as their lead over Qatar increased to 1-0. This was a significant moment as it reduced Qatar's chances of winning and significantly impacted the match's outcome, given that Switzerland had 91% win probability after this goal.\n2. Historical precedent shows that similar moments have occurred in previous FIFA World Cup matches, such as Sweden scoring against Switzerland in 2018 and Costa Rica against Switzerland in 2018. In both cases, the winning team had a higher possession rate and more shots on target.",
+      "grounding_violation": false,
+      "faithfulness": 0.7
+    },
+    {
+      "id": "760417:90:goal:1",
+      "match": "United States vs Paraguay",
+      "event_type": "goal",
+      "minute": 90,
+      "response": "1. At minute 90', the United States scored a goal to lead Paraguay 4-1, with a shot-model estimate of xG of 1.56 compared to Paraguay's xG of 0.65. This resulted in a win probability shift from 100% to 100%, indicating that the United States had secured victory based on statistical analysis.\n2. The impact of this moment was significant as it marked the end of the match and the United States' dominance throughout the game, with possession at 65% compared to Paraguay's 35%. There is no precedent in FIFA World Cup history for a similar situation where",
+      "grounding_violation": false,
+      "faithfulness": 0.5
+    },
+    {
+      "id": "760427:32:goal:1",
+      "match": "Iran vs New Zealand",
+      "event_type": "goal",
+      "minute": 32,
+      "response": "At minute 32', a goal by Ramin Rezaeian of Iran shifted the score to 1-1 against New Zealand in the FIFA World Cup match. The impact of this moment was significant as it altered the win probability from 23% to 50%, indicating that Iran's advantage increased significantly after the goal.",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760448:68:goal:1",
+      "match": "Germany vs Ivory Coast",
+      "event_type": "goal",
+      "minute": 68,
+      "response": "At minute 68', Germany scored to tie Ivory Coast 1-1, with a shot-model estimate of 1.57 xG compared to Ivory Coast's 1.46 xG. This moment shifted the win probability from 9% to 35%, indicating that the goal had a significant impact on the outcome of the match. The historical precedents given show that goals can have a substantial impact on the match, with Switzerland scoring in the 47th minute against Cameroon and Senegal scoring in the 83rd minute against the Netherlands.",
+      "grounding_violation": false,
+      "faithfulness": 0.625
+    },
+    {
+      "id": "760453:24:goal:1",
+      "match": "Spain vs Saudi Arabia",
+      "event_type": "goal",
+      "minute": 24,
+      "response": "At minute 24', Mikel Oyarzabal's goal for Spain against Saudi Arabia shifted the game in their favor, with a win probability shift from 99% to 100%. This marks the first time in FIFA World Cup history that a team has gone from a lower possession percentage (33%) to a higher possession percentage (67%) after scoring a goal.",
+      "grounding_violation": false,
+      "faithfulness": 0.6
+    },
+    {
+      "id": "760496:68:penalty_goal:1",
+      "match": "Portugal vs Croatia",
+      "event_type": "goal",
+      "minute": 68,
+      "response": "At minute 68', a penalty goal by Cristiano Ronaldo shifted the game in Portugal's favor, making the score 1-1 against Croatia. The xG estimate for each team was 2.55 vs 1.13 and possession was at 60% vs 40%. This moment resulted in a significant win probability shift of 5% to 27%, indicating that it had a significant impact on the outcome of the match.",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760417:52:red:1",
+      "match": "United States vs Paraguay",
+      "event_type": "red_card",
+      "minute": 52,
+      "response": "The red card issued to Tim Ream at minute 52' of the match between United States and Paraguay shifted the scoreline to 3-0 in favor of Paraguay. The historical precedent for this situation is the FIFA World Cup 2018 match between Sweden and Switzerland, where Sweden scored a goal after Switzerland was reduced to 10 men due to a red card at minute 92. However, unlike the previous match, there was no significant shift in win probability after the red card. The current match totals show that United States has an xG of 1.56 compared to Paraguay's 0.65, and possession is currently 65% in",
+      "grounding_violation": false,
+      "faithfulness": 0.625
+    },
+    {
+      "id": "760507:57:goal:2",
+      "match": "United States vs Belgium",
+      "event_type": "goal",
+      "minute": 57,
+      "response": "At minute 57', Belgium scored a goal to take a commanding 3-1 lead over the United States in the FIFA World Cup match. The scoreline was previously 1-0 in favor of Belgium, with both teams having taken shots at each other. This moment significantly shifted the outcome of the game, as it increased Belgium's win probability from 76% to 95%.",
+      "grounding_violation": false,
+      "faithfulness": 0.6666666666666666
+    },
+    {
+      "id": "760444:45:goal:1",
+      "match": "Brazil vs Haiti",
+      "event_type": "goal",
+      "minute": 45,
+      "response": "At minute 45', a goal by Vin\u00edcius J\u00fanior shifted the game in favor of Brazil, increasing their lead over Haiti to 3-0. The scoreline and match statistics have been updated accordingly. This moment marked a significant turning point in the game, as it reduced Haiti's chances of victory from 98% to 100%, according to historical World Cup precedent.",
+      "grounding_violation": false,
+      "faithfulness": 0.8571428571428571
+    },
+    {
+      "id": "760516:48:goal:1",
+      "match": "France vs England",
+      "event_type": "goal",
+      "minute": 48,
+      "response": "At minute 48', a goal by Kylian Mbapp\u00e9 shifted the game in favor of France, leaving England struggling to keep up. The score now stood at 1-4 in favor of France, with France having a commanding lead in both xG and possession. This moment marked a significant turning point in the match, as England's chances of coming back from behind rapidly diminished.",
+      "grounding_violation": false,
+      "faithfulness": 0.25
+    },
+    {
+      "id": "760482:78:goal:1",
+      "match": "Congo DR vs Uzbekistan",
+      "event_type": "goal",
+      "minute": 78,
+      "response": "At minute 78', Fiston Mayele scored a goal for Congo DR against Uzbekistan in the FIFA World Cup match, leading 2-1. The shot-model estimate for the xG of the goal was 0.36, and Congo DR had 58% possession at that point.",
+      "grounding_violation": false,
+      "faithfulness": 0.5
+    },
+    {
+      "id": "760448:90:goal:1",
+      "match": "Germany vs Ivory Coast",
+      "event_type": "goal",
+      "minute": 90,
+      "response": "At minute 90', a goal by Deniz Undav shifted the game in favor of Germany, leaving Ivory Coast trailing 2-1. According to shot-model estimates, Germany had a higher xG after the goal (1.57) compared to Ivory Coast (1.46). The possession also shifted in Germany's favor, with them now holding 60% compared to Ivory Coast's 40%. This win-probability shift was significant, as it increased Germany's chances of winning from 7% to 96%, effectively ending the match.",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760487:90:goal:1",
+      "match": "Brazil vs Japan",
+      "event_type": "goal",
+      "minute": 90,
+      "response": "At minute 90', Brazil scored a goal to lead Japan 2-1, shifting the win probability in favor of Brazil by 4%. This moment was preceded by a match where Germany had 68% of the events and shot 22 times with an xG of 0.73 at minute 74.",
+      "grounding_violation": false,
+      "faithfulness": 0.6
+    },
+    {
+      "id": "760455:82:goal:2",
+      "match": "Jordan vs Algeria",
+      "event_type": "goal",
+      "minute": 82,
+      "response": "The 82' goal by Amine Gouiri shifted the score in favor of Algeria, making it 1\u20132 against Jordan. This brought the win probability shift from 19% to 87%, as Algeria's advantage grew significantly. The match so far had seen France with 53% of the events and Morocco with 58%.",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760415:84:red:2",
+      "match": "Mexico vs South Africa",
+      "event_type": "red_card",
+      "minute": 84,
+      "response": "At minute 84', Themba Zwane received a red card, leaving South Africa down one player and Mexico leading 2-0. The match's xG estimates were 1.17 for Mexico and 0.09 for South Africa, with possession at 60% for Mexico and 40% for South Africa. This shift in the game resulted in a 100% win probability for Mexico, as they now had an extra player on the field. The historical precedent of this situation is the FIFA World Cup match between Colombia and Japan in 2018, where Colombia was reduced to 10 men after a red card at minute 2, resulting in a 10",
+      "grounding_violation": false,
+      "faithfulness": 0.8333333333333334
+    },
+    {
+      "id": "760439:74:goal:1",
+      "match": "Switzerland vs Bosnia-Herzegovina",
+      "event_type": "goal",
+      "minute": 74,
+      "response": "At minute 74', a goal by Johan Manzambi shifted the game in favor of Switzerland, making it 1-0 against Bosnia-Herzegovina. The impact of this moment was significant as the win probability shifted from Switzerland's 36% to 89%, indicating that the goal gave them a commanding lead and increased their chances of winning the match. This is not an unprecedented situation in FIFA World Cup history, as similar moments have occurred before, such as in Serbia vs Switzerland in 2018 at minute 51, when the score was 1-0 in favor of Serbia, but Switzerland scored to make it 1-1. Additionally",
+      "grounding_violation": false,
+      "faithfulness": 0.75
+    },
+    {
+      "id": "760516:18:goal:2",
+      "match": "France vs England",
+      "event_type": "goal",
+      "minute": 18,
+      "response": "The goal scored by Ezri Konsa at minute 18' shifted the game in favor of England with a win probability increase from 63% to 86%. This is reminiscent of the FIFA World Cup match between France and Brazil in 2014, where Brazil scored a goal in the 7th minute to take a commanding 1-0 lead. However, unlike that match, England had already been leading France 1-0 before the second goal was scored. The impact of this moment on the game was significant as it marked a significant shift in possession and chances for both teams.",
+      "grounding_violation": true,
+      "faithfulness": 0.625
+    },
+    {
+      "id": "760473:64:goal:2",
+      "match": "Cura\u00e7ao vs Ivory Coast",
+      "event_type": "goal",
+      "minute": 64,
+      "response": "At minute 64', a goal by Nicolas P\u00e9p\u00e9 shifted the scoreline in favor of Ivory Coast, making it 0-2 in their match against Cura\u00e7ao. This was a significant moment because it increased Ivory Coast's win probability from 84% to 97%, indicating that they were now heavily favored to win the match. Additionally, Cura\u00e7ao had been struggling to keep up with Ivory Coast's possession, as they had only 37% of the events compared to Ivory Coast's 63%. This meant that Ivory Coast was controlling most of the game and had more opportunities to score. Overall, this moment marked a turning point in the",
+      "grounding_violation": false,
+      "faithfulness": 0.8
+    },
+    {
+      "id": "760512:36:goal:1",
+      "match": "Norway vs England",
+      "event_type": "goal",
+      "minute": 36,
+      "response": "At minute 36', a goal by Andreas Schjelderup gave Norway a 1-0 lead over England in the FIFA World Cup match, shifting the win probability from 24% to 56%. This is a significant shift in favor of Norway.",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760438:6:goal:1",
+      "match": "Czechia vs South Africa",
+      "event_type": "goal",
+      "minute": 6,
+      "response": "1. At minute 6', a goal by Michal Sad\u00edlek increased the lead of Czechia to 1-0 against South Africa in the FIFA World Cup match. The goal was notable because it represented a significant shift in possession and momentum, with Czechia gaining control of the game at that moment.\n2. The impact of this goal was significant, as it shifted the win probability from 52% in favor of Czechia to 76%. This suggests that the goal was particularly important in determining the outcome of the match, as it gave Czechia a substantial advantage over South Africa.",
+      "grounding_violation": false,
+      "faithfulness": 0.8333333333333334
+    },
+    {
+      "id": "760448:30:goal:2",
+      "match": "Germany vs Ivory Coast",
+      "event_type": "goal",
+      "minute": 30,
+      "response": "At minute 30', a goal by Franck Kessi\u00e9 shifted the score in favor of Ivory Coast, making it 0-1 Germany. This moment had a significant impact on the match, as the possession shifted from 60% to 40%, and the win probability shifted from 20% to 47%. The historical precedent is Senegal vs Netherlands at minute 83', where the Netherlands scored to make it 0-1.",
+      "grounding_violation": false,
+      "faithfulness": 0.8571428571428571
+    },
+    {
+      "id": "760468:77:goal:1",
+      "match": "Ecuador vs Germany",
+      "event_type": "goal",
+      "minute": 77,
+      "response": "At minute 77', a goal by Gonzalo Plata shifted the balance of power in favor of Ecuador, taking their lead over Germany to 2-1. The impact of this moment was significant as it changed the win probability from 17% to 84%, indicating that Ecuador had gained a strong advantage in the match. This goal marked a turning point in the game and set the stage for Ecuador's eventual victory.",
+      "grounding_violation": false,
+      "faithfulness": 0.875
+    },
+    {
+      "id": "760516:54:goal:1",
+      "match": "France vs England",
+      "event_type": "goal",
+      "minute": 54,
+      "response": "At minute 54', France scored a goal to take England's lead to 2-4. The shot-model estimate for this goal was 2.88, while the match totals were xG (shot-model estimate) 3.47 vs 4.62. After this moment, France's win probability shifted from 0% to 1%, indicating a significant impact on the outcome of the match.",
+      "grounding_violation": false,
+      "faithfulness": 0.4
+    },
+    {
+      "id": "760515:85:goal:2",
+      "match": "England vs Argentina",
+      "event_type": "goal",
+      "minute": 85,
+      "response": "At minute 85', Enzo Fern\u00e1ndez scored a goal for Argentina to equalize the score at 1-1 against England in the FIFA World Cup match. The historical precedent is the 2018 FIFA World Cup match between Colombia and England, where the score was also tied at 1-1 after 92 minutes, with England having 50% of the events and shooting the ball. In this case, the impact of the moment shifted the win probability from 1% in favor of England to 16% in favor of Argentina.",
+      "grounding_violation": false,
+      "faithfulness": 0.3333333333333333
+    },
+    {
+      "id": "760475:21:goal:1",
+      "match": "Norway vs France",
+      "event_type": "goal",
+      "minute": 21,
+      "response": "At minute 21', a goal by Thelo Aasgaard gave Norway a 1-2 lead over France in the FIFA World Cup match. Prior to this moment, France had been leading 2-0, with possession at 57% and xG estimate at 1.39. The scoreline shift of +2% was significant as it brought France's win probability down from 7% to 5%, indicating a potential turning point in the match.",
+      "grounding_violation": false,
+      "faithfulness": 0.14285714285714285
+    },
+    {
+      "id": "760427:64:goal:1",
+      "match": "Iran vs New Zealand",
+      "event_type": "goal",
+      "minute": 64,
+      "response": "At minute 64', Iran scored a goal to lead New Zealand 2-2 in the World Cup match between Iran and New Zealand. The goal shifted the win probability in favor of Iran from 10% to 36%, indicating that Iran had gained an advantage in the match.",
+      "grounding_violation": false,
+      "faithfulness": 0.75
+    },
+    {
+      "id": "760470:31:goal:1",
+      "match": "T\u00fcrkiye vs United States",
+      "event_type": "goal",
+      "minute": 31,
+      "response": "The goal by Baris Alper Yilmaz for T\u00fcrkiye at minute 31' shifted the game significantly as the United States' lead was reduced to 2-1. The scoreline after this moment was 2.79 xG (shot-model estimate) for T\u00fcrkiye vs 1.89 for the United States, and possession shifted from 53% to 47%. This goal also led to a major win probability shift in favor of T\u00fcrkiye, with their chances increasing from 36% to 71%.",
+      "grounding_violation": false,
+      "faithfulness": 0.75
+    },
+    {
+      "id": "760471:62:goal:2",
+      "match": "Japan vs Sweden",
+      "event_type": "goal",
+      "minute": 62,
+      "response": "At minute 62', Sweden scored a goal against Japan to lead 1-0 in the World Cup match. The scoreline changed from 0-0 to 1-0, with Sweden taking possession of the ball for 52% and Japan having 48%.\nHistorically, the FIFA World Cup match between Sweden and South Korea in 2018 saw a similar moment when Sweden scored a goal at minute 64 to take a 1-0 lead. In that game, Sweden had 59% of the events and shot 13 times.",
+      "grounding_violation": false,
+      "faithfulness": 0.8
+    },
+    {
+      "id": "760454:43:goal:1",
+      "match": "Norway vs Senegal",
+      "event_type": "goal",
+      "minute": 43,
+      "response": "At minute 43', a goal by Marcus Holmgren Pedersen shifted the match to Norway leading Senegal 1-0. The historical precedent is from the FIFA World Cup in 2022 where Senegal scored a goal at minute 83 against the Netherlands to lead 0-1. Currently, the shot-model estimate of xG is 2.07 for Norway and 1.89 for Senegal, with possession being 42% for Norway and 58% for Senegal. The win probability shift following this moment was from 36% to 73%, indicating a significant change in the likelihood of victory.",
+      "grounding_violation": false,
+      "faithfulness": 0.875
+    },
+    {
+      "id": "760421:75:goal:1",
+      "match": "Australia vs T\u00fcrkiye",
+      "event_type": "goal",
+      "minute": 75,
+      "response": "1. At minute 75', Australia scored a goal to take T\u00fcrkiye's lead from 0-0 to 2-0. This moment significantly shifted the game in favor of Australia, with their win probability increasing from 78% to 97%.\n2. The previous FIFA World Cup precedent where Tunisia scored against Australia at minute 22 also shows a similar impact on possession and shots taken. However, Denmark's goal at minute 59 was not a result of a shift in win probability but rather an increase in possession from 64% to 67%.",
+      "grounding_violation": false,
+      "faithfulness": 0.2857142857142857
+    },
+    {
+      "id": "760490:74:goal:1",
+      "match": "Ivory Coast vs Norway",
+      "event_type": "goal",
+      "minute": 74,
+      "response": "At minute 74', Amad Diallo scored a goal for Ivory Coast to tie the game against Norway in the FIFA World Cup match. The score was previously 1-0 in favor of Norway. This moment shifted the win probability from a 2% chance for Ivory Coast to a 15% chance, indicating a significant impact on the outcome of the game. The historical precedent for this situation is the FIFA World Cup 2022 match between Portugal and Switzerland, where Portugal scored a goal at minute 57 to take the lead 4-1. In that match, Portugal had 52% of the events.",
+      "grounding_violation": false,
+      "faithfulness": 0.8333333333333334
+    },
+    {
+      "id": "760504:79:goal:2",
+      "match": "Brazil vs Norway",
+      "event_type": "goal",
+      "minute": 79,
+      "response": "The goal by Erling Haaland at minute 79' shifted the balance of power in favor of Norway, making their win probability increase from 14% to 79%. This moment had a significant impact on the match as it marked a turning point in possession and shots taken. The historical precedent of Sweden scoring against Switzerland at minute 65 in FIFA World Cup 2018 shows that goals can be scored at any time during the game, and this goal by Haaland was crucial in determining the outcome of the match.",
+      "grounding_violation": false,
+      "faithfulness": 0.5714285714285714
+    },
+    {
+      "id": "760431:50:goal:2",
+      "match": "Austria vs Jordan",
+      "event_type": "goal",
+      "minute": 50,
+      "response": "1. At minute 50', a goal by Ali Olwan shifted the game in Jordan's favor, bringing the score to 1-1. This moment had a significant impact on the match as it shifted the win probability in Jordan's favor from 5% to 22%.\n2. The historical precedent of Serbia vs Switzerland in FIFA World Cup 2022 also shows that a goal scored at minute 47 resulted in a 2-3 scoreline, with Serbia having 51% of the events so far. In this case, the impact of the goal was to give Switzerland an advantage, but it ultimately lost the match 2-3.",
+      "grounding_violation": false,
+      "faithfulness": 0.8888888888888888
+    },
+    {
+      "id": "760475:20:goal:2",
+      "match": "Norway vs France",
+      "event_type": "goal",
+      "minute": 20,
+      "response": "At minute 20', Ousmane Demb\u00e9l\u00e9 scored a goal for France against Norway in the FIFA World Cup match, shifting the score to 0-2 in favor of France. The current match totals show that France has a higher xG (shot-model estimate) of 1.60 compared to Norway's 1.39, and France currently possesses the ball 43% of the time. This moment has significantly impacted the game, as France's win probability has increased from 77% to 93%, indicating that they are now heavily favored to win the match.",
+      "grounding_violation": false,
+      "faithfulness": 0.8571428571428571
+    },
+    {
+      "id": "760424:84:goal:1",
+      "match": "Sweden vs Tunisia",
+      "event_type": "goal",
+      "minute": 84,
+      "response": "At minute 84', Mattias Svanberg scored a goal for Sweden against Tunisia, shifting the scoreline to 4-1 in favor of Sweden. The historical precedent is from the FIFA World Cup 2018 match between Sweden and Switzerland, where Sweden scored the first goal at minute 65. The impact of this moment was significant, as it brought Sweden's win probability to 100%, leaving Tunisia struggling to keep up.",
+      "grounding_violation": false,
+      "faithfulness": 0.8571428571428571
+    },
+    {
+      "id": "760462:29:goal:1",
+      "match": "Bosnia-Herzegovina vs Qatar",
+      "event_type": "goal",
+      "minute": 29,
+      "response": "At minute 29', Kerim Alajbegovic scored a goal for Bosnia-Herzegovina against Qatar in the FIFA World Cup match, shifting the score to 1-0 in favor of Bosnia-Herzegovina. The shot-model estimate for the goal was 1.03 and Qatar had 46% possession at that point. This moment had a significant impact on the game as it shifted the win probability from 42% to 73%, indicating a dramatic shift in favor of Bosnia-Herzegovina.",
+      "grounding_violation": false,
+      "faithfulness": 0.8571428571428571
+    },
+    {
+      "id": "760470:90:goal:1",
+      "match": "T\u00fcrkiye vs United States",
+      "event_type": "goal",
+      "minute": 90,
+      "response": "At minute 90', a goal by Kaan Ayhan shifted the game in favor of T\u00fcrkiye, leaving the United States struggling to keep up. The goal brought T\u00fcrkiye's lead to 3-2 and marked a significant turning point in the match. With possession shifting in T\u00fcrkiye's favor at 53%, it is now highly likely that they will win the game (100% win probability). This moment has had a major impact on the outcome of the match, with the United States failing to keep up despite having dominated events so far with 56% possession.",
+      "grounding_violation": false,
+      "faithfulness": 0.625
+    },
+    {
+      "id": "760445:2:goal:2",
+      "match": "Scotland vs Morocco",
+      "event_type": "goal",
+      "minute": 2,
+      "response": "At minute 2', Morocco scored the first goal to lead Scotland 0-1 in the FIFA World Cup match. This moment shifted the game's dynamics significantly as it led to a significant win probability shift from 53% for Morocco to 76%. This indicates that the goal had a considerable impact on the outcome of the match, increasing the likelihood of a Moroccan victory.",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760423:90:goal:1",
+      "match": "Ivory Coast vs Ecuador",
+      "event_type": "goal",
+      "minute": 90,
+      "response": "At minute 90', a goal by Amad Diallo of Ivory Coast shifted the game's score to 1-0 in their favor against Ecuador. The win probability shift was significant, moving from 7% to 86%. This moment had a significant impact on the match, as it reduced Ecuador's chances of victory and increased Ivory Coast's chances.",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760422:6:goal:1",
+      "match": "Germany vs Cura\u00e7ao",
+      "event_type": "goal",
+      "minute": 6,
+      "response": "At minute 6', a goal by Felix Nmecha shifted the game in favor of Germany, taking their lead over Cura\u00e7ao to 1-0. The match so far had seen Germany having 75% of possession and taking 23 shots with an xG of 4.39. In comparison, Cura\u00e7ao had 25% possession and 6 shots with an xG of 0.51. The win probability shift from 76% to 92% indicates that the goal was a significant turning point in the match.",
+      "grounding_violation": false,
+      "faithfulness": 0.5
+    },
+    {
+      "id": "760449:83:goal:2",
+      "match": "Tunisia vs Japan",
+      "event_type": "goal",
+      "minute": 83,
+      "response": "At minute 83', a goal by Ayase Ueda shifted the game in favor of Japan, as they now led Tunisia 4-0. This goal represented a significant moment in the match, as it marked a major shift in possession and shots on target. Prior to this moment, Tunisia had been leading Japan in possession (62% vs 38%) and shots on target (2.34 xG vs 0.10 xG). This goal, therefore, had a significant impact on the game by changing the win probability from 100% for Tunisia to 100% for Japan.",
+      "grounding_violation": false,
+      "faithfulness": 0.5
+    },
+    {
+      "id": "760460:54:goal:2",
+      "match": "Panama vs Croatia",
+      "event_type": "goal",
+      "minute": 54,
+      "response": "The goal scored by Ante Budimir in the 54th minute of the match shifted the score to Panama 0\u20131 Croatia, causing a significant win-probability shift from 36% to 78%. While this moment represents a significant turning point in the game, it is important to note that historical precedents show similar situations in previous World Cup matches, such as Tunisia's own goal against Panama in minute 32 of the 2018 match and Tunisia's goal against Panama in minute 65 of the same match.",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760505:38:goal:2",
+      "match": "Mexico vs England",
+      "event_type": "goal",
+      "minute": 38,
+      "response": "At minute 38', a goal by Jude Bellingham put England's lead over Mexico at 2-0. This moment shifted the game significantly, with the win probability shifting from 70% to 92%. While historical precedents exist of own goals in FIFA World Cup matches altering the scoreline, there is no direct correlation between this specific moment and a shift in momentum or morale.",
+      "grounding_violation": false,
+      "faithfulness": 0.75
+    },
+    {
+      "id": "760514:58:goal:2",
+      "match": "France vs Spain",
+      "event_type": "goal",
+      "minute": 58,
+      "response": "1. At minute 58', Pedro Porro scored a goal for Spain, increasing their lead over France to 2-0 in the FIFA World Cup match. The xG estimate of France's shots was 0.85 compared to Spain's 1.39, indicating that Spain had a higher probability of scoring from their shots.\n2. The impact of this moment was significant as it shifted the win probability from 78% in favor of France to 96% in favor of Spain. This means that after the goal, Spain had a much higher chance of winning the match than France did.",
+      "grounding_violation": false,
+      "faithfulness": 0.625
+    },
+    {
+      "id": "760432:82:goal:1",
+      "match": "France vs Senegal",
+      "event_type": "goal",
+      "minute": 82,
+      "response": "At minute 82', a goal by Bradley Barcola increased France's lead over Senegal to 2-0 in the World Cup match. The shift in win probability from 89% to 99% indicates that the goal had a significant impact on the outcome of the match. In terms of historical precedent, this situation is similar to minute 98 of the same match where Netherlands scored again to make it 0-2. In that match, Netherlands had 51% of the events, and Senegal had 49%. The goal in both matches appears to have been a critical turning point in the game.",
+      "grounding_violation": false,
+      "faithfulness": 0.4
+    },
+    {
+      "id": "760507:90:goal:2",
+      "match": "United States vs Belgium",
+      "event_type": "goal",
+      "minute": 90,
+      "response": "At minute 90', Romelu Lukaku scored a goal for Belgium to lead the United States 1-4 in the FIFA World Cup match. This moment shifted the win probability from 50% to 100%, with Belgium now having a perfect chance of winning the game based on historical precedent and current match data. The shift in possession percentage from 56% (United States) to 44% (Belgium) did not have a significant impact on the overall outcome of the match, as Belgium had already been leading by three goals before Lukaku's goal at minute 90'.",
+      "grounding_violation": false,
+      "faithfulness": 0.42857142857142855
+    },
+    {
+      "id": "760510:60:goal:1",
+      "match": "France vs Morocco",
+      "event_type": "goal",
+      "minute": 60,
+      "response": "At minute 60', Kylian Mbapp\u00e9 scored a goal for France to lead Morocco 2-0 in the FIFA World Cup match. The win probability shifted from 36% to 80%, indicating that France had gained a significant advantage in the game.",
+      "grounding_violation": false,
+      "faithfulness": 0.75
+    },
+    {
+      "id": "760488:72:goal:1",
+      "match": "Netherlands vs Morocco",
+      "event_type": "goal",
+      "minute": 72,
+      "response": "At minute 72', Netherlands scored a goal to take Morocco's lead 1-0 in the FIFA World Cup match between the two countries. The shot model estimate of xG for Netherlands was 0.34 and 1.36 for Morocco, indicating that the Dutch team had taken more shots but with lower expected goals. This shift in possession from 30% to 70% in favor of Morocco was significant as it reduced their chances of winning by 20 percentage points, making it 82% chance for Netherlands to win the match. The match so far showed that Belgium had 61% of the events and had taken 9 shots, while Netherlands had",
+      "grounding_violation": false,
+      "faithfulness": 0.25
+    },
+    {
+      "id": "760474:4:goal:1",
+      "match": "Senegal vs Iraq",
+      "event_type": "goal",
+      "minute": 4,
+      "response": "At minute 4', a goal by Habib Diarra shifted the score in favor of Senegal, leaving Iraq trailing 1-0. The shot-model estimate for Senegal's xG was 3.48, while Iraq's was only 0.25. This increased Senegal's win probability from 57% to 79%, indicating the importance of this moment in the match.",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760439:84:goal:1",
+      "match": "Switzerland vs Bosnia-Herzegovina",
+      "event_type": "goal",
+      "minute": 84,
+      "response": "At minute 84', Switzerland scored a goal by Rub\u00e9n Vargas to lead Bosnia-Herzegovina 2\u20130. This moment shifted the game's momentum in favor of Switzerland, with their win probability increasing from 94% to 100%. The scoreline now stood at Switzerland 2\u20130 Bosnia-Herzegovina, and they had an advantage of 1.79 xG compared to Bosnia-Herzegovina's 0.51 xG. This goal also meant that Bosnia-Herzegovina had lost possession of the ball, with Switzerland now holding 62% of it. Overall, this moment marked a",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760474:59:goal:1",
+      "match": "Senegal vs Iraq",
+      "event_type": "goal",
+      "minute": 59,
+      "response": "The moment in which Pape Gueye scored the third goal for Senegal against Iraq at minute 59' shifted the game significantly. The scoreline now stood at 3-0 in favor of Senegal, with a shot-model estimate xG of 3.48 compared to Iraq's 0.25. This marked a decisive shift in possession, with Senegal maintaining 69% of the events and Iraq holding only 31%. The win probability shifted from 98% to 100%, indicating that Senegal was now dominating the match.",
+      "grounding_violation": false,
+      "faithfulness": 0.625
+    },
+    {
+      "id": "760470:3:goal:2",
+      "match": "T\u00fcrkiye vs United States",
+      "event_type": "goal",
+      "minute": 3,
+      "response": "At minute 3', Auston Trusty scored a goal for the United States, taking T\u00fcrkiye's lead to 1-0. The goal shifted the win probability in favor of the United States from 32% to 60%, indicating that the match had a significant turning point at this moment. There are no precedents in FIFA World Cup history for a similar moment, so it is difficult to draw historical comparisons.",
+      "grounding_violation": false,
+      "faithfulness": 0.6
+    },
+    {
+      "id": "760447:54:goal:1",
+      "match": "Netherlands vs Sweden",
+      "event_type": "goal",
+      "minute": 54,
+      "response": "At minute 54', Cody Gakpo scored a goal for the Netherlands, giving them a 4-0 lead over Sweden in the World Cup match. The xG estimate for the shot was 2.41, and possession shifted to the Netherlands at 100%. This marked a significant moment in the game as it ended with a win probability shift of 100% in favor of the Netherlands. While there are historical precedents of similar moments in previous World Cup matches, such as Sweden's goal against Switzerland in 2018 and Germany's goal against Sweden in the same year, this moment was unique to this specific match and had a significant impact on the outcome.",
+      "grounding_violation": false,
+      "faithfulness": 0.6363636363636364
+    },
+    {
+      "id": "760454:48:goal:1",
+      "match": "Norway vs Senegal",
+      "event_type": "goal",
+      "minute": 48,
+      "response": "At minute 48', a moment shifted the game in FIFA World Cup 2022 when Norway scored a goal against Senegal to lead 2-0. The scoreline had previously been deadlocked at 0-0, with Senegal having 58% possession and Norway 42%. This shift in possession seemed to give more opportunities for Norway to create chances and ultimately scored the second goal. The win probability shifted from 75% in favor of Senegal to 94% in favor of Norway.",
+      "grounding_violation": false,
+      "faithfulness": 0.25
+    },
+    {
+      "id": "760424:7:goal:1",
+      "match": "Sweden vs Tunisia",
+      "event_type": "goal",
+      "minute": 7,
+      "response": "At minute 7' of the World Cup match between Sweden and Tunisia, Yasin Ayari scored a goal for Sweden, shifting the score to 1-0 in favor of the host country. The shot-model estimate for xG was 1.61 for Sweden and 0.53 for Tunisia, indicating that the goal was a significant moment in the match. Additionally, Sweden's possession increased to 49%, while Tunisia's decreased to 51%. Following this moment, Sweden's win probability shifted from 39% to 68%, indicating that the goal had a significant impact on the outcome of the match.",
+      "grounding_violation": false,
+      "faithfulness": 0.5555555555555556
+    },
+    {
+      "id": "760440:16:goal:1",
+      "match": "Canada vs Qatar",
+      "event_type": "goal",
+      "minute": 16,
+      "response": "At minute 16', Canada scored a goal to take a 1-0 lead against Qatar in the FIFA World Cup match. The goal shifted the game's momentum significantly, with Canada's win probability increasing from 75% to 93%. This moment had a significant impact on the match so far, as Canada had been dominating possession (79%) and shots (xG: 5.20 vs 0.12). However, it is important to note that this match was not precedented by any specific historical FIFA World Cup matches.",
+      "grounding_violation": false,
+      "faithfulness": 0.8571428571428571
+    },
+    {
+      "id": "760516:90:goal:1",
+      "match": "France vs England",
+      "event_type": "goal",
+      "minute": 90,
+      "response": "1. In minute 90', a goal by Ousmane Demb\u00e9l\u00e9 shifted the score to 4-5 in favor of England, with France having no remaining win probability. This is consistent with historical precedents where England scored at minute 77 to take a 1-2 lead (FIFA World Cup 2022) and at minute 53 to make it 1-1 (FIFA World Cup 2022).\n2. The impact of this moment was significant as France had been leading 4-3 until the last minute, with England having only one shot on target after 90 minutes. Despite France's dominance in possession (46% vs",
+      "grounding_violation": false,
+      "faithfulness": 0.4
+    },
+    {
+      "id": "760499:55:own_goal:2",
+      "match": "Australia vs Egypt",
+      "event_type": "goal",
+      "minute": 55,
+      "response": "At minute 55', Egypt scored an own goal to tie Australia's lead in the World Cup match. The score is now 1-1 and possession has shifted from Australia (42%) to Egypt (58%). This moment caused a significant win probability shift of 9% \u2192 34%, indicating that Egypt's chances of winning have improved significantly.",
+      "grounding_violation": false,
+      "faithfulness": 0.6
+    },
+    {
+      "id": "760453:21:goal:1",
+      "match": "Spain vs Saudi Arabia",
+      "event_type": "goal",
+      "minute": 21,
+      "response": "At minute 21', Mikel Oyarzabal scored a goal for Spain against Saudi Arabia in the FIFA World Cup match, shifting the score to 2-0 in favor of Spain. The historical precedent cited is from the FIFA World Cup 2022 match between Poland and Saudi Arabia, where Poland scored a goal at minute 81 to take the lead 2-0. In this current match, Saudi Arabia had previously held 67% of the possession, while Spain had 33%. However, after the goal, the win probability shifted from 95% in favor of Spain to 99%, indicating a significant impact on the outcome of the match.",
+      "grounding_violation": false,
+      "faithfulness": 0.5
+    },
+    {
+      "id": "760442:43:goal:1",
+      "match": "United States vs Australia",
+      "event_type": "goal",
+      "minute": 43,
+      "response": "At minute 43', a goal by Alex Freeman shifted the game in favor of United States, leaving Australia trailing 2-0. The scoreline was accompanied by a change in possession as the United States took control with 62% compared to Australia's 38%. This moment led to a significant shift in win probability, with the United States' chances increasing from 72% to 92%.",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760437:36:goal:2",
+      "match": "England vs Croatia",
+      "event_type": "goal",
+      "minute": 36,
+      "response": "At minute 36' in the FIFA World Cup match between Croatia and England, a goal by Martin Baturina for Croatia brought the score to 1-1. The shot-model estimate for xG (expected goals) shifted from Croatia's favor at 0.98 to England's at 3.68, indicating that this moment was significant in the match. Additionally, possession shifted from England's 52% to Croatia's 48%, and the win probability shift for Croatia increased by 7%.",
+      "grounding_violation": false,
+      "faithfulness": 0.6666666666666666
+    },
+    {
+      "id": "760490:86:goal:2",
+      "match": "Ivory Coast vs Norway",
+      "event_type": "goal",
+      "minute": 86,
+      "response": "At minute 86' in the match between Ivory Coast and Norway, a goal by Erling Haaland shifted the game from a 1-1 draw to a 2-1 lead for Norway. This was a significant moment in the match as it changed the dynamic of the game and increased Norway's chances of winning. The shot-model estimate for xG after the goal was 1.98, indicating that the goal was considered an excellent opportunity. Additionally, possession shifted to 53% in favor of Norway after the goal, further solidifying their advantage. Overall, this moment had a significant impact on the outcome of the match, with Norway winning 2-1.",
+      "grounding_violation": false,
+      "faithfulness": 0.7777777777777778
+    },
+    {
+      "id": "760465:7:goal:2",
+      "match": "Scotland vs Brazil",
+      "event_type": "goal",
+      "minute": 7,
+      "response": "At minute 7', a moment shifted the game in the World Cup match between Brazil and Scotland as Vin\u00edcius J\u00fanior scored to give Brazil a 1-0 lead. The current match totals show that Brazil has a higher xG (shot-model estimate) of 3.26 compared to Scotland's 1.55, indicating that Brazil has been taking more shots with greater expected goals. Additionally, Brazil currently has possession of the ball 54% of the time. The win probability shift from 61% to 83% suggests that the goal has significantly increased Brazil's chances of winning the match.",
+      "grounding_violation": false,
+      "faithfulness": 0.8571428571428571
+    },
+    {
+      "id": "760507:31:goal:1",
+      "match": "United States vs Belgium",
+      "event_type": "goal",
+      "minute": 31,
+      "response": "At minute 31', the United States scored a goal to equalize Belgium's lead, shifting the win probability from 9% to 30%. This moment is similar to previous FIFA World Cup matches where a goal scored by Belgium against Canada in 2022 and Panama in 2018 at minutes 43 and 68 respectively, increased their lead to 1-0 and 2-0, respectively.",
+      "grounding_violation": false,
+      "faithfulness": 0.5
+    },
+    {
+      "id": "760500:92:goal:1",
+      "match": "Argentina vs Cape Verde",
+      "event_type": "goal",
+      "minute": 92,
+      "response": "At minute 92', an Argentine goal shifted the game in their favor by making it 2-1, with a shot-model estimate of 2.58 against Cape Verde's xG of 0.89. This move also brought about a significant shift in possession from 36% for Cape Verde to 64% for Argentina, leaving the African team struggling to keep up with their opponents. The historical precedent for this situation is the FIFA World Cup match between Croatia and Argentina in 2018, where the goal by the South Americans at minute 68 made it 3-0 for them, despite Croatia having a slightly higher possession percentage of",
+      "grounding_violation": false,
+      "faithfulness": 0.375
+    },
+    {
+      "id": "760430:43:goal:2",
+      "match": "Iraq vs Norway",
+      "event_type": "goal",
+      "minute": 43,
+      "response": "At minute 43', a goal by Erling Haaland shifted the game in favor of Norway, leaving Iraq trailing 1-2. The xG estimate for Iraq was 1.35 compared to Norway's 3.17, indicating that Norway had more expected goals from their shots. Additionally, possession was 61% in favor of Norway and 39% for Iraq. This moment led to a significant win probability shift, with Norway's probability increasing from 53% to 83%. Overall, this goal had a substantial impact on the outcome of the match.",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760471:56:goal:1",
+      "match": "Japan vs Sweden",
+      "event_type": "goal",
+      "minute": 56,
+      "response": "At minute 56', Japan scored a goal to take a 1-0 lead over Sweden in the FIFA World Cup match. The scoreline shift from 0-0 to 1-0 significantly impacted the match, as the xG estimate for Japan increased from 0.79 to 1.01 and their possession percentage decreased from 52% to 48%. This marked a notable win-probability shift from 44% to 83%, indicating that Japan had a higher chance of winning the match after the goal. In comparison, there are no prior FIFA World Cup matches with identical circumstances that could serve as a historical precedent for this moment.",
+      "grounding_violation": false,
+      "faithfulness": 0.5714285714285714
+    },
+    {
+      "id": "760497:66:goal:1",
+      "match": "Spain vs Austria",
+      "event_type": "goal",
+      "minute": 66,
+      "response": "1. At minute 66', Pedro Porro scored a goal for Spain to lead Austria 2-0 in the FIFA World Cup match. This moment shifted the game significantly as it increased Spain's xG from 0.50 to 2.14, while Austria's xG remained at 0.32.\n2. The impact of this goal was notable as it increased Spain's win probability from 89% to 99%, effectively ending the match in favor of Spain. This reflects the importance of a well-timed and well-placed shot in the context of the match, as it can significantly alter the outcome.",
+      "grounding_violation": false,
+      "faithfulness": 0.2857142857142857
+    },
+    {
+      "id": "760482:90:goal:1",
+      "match": "Congo DR vs Uzbekistan",
+      "event_type": "goal",
+      "minute": 90,
+      "response": "At minute 90', Yoane Wissa scored a goal for Congo DR to lead Uzbekistan 3-1 in the FIFA World Cup match. The win probability shift from 92% to 100% indicates that Congo DR had a high chance of winning the game after this moment. This is similar to previous matches, such as FIFA World Cup 2022 Cameroon vs Serbia at minute 65 and 62, where a goal was scored by Cameroon to lead Serbia 3-3 and 2-3 respectively. In both cases, Congo DR had a high possession percentage and a high number of shots on target. The impact of this",
+      "grounding_violation": false,
+      "faithfulness": 0.6666666666666666
+    },
+    {
+      "id": "760475:90:goal:2",
+      "match": "Norway vs France",
+      "event_type": "goal",
+      "minute": 90,
+      "response": "At minute 90', D\u00e9sir\u00e9 Dou\u00e9 scored a goal for France against Norway in the FIFA World Cup match, shifting the score to 1-4. The historical precedent of the match was in 2022, when France scored a goal at minute 85 to lead Denmark 2-1 and in 2022, when France scored a goal at minute 60 to lead Denmark 1-0. The match so far had been relatively evenly split between the two teams, with France having slightly more possession (43% vs 57%) and shots (xG: 1.60 vs 1.39). However, this moment significantly increased France's",
+      "grounding_violation": false,
+      "faithfulness": 0.75
+    },
+    {
+      "id": "760479:90:red:1",
+      "match": "Uruguay vs Spain",
+      "event_type": "red_card",
+      "minute": 90,
+      "response": "The red card for Agust\u00edn Canobbio at minute 90' shifted the game in favor of Spain, leaving Uruguay down to 10 men. The score now stood at Uruguay 0-1 Spain. The match so far had seen Uruguay with 51% of the events and Russia with 49%. This moment had a significant impact on the game as it reduced Uruguay's chances of victory from 97% to 98%, meaning that Spain now had a higher probability of winning the match.",
+      "grounding_violation": false,
+      "faithfulness": 0.625
+    },
+    {
+      "id": "760417:73:goal:2",
+      "match": "United States vs Paraguay",
+      "event_type": "goal",
+      "minute": 73,
+      "response": "At minute 73', a goal by Maur\u00edcio shifted the game in favor of Paraguay, leaving the United States leading 3-1. The shot-model estimate for the United States was 1.56 xG compared to Paraguay's 0.65 xG, indicating that the United States had been dominating possession with 65% compared to Paraguay's 35%. However, this goal did not significantly alter the win probability shift, as it remained at 0% for both teams.",
+      "grounding_violation": false,
+      "faithfulness": 0.7
+    },
+    {
+      "id": "760430:90:own_goal:1",
+      "match": "Iraq vs Norway",
+      "event_type": "goal",
+      "minute": 90,
+      "response": "At minute 90', an own goal by Aymen Hussein shifted the game in favor of Norway, leaving Iraq trailing 1-4. The historical precedent for this moment is the FIFA World Cup match between Morocco and Iran in 2018, where an own goal at minute 94 gave Iran a 1-0 lead over Morocco, despite Morocco having had 61% of the events so far. Similarly, in the FIFA World Cup match between Portugal and Switzerland in 2022, a goal at minute 57 brought Switzerland's lead to 4-1, with Portugal having only 52% of the events so far. The impact",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760485:62:goal:2",
+      "match": "Panama vs England",
+      "event_type": "goal",
+      "minute": 62,
+      "response": "The goal by Jude Bellingham at minute 62' shifted the balance of power in favor of England, with the score now standing at Panama 0-1. Prior to this moment, England had been leading 5-0 and had a 59% advantage in events. After the goal, however, the possession ratio shifted to 33% for England, indicating that Panama was starting to gain momentum. Additionally, the xG (shot-model estimate) for England dropped from 1.80 to 1.70 after the goal, while it remained at 2.16 for Panama. This suggests that England's shots were not as accurate or high-quality as previously",
+      "grounding_violation": false,
+      "faithfulness": 0.5
+    },
+    {
+      "id": "760416:21:goal:2",
+      "match": "Canada vs Bosnia-Herzegovina",
+      "event_type": "goal",
+      "minute": 21,
+      "response": "At minute 21', Jovo Lukic scored a goal for Bosnia-Herzegovina to lead Canada 0\u20131 in the FIFA World Cup match. The shot model estimate of xG for Bosnia-Herzegovina increased to 1.58 after the goal, while Canada's decreased to 1.55. Additionally, possession shifted from 61% for Canada to 39% for Bosnia-Herzegovina. The win probability shift was significant, with Bosnia-Herzegovina's chances of winning increasing from 11% to 32%.",
+      "grounding_violation": false,
+      "faithfulness": 0.6
+    },
+    {
+      "id": "760477:90:goal:2",
+      "match": "New Zealand vs Belgium",
+      "event_type": "goal",
+      "minute": 90,
+      "response": "1. In minute 90', Belgium scored a goal to lead New Zealand 5-1, resulting in a shift in win probability from 100% to 100%. This is the first time in FIFA World Cup history that a goal has been scored at this point in a match, with Belgium previously leading Japan 2-2 before scoring a winning goal in minute 93.\n2. The impact of this moment on the match was significant, as it effectively ended New Zealand's chance of coming back from behind. With Belgium now holding a commanding 5-1 lead and no shots on target after 90 minutes, New Zealand will need to pull off an extraordinary comeback in extra time",
+      "grounding_violation": false,
+      "faithfulness": 0.5555555555555556
+    },
+    {
+      "id": "760438:83:penalty_goal:2",
+      "match": "Czechia vs South Africa",
+      "event_type": "goal",
+      "minute": 83,
+      "response": "At minute 83', a penalty goal by Teboho Mokoena shifted the game in South Africa's favor, bringing their lead to 1-1 against Czechia. This moment had a significant impact on the match as it marked a turning point in possession and shot-model estimate (xG) advantage, with South Africa gaining 38% possession compared to Czechia's 62%. The win probability shifted from 1% to 12%, indicating that this goal increased South Africa's chances of winning the match.",
+      "grounding_violation": false,
+      "faithfulness": 0.6
+    },
+    {
+      "id": "760443:2:goal:2",
+      "match": "T\u00fcrkiye vs Paraguay",
+      "event_type": "goal",
+      "minute": 2,
+      "response": "At minute 2', Mat\u00edas Galarza scored a goal for Paraguay, shifting the score to 0-1 in favor of T\u00fcrkiye. The match has since finished with Paraguay winning 3-0. This is not the first time an own goal has impacted a FIFA World Cup game; it occurred at minute 69 of Costa Rica vs Germany in 2022, resulting in a 1-1 scoreline and subsequently a German victory.",
+      "grounding_violation": false,
+      "faithfulness": 0.375
+    },
+    {
+      "id": "760437:12:penalty_goal:1",
+      "match": "England vs Croatia",
+      "event_type": "goal",
+      "minute": 12,
+      "response": "At minute 12', a penalty goal by Harry Kane shifted the game in favor of England, leaving Croatia struggling to keep up with their opponents' possession and shot accuracy.",
+      "grounding_violation": false,
+      "faithfulness": 0.5
+    },
+    {
+      "id": "760516:3:goal:2",
+      "match": "France vs England",
+      "event_type": "goal",
+      "minute": 3,
+      "response": "At minute 3', Declan Rice scored a goal for England, taking the lead against France in the World Cup match. The scoreline shifted to 0-1 in favor of England, and their possession increased to 54%. A win probability shift was also recorded, with England's chances increasing from 32% to 61%. This moment had a significant impact on the game, as it marked a turning point in the match and gave England an advantage. The historical precedent for this moment is the FIFA World Cup 2022 match between England and France, where a goal was scored at minute 53 by England to make it 1-1.",
+      "grounding_violation": false,
+      "faithfulness": 0.9
+    },
+    {
+      "id": "760430:29:goal:2",
+      "match": "Iraq vs Norway",
+      "event_type": "goal",
+      "minute": 29,
+      "response": "At minute 29', Norway scored a goal to lead Iraq 0-1 in the FIFA World Cup match. This moment shifted the game as it occurred when the score was 0-0, leaving Iraq struggling to keep up with Norway's possession and shots on target. The win probability shift from 57% to 83% indicates that this goal had a significant impact on the outcome of the match, favoring Norway in the end.",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760461:39:goal:1",
+      "match": "Portugal vs Uzbekistan",
+      "event_type": "goal",
+      "minute": 39,
+      "response": "At minute 39', a goal by Cristiano Ronaldo increased Portugal's lead over Uzbekistan to 3-0 in the World Cup match. The xG difference between the two teams is now 3.27 vs 0.39, and Portugal has possession of the ball at 66%. This moment has significantly impacted the game, with the win probability shifting from 95% to 99%, indicating that the outcome of the match is now heavily in favor of Portugal.",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760484:90:goal:1",
+      "match": "Algeria vs Austria",
+      "event_type": "goal",
+      "minute": 90,
+      "response": "At minute 90', Algeria scored a goal to take their lead against Austria in the FIFA World Cup match. The score now stands at 3-2 in favor of Algeria. Based on the historical precedent provided, we can see that similar moments have occurred in previous matches, including France's goal against Australia in 2022 and Tunisia's goal against Australia in 2022. In both cases, the win probability shifted significantly, with Tunisia moving from a 53% chance of winning to an 87% chance after scoring the second goal against Australia, and France moving from a 62% chance of winning to a 99% chance after",
+      "grounding_violation": false,
+      "faithfulness": 0.5714285714285714
+    },
+    {
+      "id": "760507:33:goal:2",
+      "match": "United States vs Belgium",
+      "event_type": "goal",
+      "minute": 33,
+      "response": "The moment when Charles De Ketelaere scored for Belgium at minute 33' shifted the game in their favor. The score went from 1-0 in favor of the United States to 2-1 for Belgium. This was a significant shift as it gave Belgium a significant advantage over the US, with a win probability of 70% compared to the US's 25%.",
+      "grounding_violation": false,
+      "faithfulness": 0.6666666666666666
+    },
+    {
+      "id": "760494:45:goal:1",
+      "match": "United States vs Bosnia-Herzegovina",
+      "event_type": "goal",
+      "minute": 45,
+      "response": "The goal by Folarin Balogun shifted the FIFA World Cup match between United States and Bosnia-Herzegovina in favor of the United States at minute 45'. The score now stands at 1-0 in favor of the United States, with xG estimates indicating a higher expected goal difference in their favor (1.51 vs 0.64). This moment has significantly increased the win probability for the United States, from 55% to 85%, based on historical precedent and current match statistics.",
+      "grounding_violation": false,
+      "faithfulness": 0.8333333333333334
+    },
+    {
+      "id": "760500:59:goal:2",
+      "match": "Argentina vs Cape Verde",
+      "event_type": "goal",
+      "minute": 59,
+      "response": "At minute 59', a goal by Deroy Duarte shifted the game from Argentina's favor to a tie with Cape Verde at 1-1. The current match totals show that Argentina still has an advantage in shot-model estimated xG (2.58) and possession (64%), but the win probability shift is notable, with Cape Verde's chance of winning increasing from 0% to 5%. This moment is not a precedent for FIFA World Cup matches, as no other match, player, minute, or scoreline is explicitly given.",
+      "grounding_violation": false,
+      "faithfulness": 0.625
+    },
+    {
+      "id": "760467:55:goal:2",
+      "match": "Czechia vs Mexico",
+      "event_type": "goal",
+      "minute": 55,
+      "response": "At minute 55', Mateo Ch\u00e1vez scored the latest goal for Mexico against Czechia in the World Cup match, taking their lead to 1-0. This moment shifted the game significantly, as it marked the first time that Mexico had taken a lead after 45 minutes of play. Prior to this point, the possession was split evenly between the two teams, but now Mexico had a dominant 72% advantage in possession. The shot-model estimate for both teams was also updated, with Mexico having an xG of 1.70 and Czechia having an xG of 0.77. This win probability shift was dramatic, as it moved Mexico's chances of winning from 4",
+      "grounding_violation": false,
+      "faithfulness": 0.5
+    },
+    {
+      "id": "760452:58:goal:2",
+      "match": "New Zealand vs Egypt",
+      "event_type": "goal",
+      "minute": 58,
+      "response": "At minute 58', a goal by Mostafa Zico shifted the game in Egypt's favor, bringing the score to 1-1 against New Zealand. This moment had an impact on the match as it caused a significant shift in win probability, with Egypt's chances increasing from 8% to 31%.",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760513:72:red:2",
+      "match": "Argentina vs Switzerland",
+      "event_type": "red_card",
+      "minute": 72,
+      "response": "At minute 72', the red card issued to Breel Embolo shifted the game in favor of Argentina, reducing Switzerland's lead to 1-1. The impact on the match was significant as it reduced Switzerland to 10 men, making it more challenging for them to maintain possession and control the game.",
+      "grounding_violation": false,
+      "faithfulness": 0.6666666666666666
+    },
+    {
+      "id": "760465:45:goal:2",
+      "match": "Scotland vs Brazil",
+      "event_type": "goal",
+      "minute": 45,
+      "response": "At minute 45', a goal by Vin\u00edcius J\u00fanior shifted the game in favor of Brazil, leaving Scotland struggling to keep up. The current match totals show that Brazil has a commanding lead in xG (shot-model estimate) at 3.26, while Scotland is still trying to keep up with 1.55. Additionally, possession remains in Brazil's favor at 54%, meaning they are currently the team in control of the match.",
+      "grounding_violation": false,
+      "faithfulness": 0.625
+    },
+    {
+      "id": "760453:10:goal:1",
+      "match": "Spain vs Saudi Arabia",
+      "event_type": "goal",
+      "minute": 10,
+      "response": "At minute 10', a goal by Lamine Yamal shifted the score to 1-0 in favor of Spain against Saudi Arabia. This moment had a significant impact on the game as it marked the first time that Saudi Arabia failed to maintain possession, which dropped their possession rate from 67% to 33%. Additionally, this goal resulted in a substantial win probability shift for Spain, moving their chances of winning from 81% to 96%, indicating that the match had turned in their favor.",
+      "grounding_violation": false,
+      "faithfulness": 0.7142857142857143
+    },
+    {
+      "id": "760514:22:penalty_goal:2",
+      "match": "France vs Spain",
+      "event_type": "goal",
+      "minute": 22,
+      "response": "1. At minute 22', a penalty goal by Mikel Oyarzabal shifted the score from France 0-0 to Spain 1-0, with a corresponding xG of 0.85 for France and 1.39 for Spain. The win probability shift was significant, moving from 44% in favor of Spain to 73%, indicating that this moment had a significant impact on the outcome of the match.\n2. There is no historical precedent for a similar situation in the FIFA World Cup, but it is worth noting that penalty goals can have a significant impact on the outcome of a match. In general, a team that concedes a penalty goal may struggle to regain",
+      "grounding_violation": false,
+      "faithfulness": 0.5
+    },
+    {
+      "id": "760435:45:goal:2",
+      "match": "Portugal vs Congo DR",
+      "event_type": "goal",
+      "minute": 45,
+      "response": "At minute 45', Yoane Wissa scored a goal for Congo DR to tie the match at 1-1, shifting the win probability in favor of Congo DR by 3%. This moment had a significant impact on the match as it marked the first time Portugal had conceded a shot on target after 45 minutes. The goal was also notable because it occurred in the second half of the game when Portugal was expected to dominate possession, but Congo DR managed to take advantage of a mistake by Portugal's defense to score.",
+      "grounding_violation": false,
+      "faithfulness": 0.2
+    },
+    {
+      "id": "760505:60:penalty_goal:2",
+      "match": "Mexico vs England",
+      "event_type": "goal",
+      "minute": 60,
+      "response": "At minute 60', a penalty goal by Harry Kane led to a win probability shift of 72% to 94%, effectively ending the match in England's favor. This moment marked a significant turning point in the game, with Mexico having been leading 1-3 at that point. The xG difference between the two teams after this moment was 2.34 to 1.69, indicating that England had more chances to score than Mexico.",
+      "grounding_violation": false,
+      "faithfulness": 0.7142857142857143
+    },
+    {
+      "id": "760505:54:red:2",
+      "match": "Mexico vs England",
+      "event_type": "red_card",
+      "minute": 54,
+      "response": "1. At minute 54', Jarell Quansah was sent off with a red card, leaving England leading Mexico 1-2 in the FIFA World Cup match.\n2. This moment shifted the game's win probability from 5% in favor of Mexico to 7%, with England retaining possession at 67%.",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760474:71:goal:1",
+      "match": "Senegal vs Iraq",
+      "event_type": "goal",
+      "minute": 71,
+      "response": "At minute 71', Senegal scored a goal to take their lead over Iraq in the World Cup match, shifting the game's momentum. The score was now 4-0 in favor of Senegal, and according to the xG model estimate, they had a commanding advantage of 3.48 goals expected compared to Iraq's 0.25. Senegal's possession had also increased to 69%, while Iraq had 31%. This moment marked a significant shift in the match's outcome, as Senegal's win probability jumped from 100% to 100%.",
+      "grounding_violation": false,
+      "faithfulness": 0.75
+    },
+    {
+      "id": "760461:6:goal:1",
+      "match": "Portugal vs Uzbekistan",
+      "event_type": "goal",
+      "minute": 6,
+      "response": "At minute 6', a goal by Cristiano Ronaldo shifted the balance of power in favor of Portugal, giving them an 83% win probability. This moment was precedented in FIFA World Cup history in 2018 when Iran scored to make it 1-1 against Portugal in their Group B match at minute 92, with Portugal still having a higher possession percentage and lower xG value.",
+      "grounding_violation": false,
+      "faithfulness": 0.7142857142857143
+    },
+    {
+      "id": "760454:53:goal:2",
+      "match": "Norway vs Senegal",
+      "event_type": "goal",
+      "minute": 53,
+      "response": "The goal by Isma\u00efla Sarr in minute 53' shifted the score from 2-0 to 2-1 in favor of Senegal, giving them a 5% chance of winning the match. This impacted the possession balance, as Senegal now had 58% of the events compared to Norway's 42%.\nHistorically, this moment can be compared to a similar situation during the FIFA World Cup match between Senegal and Netherlands in 2018, where a goal scored by Netherlands in minute 98 led to their victory. In that match, Senegal had 51% of the events before the goal, while Netherlands had 49",
+      "grounding_violation": false,
+      "faithfulness": 0.4
+    },
+    {
+      "id": "760484:28:goal:2",
+      "match": "Algeria vs Austria",
+      "event_type": "goal",
+      "minute": 28,
+      "response": "At minute 28', a goal by Marko Arnautovic shifted the scoreline in Austria's favor, leaving Algeria struggling to keep up with possession and shooting accuracy. The historical precedent of Australia scoring at the 22nd minute against Tunisia in 2022 is similar, but it was Australia that had the majority of events so far. The impact of this moment on the match was significant, as Austria's win probability shifted from 32% to 68%, meaning they were now heavily favored to win the game.",
+      "grounding_violation": false,
+      "faithfulness": 0.7142857142857143
+    },
+    {
+      "id": "760474:82:goal:1",
+      "match": "Senegal vs Iraq",
+      "event_type": "goal",
+      "minute": 82,
+      "response": "At minute 82', a goal by Iliman Ndiaye shifted the game in Senegal's favor, leaving Iraq struggling to keep up. The current match totals show that Senegal has dominated possession so far with 69%, while Iraq has only had 31%. This moment has significantly impacted the outcome of the match, as it has increased Senegal's xG from 3.48 to 5.00 and shifted the win probability from 75% in favor of Iraq to 100% in favor of Senegal.",
+      "grounding_violation": false,
+      "faithfulness": 0.625
+    },
+    {
+      "id": "760459:76:goal:1",
+      "match": "Colombia vs Congo DR",
+      "event_type": "goal",
+      "minute": 76,
+      "response": "At minute 76', a goal by Daniel Mu\u00f1oz shifted the game in favor of Colombia, giving them a commanding 1-0 lead over Congo DR. This moment represented a significant turning point in the match, as possession had been heavily skewed in favor of Colombia up until this point (64% vs. 36%). The goal also increased Colombia's xG estimate from 1.58 to 2.28, while Congo DR's xG remained at 0.70. Overall, the impact of this moment was substantial, as it marked a significant shift in the power balance and increased the likelihood of a Colombian victory.",
+      "grounding_violation": false,
+      "faithfulness": 0.7777777777777778
+    },
+    {
+      "id": "760447:89:goal:1",
+      "match": "Netherlands vs Sweden",
+      "event_type": "goal",
+      "minute": 89,
+      "response": "At minute 89', Crysencio Summerville scored a goal for the Netherlands against Sweden in their FIFA World Cup match. The score then stood at 5-1 in favor of the Netherlands. According to xG (shot-model estimate), the Netherlands had a higher expected goal rate than Sweden, with 2.41 vs 1.49. In terms of possession, the Netherlands had been leading with 51% compared to Sweden's 49%. The win probability shifted from 100% for both teams to 100% in favor of the Netherlands after the goal. This moment marked a significant shift in the game, as it left Sweden struggling to keep up and",
+      "grounding_violation": false,
+      "faithfulness": 0.6666666666666666
+    },
+    {
+      "id": "760482:10:goal:2",
+      "match": "Congo DR vs Uzbekistan",
+      "event_type": "goal",
+      "minute": 10,
+      "response": "At minute 10', Eldor Shomurodov scored a goal for Uzbekistan to lead Congo DR 0\u20131 in the FIFA World Cup match. This moment shifted the game significantly as the scoreline changed and Uzbekistan's win probability increased from 41% to 70%.",
+      "grounding_violation": false,
+      "faithfulness": 1.0
+    },
+    {
+      "id": "760505:69:penalty_goal:1",
+      "match": "Mexico vs England",
+      "event_type": "goal",
+      "minute": 69,
+      "response": "At minute 69', a penalty goal by Ra\u00fal Jim\u00e9nez put Mexico in a 2-3 lead against England in the FIFA World Cup match. The win probability shift was from 0% to 4%, indicating that this moment had a significant impact on the outcome of the game. This is the first time in FIFA World Cup history that a penalty goal has shifted the win probability by 4%.",
+      "grounding_violation": false,
+      "faithfulness": 0.25
+    },
+    {
+      "id": "760440:64:goal:1",
+      "match": "Canada vs Qatar",
+      "event_type": "goal",
+      "minute": 64,
+      "response": "At minute 64', Canada scored a goal to take Qatar's lead to 4-0, with the xG estimate of 5.20 vs 0.12 in favor of Canada. Prior to this moment, possession was evenly split between the two teams, but after the goal, Canada had 79% possession. The win probability shifted from 100% for Qatar to 100% for Canada. This moment marked a significant shift in the match's dynamics and set the stage for Canada's dominance in the remainder of the game.",
+      "grounding_violation": false,
+      "faithfulness": 0.625
+    },
+    {
+      "id": "760493:51:goal:2",
+      "match": "Belgium vs Senegal",
+      "event_type": "goal",
+      "minute": 51,
+      "response": "At minute 51', a goal by Senegal's Isma\u00efla Sarr shifted the balance of power in the FIFA World Cup match between Belgium and Senegal. The score went from 0-1 to 0-2, with Senegal now leading 92% to Belgium's 70% chance of winning. This was a significant moment, as it marked a major shift in possession and chances for both teams.",
+      "grounding_violation": false,
+      "faithfulness": 0.5
+    }
+  ]
+}

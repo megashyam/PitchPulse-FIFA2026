@@ -1,38 +1,61 @@
 """
-Shared Weaviate access layer for narrative and tactical RAG pipelines.
+Weaviate client for the NarrativeArcs and tactical collections.
 
-Provides a centralized client wrapper responsible for connection management,
-collection initialization, document storage, and hybrid vector/BM25 retrieval
-across the NarrativeArcs and TacticalProfiles collections.
-
-The module abstracts Weaviate operations used by downstream agents, including
-narrative retrieval, tactical fingerprint matching, collection health checks,
-and document counting. Connection parameters are configured through environment
-variables to support both local development and containerized deployments.
-
-The client gracefully degrades when Weaviate is unavailable, allowing agents
-to continue operating with fallback logic.
+WEAVIATE_HOST / WEAVIATE_PORT / WEAVIATE_GRPC_PORT control both the gRPC
+connection and the REST URLs; WEAVIATE_API_KEY enables API-key auth.
 """
 
 import json
 import logging
 import os
+import time
 import urllib.request
 from typing import List, Optional
 
 import weaviate
 import weaviate.classes as wvc
+from weaviate.classes.init import Auth
 from weaviate.classes.query import MetadataQuery
 
 log = logging.getLogger(__name__)
 
-HYBRID_ALPHA = 0.75
+HYBRID_ALPHA = 0.75  # 75% vector + 25% BM25
+# Collections use one self-provided named vector. Vectors must be written
+# under this name: a plain `vector` list (batch) or the legacy REST "vector"
+# field is stored but never reaches the HNSW index, which silently turned
+# every hybrid query into 0.25 x BM25.
+VECTOR_NAME = "default"
+READY_TTL_S = 5.0
 
 WEAVIATE_HOST = os.getenv("WEAVIATE_HOST", "localhost")
 WEAVIATE_PORT = int(os.getenv("WEAVIATE_PORT", "8080"))
 WEAVIATE_GRPC_PORT = int(os.getenv("WEAVIATE_GRPC_PORT", "50051"))
 _REST_BASE = f"http://{WEAVIATE_HOST}:{WEAVIATE_PORT}"
+# Set when Weaviate runs with API-key auth (docker-compose.yml).
+WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY", "")
 
+
+def connect_local() -> weaviate.WeaviateClient:
+    auth = Auth.api_key(WEAVIATE_API_KEY) if WEAVIATE_API_KEY else None
+    return weaviate.connect_to_local(
+        host=WEAVIATE_HOST,
+        port=WEAVIATE_PORT,
+        grpc_port=WEAVIATE_GRPC_PORT,
+        auth_credentials=auth,
+    )
+
+
+def rest_headers() -> dict:
+    h = {"Content-Type": "application/json"}
+    if WEAVIATE_API_KEY:
+        h["Authorization"] = f"Bearer {WEAVIATE_API_KEY}"
+    return h
+
+# ── Collection registry ───────────────────────────────────────────────────
+#   NarrativeArcs    — historical WC storylines (goals, red cards, momentum).
+#                      Used by event_reaction / xg_divergence narration + briefings.
+#   TacticalProfiles — per-team-per-match pressing fingerprints (PPDA per zone).
+#                      Used by tactical narration + the /tactical route.
 NARRATIVE_ARCS = "NarrativeArcs"
 TACTICAL_PROFILES = "TacticalProfiles"
 
@@ -66,43 +89,23 @@ _SCHEMAS = {
 _RETURN_PROPS = {
     NARRATIVE_ARCS: ["content", "match_id", "competition", "season"],
     TACTICAL_PROFILES: [
-        "content",
-        "team",
-        "opponent",
-        "match_id",
-        "competition",
-        "season",
-        "ppda",
-        "ppda_def_third",
-        "ppda_mid_third",
-        "ppda_att_third",
-        "possession",
-        "press_intensity",
+        "content", "team", "opponent", "match_id", "competition", "season",
+        "ppda", "ppda_def_third", "ppda_mid_third", "ppda_att_third",
+        "possession", "press_intensity",
     ],
 }
 
 
 class WeaviateClient:
-    """
-    Stateful wrapper around the shared Weaviate retrieval backend.
-
-    Manages the lifecycle of the Weaviate connection, ensures required
-    collections exist, and exposes common operations used by RAG agents:
-    document counting, hybrid retrieval, and document insertion.
-
-    The wrapper provides a stable interface for narrative and tactical
-    pipelines while allowing deployment-specific Weaviate details to remain
-    isolated inside this module.
-    """
 
     def __init__(self):
         self._client: Optional[weaviate.WeaviateClient] = None
+        self._ready = False
+        self._ready_at = float("-inf")
 
     def connect(self) -> None:
         try:
-            self._client = weaviate.connect_to_local(
-                host=WEAVIATE_HOST, port=WEAVIATE_PORT, grpc_port=WEAVIATE_GRPC_PORT
-            )
+            self._client = connect_local()
             log.info(
                 f"Weaviate connected ({WEAVIATE_HOST}:{WEAVIATE_PORT}) — "
                 f"ready: {self._client.is_ready()}"
@@ -124,10 +127,18 @@ class WeaviateClient:
 
     @property
     def ready(self) -> bool:
+        """is_ready(), cached for READY_TTL_S (it is a blocking round-trip)."""
+        now = time.monotonic()
+        if now - self._ready_at < READY_TTL_S:
+            return self._ready
         try:
-            return self._client is not None and self._client.is_ready()
+            self._ready = self._client is not None and self._client.is_ready()
         except Exception:
-            return False
+            self._ready = False
+        self._ready_at = now
+        return self._ready
+
+    # ── Schema management ─────────────────────────────────────────────────
 
     def ensure_collections(self) -> None:
         """Create any missing collections. Safe to call on every startup."""
@@ -146,8 +157,11 @@ class WeaviateClient:
                 wvc.config.Property(name=p_name, data_type=p_type)
                 for p_name, p_type in props
             ],
+            vector_config=wvc.config.Configure.Vectors.self_provided(name=VECTOR_NAME),
         )
         log.info(f"Created Weaviate collection '{name}'")
+
+    # ── Counts ────────────────────────────────────────────────────────────
 
     def get_count(self, collection: str = DEFAULT_COLLECTION) -> int:
         if collection not in _SCHEMAS:
@@ -158,7 +172,7 @@ class WeaviateClient:
             req = urllib.request.Request(
                 f"{_REST_BASE}/v1/graphql",
                 data=q.encode(),
-                headers={"Content-Type": "application/json"},
+                headers=rest_headers(),
                 method="POST",
             )
             with urllib.request.urlopen(req, timeout=5) as r:
@@ -172,6 +186,8 @@ class WeaviateClient:
         """All collection counts — used by /health and debug routes."""
         return {name: self.get_count(name) for name in _SCHEMAS}
 
+    # ── Search ────────────────────────────────────────────────────────────
+
     def hybrid_search(
         self,
         query_vector: List[float],
@@ -180,27 +196,12 @@ class WeaviateClient:
         event_filter: Optional[str] = None,
         collection: str = DEFAULT_COLLECTION,
         return_objects: bool = False,
+        alpha: float = HYBRID_ALPHA,
     ):
-        """
-        Execute hybrid semantic and keyword retrieval against Weaviate.
+        """Hybrid BM25 + vector search.
 
-        Combines vector similarity search with BM25 keyword matching to retrieve
-        relevant documents from the selected collection.
-
-        Supports both narrative retrieval (content-only responses) and tactical
-        retrieval (full metadata objects including similarity scores).
-
-        Args:
-            query_vector: Embedded representation of the search query.
-            query_text: Raw text query for keyword retrieval.
-            top_k: Maximum number of results returned.
-            event_filter: Optional event type filter for narrative documents.
-            collection: Target Weaviate collection.
-            return_objects: Whether to return metadata objects instead of text.
-
-        Returns:
-            list: Retrieved documents or metadata objects. Returns an empty list
-            when retrieval is unavailable or fails.
+        Defaults to NarrativeArcs, returning content strings; return_objects
+        returns the full property dicts.
         """
         if not self.ready:
             log.debug("Weaviate not ready — skipping RAG")
@@ -220,7 +221,8 @@ class WeaviateClient:
             results = col.query.hybrid(
                 query=query_text,
                 vector=query_vector,
-                alpha=HYBRID_ALPHA,
+                alpha=alpha,
+                target_vector=VECTOR_NAME,
                 limit=top_k,
                 filters=filters,
                 return_metadata=MetadataQuery(score=True),
@@ -240,45 +242,28 @@ class WeaviateClient:
                     except Exception:
                         props["_score"] = None
                     out.append(props)
-                log.debug(
-                    f"Weaviate[{collection}]: {len(out)} objs for '{query_text[:50]}'"
-                )
+                log.debug(f"Weaviate[{collection}]: {len(out)} objs for '{query_text[:50]}'")
                 return out
 
             docs = [obj.properties["content"] for obj in results.objects]
-            log.debug(
-                f"Weaviate[{collection}]: {len(docs)} docs for '{query_text[:50]}'"
-            )
+            log.debug(f"Weaviate[{collection}]: {len(docs)} docs for '{query_text[:50]}'")
             return docs
 
         except Exception as exc:
             log.warning(f"Weaviate search error [{collection}]: {exc}")
             return []
 
-    def insert_document(
-        self, collection: str, properties: dict, vector: List[float]
-    ) -> bool:
-        """
-        Insert an embedded document into a Weaviate collection.
+    # ── Insert (REST path — bypasses Python client version quirks) ─────────
 
-        Stores both document metadata and its vector representation through the
-        Weaviate REST API.
-
-        Args:
-            collection: Destination collection name.
-            properties: Structured metadata associated with the document.
-            vector: Embedding vector used for semantic retrieval.
-
-        Returns:
-            bool: True when insertion succeeds, otherwise False.
-        """
+    def insert_document(self, collection: str, properties: dict, vector: List[float]) -> bool:
+        """Generic insert. Caller supplies the full properties dict."""
         payload = json.dumps(
-            {"class": collection, "properties": properties, "vector": vector}
+            {"class": collection, "properties": properties, "vectors": {VECTOR_NAME: vector}}
         ).encode()
         request = urllib.request.Request(
             f"{_REST_BASE}/v1/objects",
             data=payload,
-            headers={"Content-Type": "application/json"},
+            headers=rest_headers(),
             method="POST",
         )
         try:
