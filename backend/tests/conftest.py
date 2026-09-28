@@ -1,10 +1,10 @@
 """
 Shared fixtures for the integration test suite.
 
-The tests exercise the real stack — Redis, Weaviate, the odds provider, the
-LLM provider, and StatsBomb open data — rather than mocks. Every external
-dependency is wrapped in a fixture that skips, never errors, when the service
-or credential is absent, so any configured subset can be run:
+The tests exercise the real stack (Redis, Weaviate, the odds provider, the
+LLM provider and StatsBomb open data) rather than mocks. Every external
+dependency is a fixture that skips, never errors, when the service or
+credential is absent:
 
     # everything
     set PYTHONPATH=.
@@ -21,9 +21,6 @@ Environment (mirrors the application's own os.getenv usage):
     OLLAMA_URL             optional local LLM
 
 Markers: integration, redis, weaviate, odds, llm, statsbomb.
-
-No data is fabricated: if a service returns nothing, the test is skipped with
-a clear reason rather than asserting against synthetic values.
 """
 
 from __future__ import annotations
@@ -57,10 +54,9 @@ def event_loop():
 
 @pytest_asyncio.fixture(scope="function")
 async def redis_client():
-    """Live Redis connection. Skips if the server is unreachable.
+    """Live Redis connection; skips if unreachable.
 
-    Writes go under the ``test:`` / high fixture-id namespace and are cleaned
-    up after each test so a live production Redis is never polluted.
+    Writes use the ``test:`` / high fixture-id namespace and are cleaned up.
     """
     import redis.asyncio as aioredis
 
@@ -92,8 +88,7 @@ async def redis_client():
 
 @pytest.fixture(scope="session")
 def weaviate():
-    """Process-wide Weaviate client. Skips if not ready OR if collections are
-    empty (nothing indexed to retrieve against)."""
+    """Process-wide Weaviate client; skips if not ready or not indexed."""
     try:
         from agents.weaviate_client import get_weaviate_client
     except Exception as exc:  # noqa: BLE001  (weaviate client lib not installed)
@@ -107,8 +102,7 @@ def weaviate():
 
 @pytest.fixture(scope="session")
 def embedder():
-    """Real production encoder (all-MiniLM-L6-v2). Skips if the model can't be
-    loaded (no cache / no download)."""
+    """Production encoder (all-MiniLM-L6-v2); skips if it can't be loaded."""
     try:
         from sentence_transformers import SentenceTransformer
 
@@ -122,8 +116,7 @@ def embedder():
 
 @pytest_asyncio.fixture(scope="session")
 async def live_odds():
-    """A real odds snapshot from the configured provider. Skips if the provider
-    returns nothing (no key / off-season / rate limited)."""
+    """Odds snapshot from the configured provider; skips if empty."""
     from ml.odds_api_client import get_oddsapi_client
 
     odds = await get_oddsapi_client().get_all_odds()
