@@ -1,59 +1,83 @@
 # PitchPulse: FIFA 2026 Live Football Analytics Engine
 
 
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge)
+![LangSmith](https://img.shields.io/badge/LangSmith-1C3C3C?style=for-the-badge)
+![Weaviate](https://img.shields.io/badge/Weaviate-2A2A5C?style=for-the-badge)
+![NumPy](https://img.shields.io/badge/NumPy-013243?style=for-the-badge&logo=numpy&logoColor=white)
+![LangGraph](https://img.shields.io/badge/LangGraph-1C3C3C?style=for-the-badge)
+![Neo4j](https://img.shields.io/badge/Neo4j-4581C3?style=for-the-badge&logo=neo4j&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Ollama](https://img.shields.io/badge/Ollama-000000?style=for-the-badge)
+![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=prometheus&logoColor=white)
+![Grafana](https://img.shields.io/badge/Grafana-F46800?style=for-the-badge&logo=grafana&logoColor=white)
+![Groq](https://img.shields.io/badge/Groq-F55036?style=for-the-badge)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white)
+![React](https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black)
 
-PitchPulse is a live match tracking, statistical inference, and AI narration engine built for the 2026 World Cup. It ingests bare-bones live score data and mathematically enriches it using historical statistics, vectorized Monte Carlo tournament simulations, and large language models (LLMs). The primary goal is to deliver real-time, push-driven analytical updates: live momentum, counterfactual bracket shifts, and tactical briefings, without relying on an expensive commercial live-stats feed.
+PitchPulse is a live match tracking, statistical inference, and AI narration engine for the 2026 FIFA World Cup.
 
+* Ingests live match data from ESPN's public API.
+* Enriches it with statistical models, vectorized Monte Carlo tournament simulation, and retrieval-grounded LLM narration.
+* Pushes updates to a Next.js UI over SSE: win probability, momentum, match intelligence, counterfactual bracket shifts, tactical comparisons, social narrative surges, and pre-match briefings.
 
-> __Demo__
----
 ![Demo GIF](data/demo.gif)
-
-The retrieval and agent layers are built from scratch without LangChain, LangGraph, LlamaIndex, or other RAG frameworks. Prompt construction, retrieval logic, agent orchestration, and deterministic fallback paths are implemented directly using the Weaviate client and LLM providers.
-
-The backend follows a single-process architecture to maintain in-memory analytical state, with horizontal scaling achieved through independent application stacks sharing Redis infrastructure.
-
 
 ## Why Build This Project?
 
 ### The Need
 
-- Modern football analysis combines live events, social sentiment, tactical insights, and tournament projections, but these signals are typically fragmented across separate platforms.
-- Fanatics like myself are left to manually synthesize these signals to answer deeper questions: Why did momentum shift? How significant was that goal? How did a single event change tournament probabilities? etc.
-- Advanced analytics such as xG, pressing analysis, and live probability models are often locked behind expensive commercial data providers, leaving free platforms limited to basic score updates.
-- The biggest football moments are defined by their downstream impact: a goal, penalty, or red card can reshape qualification paths and championship probabilities across an entire tournament.
+- Following a World Cup properly means tracking live events, fan sentiment, tactical patterns, and tournament projections, yet each of these lives on a different platform.
+- Fans like me end up stitching these signals together by hand to answer the questions that actually matter: Why did the momentum swing? How big was that goal really? What did one red card do to the title race?
+- The deeper analytics, including xG, pressing metrics, and live win probability, usually sit behind paid data providers, so free platforms rarely go beyond the scoreline.
+- The moments that define a tournament are measured by their ripple effect: one goal, penalty, or sending-off can redraw qualification paths and championship odds for every team in the bracket.
 
 ### The Problem
 
-- Building real-time football intelligence normally requires commercial feeds containing possession, shots, xG, player tracking, and tactical events.
-- The available free live feed (`worldcup26.ir`) provides only basic match state: score, clock, and status.
-- Without rich telemetry, traditional approaches cannot provide advanced tactical analysis, probabilistic forecasting, or event impact modeling.
+- Real-time football intelligence is normally built on commercial feeds carrying possession, shots, xG, player tracking, and tactical events.
+- Free live feeds tend to stop at the basics: score, clock, and match status.
+- With only the basics, there is nothing to drive tactical analysis, probabilistic forecasting, or event-impact modelling.
 
 ### The Solution
 
-- PitchPulse solves the data limitation through a custom historical enrichment architecture.
-- Live 2026 fixtures are dynamically paired with structurally similar historical World Cup matches from StatsBomb Open Data, allowing historical event streams and tactical patterns to enrich sparse live signals.
-- The enriched match state powers probabilistic models, vectorized Monte Carlo simulations, retrieval-grounded LLM agents, and real-time event streaming.
-- The result is a football intelligence platform that explains live events, generates tactical narratives, and quantifies tournament-wide consequences without requiring commercial sports data licenses.
+- PitchPulse builds on free data: ESPN's public match feed for the live tournament, a committed snapshot of every fixture as a fallback, and StatsBomb's World Cup archive for historical context.
+- Its own shot model turns raw shot locations into model xG, filling the gap left by the free feed.
+- Elo and market priors, an in-play Poisson model, and vectorized Monte Carlo simulation turn each match state into live win probabilities and tournament-wide impact.
+- Retrieval-grounded LLM agents narrate those numbers and stream them to the UI in real time, all without a commercial sports data license.
 
+## Overview
 
+* **Live data:** ESPN's public API (`fifa.world`, no key) supplies score, real clock, team stats, key events with players, confirmed lineups, and Opta play-by-play with shot coordinates.
+* **Fallback data:** a committed snapshot of the full tournament (`backend/data/wc2026/`) serves every fixture when the feed is unreachable.
+* **Model xG:** `ml/shot_xg.py` scores ESPN shots from their coordinates.
+* **Historical data:** StatsBomb Open Data (World Cups 2018 and 2022) supplies retrieval precedent, tactical profiles, and evaluation data.
+* **Retrieval:** prompt construction, hybrid retrieval, and fallbacks call the Weaviate client and LLM providers directly, without LangChain or LlamaIndex.
+* **Orchestration:** match-intel narration is a LangGraph state graph (retrieve → generate → grounding check → one retry → template fallback). The other agents are plain asyncio.
+* **Runtime:** any number of backend instances can share one Redis. The instance holding the Redis leader lock runs the producer and workers; the others serve HTTP and SSE from Redis and take over if the leader stops.
 
 ## Index
 
-* [Why This Project?](#why-this-project)
+* [Why Build This Project?](#why-build-this-project)
+* [Overview](#overview)
 * [Core Features](#core-features)
 * [The Stack](#the-stack)
 * [Architecture at a Glance](#architecture-at-a-glance)
 * [Evaluation Results](#evaluation-results)
-    - [Common Random Numbers: Counterfactual Variance Reduction](#common-random-numbers--counterfactual-variance-reduction)
-    - [Narrative Anomaly Detection: IsolationForest Threshold Sweep](#narrative-anomaly-detection--isolationforest-threshold-sweep)
-    - [Hybrid Retrieval: Recall/Precision/MRR/NDCG @ K=5, Alpha Sweep](#hybrid-retrieval--recallprecisionmrrndcg--k5-alpha-sweep)
-    - [In-Play Model Calibration: Real World Cup Matches (n=12)](#in-play-model-calibration--real-world-cup-matches-n12)
-    - [Limitations](#limitations)
+    - [Common Random Numbers: Counterfactual Variance Reduction](#common-random-numbers-counterfactual-variance-reduction)
+    - [Narrative Surge Detection (synthetic)](#narrative-surge-detection-synthetic)
+    - [Hybrid Retrieval: WC 2026 Goals and Red Cards](#hybrid-retrieval-wc-2026-goals-and-red-cards)
+    - [Generation Faithfulness: RAGAS on WC 2026 Event Narration](#generation-faithfulness-ragas-on-wc-2026-event-narration)
+    - [Pre-Match Elo Prior (n=128)](#pre-match-elo-prior-n128)
+    - [In-Play Model Calibration (n=64)](#in-play-model-calibration-n64)
 * [Performance](#performance)
 * [Data Pipeline](#data-pipeline)
     - [Data Ingestion Architecture](#data-ingestion-architecture)
     - [External Data Sources](#external-data-sources)
+    - [Live Match Data](#live-match-data)
     - [External Signals](#external-signals)
     - [Schemas](#schemas)
 * [The ML Core](#the-ml-core)
@@ -68,127 +92,124 @@ The backend follows a single-process architecture to maintain in-memory analytic
     - [Embedding Pipeline](#embedding-pipeline)
     - [Hybrid Retrieval](#hybrid-retrieval)
     - [Vector Database](#vector-database)
+    - [Knowledge Graph](#knowledge-graph)
     - [Grounded Generation](#grounded-generation)
 * [Real-Time Intelligence Runtime](#real-time-intelligence-runtime)
     - [Worker Architecture](#worker-architecture)
     - [Redis State Layer](#redis-state-layer)
-    - [Event Sourcing ](#event-sourcing-partial-implementation)
+    - [State Recovery](#state-recovery)
     - [Async Execution](#async-execution)
     - [Streaming Layer](#streaming-layer)
-* [Deep Dive: The Six Core Intelligence Engines](#deep-dive-the-six-core-intelligence-engines)
-    - [1. Historical Fixture Pairing Engine](#1-historical-fixture-pairing-engine)
-    - [2. Live Win Probability and Momentum Engine](#2-live-win-probability-and-momentum-engine)
-    - [3. Live Match Intelligence Engine](#3-live-match-intelligence-engine)
-    - [4. Narrative Intelligence Hub](#4-narrative-intelligence-hub)
-    - [5. Counterfactual What-If Engine](#5-counterfactual-what-if-engine)
-    - [6. Tournament Simulation Engine](#6-tournament-simulation-engine)
 * [Performance Optimizations](#performance-optimizations)
 * [Repository Structure](#repository-structure)
 * [Setup](#setup)
     - [Prerequisites](#prerequisites)
     - [Install and Run](#install-and-run)
     - [Populate the Knowledge Base (offline, one time)](#populate-the-knowledge-base-offline-one-time)
-    - [Run the Elo Calibration Backtest](#run-the-elo-calibration-backtest)
+    - [Run the Tests and Elo Calibration Backtest](#run-the-tests-and-elo-calibration-backtest)
 * [Tech Stack](#tech-stack)
-* [Limitations](#limitations-1)
+* [Limitations](#limitations)
 
 
 
 ## Core Features
 
-1.  **Live Match Intelligence**
-    - Runs on a 30-second worker cycle using live match state and momentum signals.
-    - Evaluates goals, cards, momentum shifts, and scoreline-versus-performance divergence to determine when deeper analysis is required.
-    - Uses retrieval-grounded generation for high-value events and deterministic numeric templates for lower-value updates or generation failures.
-    - Streams concise match narratives to the frontend through SSE using the same computed metrics as the fallback path.
+1. **Live Match Intelligence**
+    - Scores goals, cards, momentum shifts, and xG-versus-scoreline divergence every 30 seconds per fixture.
+    - Narrates high-value moments with retrieval-grounded LLM generation and a deterministic grounding check; other updates use numeric templates.
+    - Streams narratives to the UI over SSE.
 
     ![Live Match Intelligence](data/05-match-live.png)
 ---
 
 2. **The Counterfactual What-If Engine**
-    - Analyzes the tournament impact of major match events including goals, cards, penalties, and substitutions.
-    - Reconstructs the pre-event state and compares paired tournament simulations to measure how a single event changes championship probabilities.
-    - Uses deterministic Monte Carlo simulation with bounded compute controls to isolate event impact.
-    - Outputs probability shifts, team-level tournament deltas, and a simulation-grounded explanation.
+    - Measures how a goal, card, penalty, or substitution changes every team's championship probability.
+    - Compares paired tournament simulations of the pre-event and post-event states with shared random seeds.
+    - Outputs probability shifts, team-level deltas, and a simulation-grounded explanation.
 
     ![Counterfactual What-If Engine](data/03-match-counterfactual.png)
 ---
 
 3. **The Tournament Simulation Engine**
-    - Simulates the complete 48-team World Cup format using Elo ratings with optional market-odds calibration.
-    - Uses fully vectorized NumPy execution across group and knockout stages for efficient large-scale Monte Carlo simulation.
-    - Produces team advancement probabilities, championship odds, and confidence intervals for tournament predictions.
-    - Powers both the prediction API and the counterfactual analysis engine.
+    - Simulates the 48-team World Cup format from Elo ratings, with market odds as the preferred prior when available.
+    - Runs group and knockout stages as vectorized NumPy operations across all simulations.
+    - Produces advancement probabilities, championship odds, and confidence intervals for the prediction API and the counterfactual engine.
 
     ![Tournament Simulation Engine](data/06-match-predictor.png)
 ---
 
 4. **Tactical Intelligence**
-    - Converts live match statistics such as possession, shot volume, and passing accuracy into a tactical style representation.
-    - Retrieves similar historical pressing fingerprints from the StatsBomb-based tactical index using embedding similarity and Weaviate retrieval.
-    - Provides historical tactical comparisons with live-statistics fallback when tactical retrieval is unavailable.
+    - Converts live possession, shot volume, and passing accuracy into a tactical style descriptor.
+    - Retrieves the closest historical pressing fingerprints from the StatsBomb-based `TacticalProfiles` index, with a live-statistics fallback.
 
     ![Tactical Intelligence](data/02-match-tactical.png)
 ---
 
 5. **The Narrative Intelligence Hub**
-    - Aggregates Mastodon, Bluesky, Google Trends, and Wikipedia signals every 60 seconds for tracked topics.
-    - Uses topic-specific `IsolationForest` anomaly detection over rolling activity histories to identify emerging events and unusual trends.
-    - Combines anomaly signals with retrieval-grounded generation to explain whether activity represents isolated virality or broader real-world events.
-    - Produces anomaly scores, source attribution, and validated narrative summaries.
+    - Polls Mastodon, Bluesky, Google Trends, and Wikipedia every 60 seconds for tracked topics.
+    - Flags a topic when at least two sources surge together above their own 3-hour baselines (one-sided robust z-score).
+    - Produces anomaly scores, source attribution, and retrieval-grounded narrative summaries.
 
     ![Narrative Intelligence Hub](data/07-match-narrative.png)
 ---
 
 6. **Pre-Match Briefing**
-    - Generates pre-match analysis within a scheduled kickoff window using team context and retrieved historical precedent.
-    - Produces grounded previews without relying on live match-state signals.
+    - Generates a pre-match preview inside a scheduled kickoff window from team context, head-to-head history, and retrieved precedent.
+    - Uses no live match-state signals.
 
     ![Pre-Match Briefing](data/04-match-briefing.png)
 
 ## The Stack
 
 * **Backend**
-    - FastAPI, single-worker by design
+    - FastAPI with one Uvicorn worker per instance; a Redis leader lock selects the instance that runs the pipeline
     - `redis.asyncio` as the only persistence layer
-* **ML** 
-    - Elo rating with Shin de-vigging
-    - A Poisson in-play scoring model
+    - LangGraph for the match-intel narration graph, plain asyncio elsewhere
+* **ML**
+    - Elo rating with exact Shin (1993) de-vigging of market odds
+    - A prior-calibrated Poisson in-play scoring model
     - A vectorized NumPy Monte Carlo tournament simulator
-    - An EWMA-smoothed logistic momentum model with a separate offline training pipeline
+    - A stateless logistic momentum model over recent model xG, sharing one feature function with its offline trainer
+    - A shot-level xG model fitted on 32.7k ESPN club shots
     - PPDA-based tactical feature engineering
-    - A per-topic `IsolationForest` for social/search anomaly detection
+    - A per-topic robust z-score surge detector with cross-source corroboration
 * **AI**
-    - Local-first inference via **Ollama** running `mistral:7b-instruct-q4_K_M` (accelerated locally by an RTX 3060)
-    - **Groq** (`llama-3.3-70b-versatile`) as cloud fallback
+    - Local-first inference via **Ollama** running `mistral:7b-instruct-q4_K_M` (on an RTX 3060)
+    - **Groq** as cloud fallback: `llama-3.1-8b-instant` primary, `llama-3.3-70b-versatile` on a 429 rate limit
     - `sentence-transformers/all-MiniLM-L6-v2` for retrieval embeddings
 * **Data**
-    - StatsBomb Open Data (real WC 2018/2022 event streams)
-    - `worldcup26.ir` (live fixture feed)
+    - ESPN public API (live WC 2026 scores, stats, events, lineups, play-by-play) with a committed tournament snapshot as fallback
+    - StatsBomb Open Data (WC 2018/2022 event streams for retrieval, tactical profiles, and head-to-head history)
+    - martj42 international results (point-in-time Elo)
     - The Odds API
-    - Mastodon/Bluesky/Google Trends/Wikipedia
-    - Zafronix/API-Sports for lineups
+    - Mastodon, Bluesky, Google Trends, Wikipedia
+    - Lineups from ESPN, then API-Sports, then Zafronix squads
 * **Frontend**
     - Next.js App Router, entirely client-rendered
     - Native `EventSource` API for streaming
     - No WebSocket library, no server-side data fetching
+* **Knowledge Graph**
+    - Neo4j holds teams, groups, bracket rounds, and StatsBomb head-to-head history used by pre-match briefings.
+* **Observability**
+    - Prometheus and Grafana for API, worker, and SSE metrics; LangSmith tracing for agent and LLM calls.
+* **CI/CD**
+    - GitHub Actions runs `ruff`, the `pytest` suite, and a Docker image build on every push and pull request to `main`.
 
 
 
 ## Architecture at a Glance
 
 ```
-worldcup26.ir + StatsBomb ──► hybrid_producer (30s poll) ──► MatchState
+ESPN API + wc2026 snapshot ──► match_producer (30s poll) ──► MatchState
                                                                    │
                                                                    ⭣
                                                              Redis (only store)
         ┌───────────┬────────────┬───────────────┬────────────┬───────────┬────────────┐
-        ⭣           ⭣            ⭣               ⭣            ⭣           ⭣            
+        ⭣           ⭣            ⭣               ⭣            ⭣           ⭣
    momentum     tactical      intel        counterfactual  narrative   briefing
    worker       worker        worker       worker          worker      worker
-   (EWMA)       (Weaviate     (LLM+RAG)    (CRN Monte      (LLM+RAG)   (LLM+RAG)
-                cosine)                    Carlo, LLM+RAG)             
-        |                                                                
+   (logistic)   (Weaviate     (LLM+RAG)    (CRN Monte      (LLM+RAG)   (LLM+RAG)
+                cosine)                    Carlo, LLM+RAG)
         │           │             │              │              │           │
         │           │             └──────┬───────┴──────────────┴───────────┘
         │           │                    ⭣
@@ -198,66 +219,149 @@ worldcup26.ir + StatsBomb ──► hybrid_producer (30s poll) ──► MatchSt
                   FastAPI SSE + REST ──► Next.js UI
 ```
 
-The platform runs as a single Uvicorn process orchestrating seven recurring asyncio workers plus startup initialization tasks. Workers coordinate exclusively through Redis-backed `MatchState` and pub/sub, producing deterministic analytics (momentum, tactical indexing, probabilistic models) before selectively invoking LLM-based reasoning agents. Runtime caches remain process-local, so horizontal scaling is achieved by deploying additional application instances against a shared Redis server instead of increasing Uvicorn worker count.
+* One Uvicorn process runs the producer and seven asyncio workers: the six above and a prediction worker that refreshes the tournament simulation every 30 minutes. Workers share state through Redis keys and pub/sub.
+* A Redis leader lock (15 s TTL) selects the one instance that runs the producer and workers. Other instances serve REST and SSE from Redis and take over within one lock TTL if the leader stops.
+* Each worker runs under a supervisor that restarts it with backoff. `/health` reports per-worker liveness.
+* LLM calls pass through per-backend priority gates (`agents/llm_queue.py`). Live event narration is served ahead of queued background trending and backfill jobs.
+* Prometheus scrapes API and worker metrics.
 
 
 
 ## Evaluation Results
 
-Offline and semi-live evaluations of the core ML components, run against real StatsBomb data, live tournament simulations.
+Offline evaluations of the core ML components.
 
-> **Data note:** StatsBomb's open-data World Cup coverage is limited to the 2018 and 2022 tournaments (128 total matches).
+* Each evaluation lists its setup, metric, and result, and names the JSON report its table is generated from.
+* Tuned parameters are selected on a dev split and reported on a held-out split.
+* Intervals are 95% confidence intervals.
+
+> **Data note:** StatsBomb Open Data contains World Cup matches from 2018 and 2022 (128 matches).
 
 ### Common Random Numbers: Counterfactual Variance Reduction
 
+* **Setup:**
+    - Paired runs of the production 48-team tournament simulator (WC 2026 field and bracket, Poisson scorelines).
+    - Argentina at +30 Elo; 10,000 simulations per leg, 20 repeats.
+* **Metric:** standard deviation of the change in championship probability, shared seed (CRN) vs independent seeds.
+* **Result:** CRN reduces estimator variance 9.9x.
+* **Source:** `backend/crn_report.json`
+
 | Metric | CRN (shared seed) | Independent seeds |
 |:---|---:|---:|
-| Δ champ prob, mean | +0.03335 | +0.03447 |
-| Δ champ prob, std | 0.00212 | 0.00469 |
-| **Variance reduction** | **4.9x** | — |
+| Δ champ prob, mean | +0.03905 | +0.03989 |
+| Δ champ prob, std | 0.00183 | 0.00576 |
+| **Variance reduction** | **9.9x** | — |
 
-Sharing a seed between the baseline and counterfactual simulation cuts estimator variance 4.9x. Independent seeding requires roughly 5x more simulations to reach the same precision on the event-impact delta.
+### Narrative Surge Detection (synthetic)
 
-### Narrative Anomaly Detection: IsolationForest Threshold Sweep
+* **Setup:**
+    - Simulated topic-days of per-minute posts, edits, and Trends intensity (daily cycle, per-topic base rates) with injected, labelled events.
+    - Positives: multi-source surges (2–4 sources, ×2–8, 3-min ramp, 5–30 min plateau).
+    - Hard negatives: single-source bursts, outages, a source switching to mock data, and a slow 4-hour rise to ×3.
+    - Simulated activity runs through the live window-counting helpers and the production `SpikeScorer`.
+    - Thresholds are selected by best F1 on 20 dev topic-days (seeds 0–19) and scored on 100 held-out topic-days (seeds 1000–1099, 300 events).
+* **Metric:**
+    - Event recall (an alert during the event or within 10 minutes after)
+    - Alert precision
+    - False alerts per topic-day
+    - Median latency
+* **Result:** the shipped detector (z ≥ 3.0; a lone source fires at z ≥ 6.0) has 0.924 precision, 0.483 recall, and 0.12 false alerts per topic-day.
+* **Source:** `backend/anomaly_report.json`
 
-| Threshold | Precision | Recall | F1 | FA/topic-day |
+| Detector | z | Event recall | Alert precision | False alerts / topic-day | Median latency |
+|:---|---:|---:|---:|---:|---:|
+| **Production (corroborated), shipped** | **3.0** | **0.483** [0.427, 0.540] | **0.924** [0.871, 0.956] | **0.12** [0.06, 0.21] | **10 min** |
+| Production (corroborated), dev-tuned | 2.0 | 0.660 [0.605, 0.711] | 0.798 [0.744, 0.844] | 0.50 [0.37, 0.66] | 8 min |
+| Trends only | 2.0 | 0.687 [0.632, 0.737] | 0.912 [0.867, 0.942] | 0.20 [0.12, 0.31] | 9 min |
+| Bluesky only | 3.0 | 0.583 [0.527, 0.638] | 0.888 [0.837, 0.925] | 0.22 [0.14, 0.33] | 4 min |
+| Any single source | 3.5 | 0.673 [0.618, 0.724] | 0.762 [0.708, 0.810] | 0.63 [0.48, 0.81] | 5 min |
+| Mastodon only | 2.5 | 0.267 [0.220, 0.319] | 0.494 [0.418, 0.570] | 0.82 [0.65, 1.02] | 11.5 min |
+| Wikipedia only | 2.0 | 0.240 [0.195, 0.291] | 0.400 [0.331, 0.473] | 1.08 [0.89, 1.30] | 15.5 min |
+
+Shipped-detector recall is 89.8% for four-source ×4–8 surges and 10.3% for two-source ×2–4 surges.
+
+### Hybrid Retrieval: WC 2026 Goals and Red Cards
+
+* **Setup:**
+    - Index: the live Weaviate `NarrativeArcs` index (348 docs from StatsBomb WC 2018/2022: 341 goals, 7 red cards).
+    - Queries: every goal and red card in the WC 2026 snapshot, through the production query builder and event filter (`match_intel_agent.event_query`).
+    - Split: fixtures ordered by kickoff; the first 48 (163 queries) select alpha, the last 49 (161 queries) are the test set.
+    - CIs are a cluster bootstrap over fixtures.
+* **Metric:**
+    - P@5, Hit@1, MRR@5, NDCG@5.
+    - A doc is relevant if it matches the event type, the acting team's game state before the event (leading, level, trailing), and the minute band.
+    - *Loose* drops the minute band.
+* **Result:** production hybrid (alpha 0.75) reaches P@5 0.137 against 0.104 for a random draw from the same filtered pool (paired difference +3.3 points, CI [+1.1, +5.4]).
+* **Source:** `backend/retrieval_report.json`
+
+| Alpha | P@5 | Hit@1 | MRR@5 | NDCG@5 | Loose P@5 |
+|:---|---:|---:|---:|---:|---:|
+| 0.00 (BM25-only) | 0.158 [0.133, 0.183] | 0.155 | 0.298 | 0.163 | 0.424 |
+| 0.25 | 0.148 | 0.174 | 0.298 | 0.156 | 0.396 |
+| 0.50 | 0.145 | 0.168 | 0.294 | 0.154 | 0.379 |
+| **0.75 (production)** | **0.137** [0.114, 0.158] | **0.162** | **0.279** | **0.146** | **0.373** |
+| 1.00 (dense-only, dev-tuned) | 0.133 [0.112, 0.152] | 0.143 | 0.264 | 0.139 | 0.368 |
+| Random 5 docs | 0.104 [0.098, 0.110] | — | — | — | — |
+
+Without the `event_type` filter, production P@5 is 0.127.
+
+### Generation Faithfulness: RAGAS on WC 2026 Event Narration
+
+* **Setup:**
+    - Every goal and red card in the WC 2026 snapshot (324 events) runs through the production narration inputs: event query, live Weaviate hybrid retrieval, win-probability swing, `match_intel_agent._event_prompt`, and Ollama `mistral:7b-instruct-q4_K_M`.
+    - Prior: Elo (odds disabled).
+    - The raw LLM text is scored against the facts block the model saw: event, score, model xG, possession, win-probability shift, up to two retrieved precedent docs.
+    - A seeded random sample of 117 events is judged by `openai/gpt-oss-120b` on Groq.
+    - CIs are a cluster bootstrap over fixtures (2,000 resamples).
+* **Metric:** RAGAS Faithfulness.
+* **Result:** mean faithfulness 0.684, 95% CI [0.639, 0.728].
+* **Source:** `backend/ragas_report.json`, script `backend/eval/eval_generation_ragas.py`
+
+| Metric | n | Mean | 95% CI |
+|:---|---:|---:|:---|
+| Faithfulness, raw LLM output | 117 | **0.684** | [0.639, 0.728] |
+| Faithfulness, after team-name guard | 116 | 0.684 | [0.640, 0.728] |
+| Share of answers with any unsupported claim | 117 | 0.82 | |
+| Share with half or more claims unsupported | 117 | 0.26 | |
+| Team-name guard violation rate, all 324 events | 324 | 0.012 | |
+
+### Pre-Match Elo Prior (n=128)
+
+* **Setup:**
+    - Every WC 2018 and 2022 match in StatsBomb, scored prequentially: each match is predicted from results-only Elo (started at 1500) built on the matches before it, then Elo is updated.
+    - Labels: the 90-minute result (knockout scores rebuilt from first- and second-half goals).
+    - Home advantage goes only to the host nation.
+    - The live prior uses point-in-time Elo from 49.5k internationals (`ml/elo_ratings.py`).
+* **Metric:** log-loss and Brier score against the in-sample outcome base rate.
+* **Result:**
+    - Δ log-loss +0.000 [−0.034, +0.035] over all 128 matches.
+    - Predicted draw rate is 27.9% against 22.7% realised.
+* **Source:** `backend/elo_backtest_report.json`
+
+| Matches | Elo log-loss | Base-rate log-loss | Δ log-loss (95% CI) | Δ Brier (95% CI) |
 |:---|---:|---:|---:|---:|
-| −0.20 | 0.000 | 0.000 | 0.000 | 0.00 |
-| −0.15 | 1.000 | 0.097 | 0.178 | 0.00 |
-| **−0.10 (production)** | **0.995** | **0.601** | **0.749** | **0.01** |
-| −0.05 | 0.879 | 0.964 | 0.920 | 0.41 |
-| +0.00 | 0.304 | 1.000 | 0.466 | 7.06 |
-| +0.05 | 0.073 | 1.000 | 0.136 | 39.17 |
+| All 128 | 1.068 | 1.068 | +0.000 [−0.034, +0.035] | −0.001 [−0.024, +0.022] |
+| Second 64 (warmed up) | 1.077 | 1.066 | +0.012 [−0.042, +0.069] | +0.007 [−0.029, +0.046] |
 
-The deployed threshold (−0.10) operates at 99.5% precision and 60.1% recall, 0.01 false alarms per topic-day. Lower thresholds trade precision for recall: −0.05 reaches 96.4% recall at 0.41 false alarms per topic-day; +0.05 reaches 100% recall at 39.17 false alarms per topic-day.
+### In-Play Model Calibration (n=64)
 
-### Hybrid Retrieval: Recall/Precision/MRR/NDCG @ K=5, Alpha Sweep
+* **Setup:**
+    - Elo is warmed up on the 64 WC 2018 matches.
+    - All 64 WC 2022 matches are scored with the same prior, host rule, and 90-minute labels as the Elo backtest.
+    - At each checkpoint the true score and red cards are fed to `inplay_wdl`.
+    - CIs are a paired bootstrap over matches against the pre-match prior.
+* **Metric:** log-loss and Brier score at minutes 0, 15, 45, and 75.
+* **Result:** log-loss falls from 1.077 (prior) to 0.852 at minute 45 and 0.611 at minute 75.
+* **Source:** `backend/inplay_report.json`
 
-Corpus: 96 docs · Queries: 36 · Encoder: `all-MiniLM-L6-v2` (production)
-
-| Alpha | Recall@5 | Precision@5 | MRR | NDCG@5 |
-|:---|---:|---:|---:|---:|
-| 0.00 (BM25-only) | 1.00 | 0.20 | 0.766 | 0.824 |
-| 0.25 | 1.00 | 0.20 | 0.789 | 0.842 |
-| 0.50 | 1.00 | 0.20 | 0.845 | 0.884 |
-| **0.75 (production)** | **1.00** | **0.20** | **0.944** | **0.959** |
-| 1.00 (dense-only) | 1.00 | 0.20 | 0.944 | 0.959 |
-
-Alpha=0.75 ties with pure dense retrieval (alpha=1.00) on MRR (0.944) and NDCG@5 (0.959).
-
-### In-Play Model Calibration: Real World Cup Matches (n=12)
-
-| Checkpoint | Log-loss | Brier |
-|:---|---:|---:|
-| Pre-match prior | 1.044 | 0.626 |
-| Base rate | 1.099 | 0.667 |
-| Minute 15 | 1.096 | 0.653 |
-| Minute 45 | 0.965 | 0.554 |
-| Minute 75 | 0.613 | 0.372 |
-
-Log-loss falls monotonically from minute 15 (1.096) to minute 75 (0.613), dropping below the pre-match prior (1.044) by minute 75 reflecting the model correctly gaining information as the match progresses 
-
-
+| Checkpoint | Log-loss | Brier | Δ log-loss vs prior (95% CI) |
+|:---|---:|---:|---:|
+| Pre-match prior (Elo) | 1.077 | 0.652 | — |
+| Base rate (in-sample) | 1.062 | 0.642 | — |
+| Minute 0 | 1.077 | 0.652 | −0.000 [−0.000, +0.000] |
+| Minute 15 | 1.095 | 0.658 | +0.018 [−0.063, +0.105] |
+| Minute 45 | 0.852 | 0.496 | −0.225 [−0.363, −0.077] |
+| Minute 75 | 0.611 | 0.348 | −0.467 [−0.649, −0.262] |
 
 ## Performance
 
@@ -275,72 +379,94 @@ Log-loss falls monotonically from minute 15 (1.096) to minute 75 (0.613), droppi
 ### Data Ingestion Architecture
 
 ```
- worldcup26.ir            StatsBomb Open Data           The Odds API
- (score, status, clock)   (WC 2018/2022 events)         (bookmaker odds)
-        │                          │                          │
-        ⭣                          ⭣                          ⭣
- hybrid_producer.py     rag_indexer.py / tactical_indexer.py   odds_api_client.py
- (30s poll)              momentum_trainer.py / backtest_elo    (on demand, 900s TTL cache)
-        │               (offline, on demand per proxy match)          │
-        ⭣                          ⭣                          ⭣
- status normalize        event replay, feature extraction     consensus average
- scorer parse            narrative + PPDA document build       Shin de-vig
- Elo-distance proxy match
-        │                          │                          │
+ ESPN public API          StatsBomb Open Data           The Odds API
+ (scores, stats, events,  (WC 2018/2022 events)         (bookmaker odds)
+  lineups, shots)                  │                          │
+ + data/wc2026 snapshot            │                          │
+        │                          ⭣                          ⭣
+        ⭣                rag_indexer.py / tactical_indexer.py   odds_api_client.py
+ match_producer.py       (offline)                     (on demand, 5400s TTL cache)
+ (30s poll)                        │                          │
+        │                          ⭣                          ⭣
+ status + real clock      narrative + PPDA document build  per-book Shin de-vig,
+ stats/events/lineups                                      then averaged
+ shot xG (shot_xg.py)              │                          │
         ⭣                          ⭣                          ⭣
    MatchState / TeamStats    Weaviate (NarrativeArcs,     prior_builder.py
-   MatchEvent                TacticalProfiles)            (W/D/L probabilities)
+   MatchEvent, shots         TacticalProfiles)            (W/D/L probabilities)
         │                                                       │
         └───────────────────────┬───────────────────────────────┘
                                  ⭣
                               Redis
-                    match:{id}:state, match:{id}:momentum,
+                    match:{id}:state, match:{id}:shots,
+                    match:{id}:lineups, match:{id}:momentum,
                     match:{id}:intel:*, predict:*
 
 
 
 
  Mastodon      Bluesky      Google Trends      Wikipedia
- (search)      (searchPosts)  (pytrends)       (recentchanges)
+ (search)      (searchPosts)  (pytrends)       (article revisions)
         │           │              │                │
         └───────────┴──────┬───────┴────────────────┘
-                            |
+                            │
               narrative_spike_detector.py (60s tick)
-              per-source rate, mock fallback, four-dim vector
+              per-source rates, mock fallback (never scored)
+                            │
+              spike_scorer.py (robust z-score, corroboration)
                             ⭣
                           Redis
-              narrative:spike:*, narrative:trending:latest
+              narrative:spike:*, narrative:spikes:feed,
+              narrative:trending:latest
 ```
 
 ### External Data Sources
 
-### External Data Sources
+* **Live match state:** ESPN public API (`fifa.world`, no key), polled every 30 seconds.
+* **Tournament snapshot:** `backend/data/wc2026/`, built by `feeds/build_snapshot.py`.
+* **Historical match data:** StatsBomb Open Data (World Cups 2018 and 2022): event streams for retrieval, tactical fingerprints, head-to-head history, and evaluation; match results for Elo calibration.
+* **Market data:** The Odds API, fetched on demand and cached for 90 minutes. Each bookmaker's odds are de-vigged (Shin) and the fair probabilities averaged. Market odds are the preferred pre-match prior.
+* **Lineups:** ESPN confirmed XI, then API-Sports if `API_SPORTS_KEY` is set, then a Zafronix squad with a projected XI (labelled as projected).
+* **Social and search signals:** Mastodon, Bluesky, Google Trends, and Wikipedia, polled every 60 seconds.
 
-* **Live match state**: `worldcup26.ir`, polled every 30 seconds to retrieve live scores, match status, kickoff time, and scorer information. Responses are normalized into a consistent internal format before entering the analytics pipeline.
+### Live Match Data
 
-* **Historical match data**: StatsBomb Open Data (World Cups 2018 & 2022). Provides full event streams for retrieval-augmented analysis, tactical fingerprint generation, momentum model training, lineup fallback, and historical evaluation. Match-level results are also used separately for Elo calibration.
+`match_producer.py` builds every fixture's `MatchState` from ESPN, with the snapshot as fallback.
 
-* **Market data**: The Odds API, refreshed on demand and cached for 15 minutes. Consensus bookmaker odds are aggregated and de-vigged before being used as the preferred pre-match probability source.
+**Each 30-second poll**
 
-* **Lineup data**: Player and formation information is resolved through multiple providers (Zafronix, API-Sports, and StatsBomb) with deterministic fallbacks when official lineups are unavailable.
+1. One scoreboard request returns every fixture's score, status, and real clock (including stoppage time, extra time, and penalties). If ESPN is unreachable, fixtures come from the snapshot.
+2. Match detail per fixture:
+    - snapshotted and completed: read from the snapshot file, no request
+    - live: ESPN summary every poll
+    - completed but not in the snapshot: ESPN summary once, then cached
+3. The detail supplies team stats, key events with players (goals, cards, substitutions), confirmed lineups, and shots with coordinates.
+4. `MatchState` is written to Redis and `match_update` is published only when the state changes.
 
-* **Social and search signals**: Mastodon, Bluesky, Google Trends, and Wikipedia are polled concurrently every 60 seconds to monitor emerging narratives and detect unusual public-interest spikes.
+**Model xG** (`ml/shot_xg.py`)
+
+* Logistic model over shot coordinates, body part, and assist type parsed from the ESPN commentary line.
+* Fitted on 32.7k ESPN club shots (`ml/fit_shot_xg.py`): held-out log-loss 0.265 vs 0.325 for the base rate.
+* Per-team-match correlation with StatsBomb xG on WC 2022: r = 0.915. WC 2026 non-penalty shots: 279.6 model xG vs 278 goals.
+* Labelled "model xG" in prompts and the UI.
+
+**Snapshot** (`feeds/build_snapshot.py`, `backend/data/wc2026/`)
+
+* 104 fixtures with FIFA match numbers, 12 groups, and per-match stats, events, lineups, and shots (about 3 MB).
+* Point-in-time Elo from the martj42 international results dataset (`ml/elo_ratings.py`), head-to-head per fixture, and FIFA Annex C for third-place slotting.
+* Sources are cross-validated at build time; `tests/test_wc2026_data.py` checks the snapshot offline.
 
 ### External Signals
 
-1. Mastodon, Bluesky, Google Trends, and Wikipedia are monitored concurrently every 60 seconds for each tracked topic.
-
-2. When a source is temporarily unavailable or rate-limited, deterministic synthetic activity is generated to preserve pipeline continuity during development and testing.
-
-3. Signals from all sources are normalized into a unified activity representation, allowing heterogeneous social, search, and edit activity to be compared on a common scale.
-
-4. A rolling historical window is maintained for each topic and evaluated by an anomaly-detection model to identify emerging spikes and continuously rank trending topics.
-
-5. The resulting trend signals are consumed by the narrative intelligence pipeline and exposed through the platform's narrative APIs for frontend visualization.
+1. Mastodon, Bluesky, Google Trends, and Wikipedia are polled concurrently every 60 seconds for each tracked topic.
+2. An unavailable or rate-limited source produces deterministic mock activity, flagged `mock` in the UI. Mock values are not scored.
+3. Counts are converted to per-hour rates (Trends to a within-query lift) and scored against each source's own baseline.
+4. Each topic and source keeps a rolling 3-hour window of live values. A topic is flagged when at least two sources surge together.
+5. Results feed the narrative agent and the narrative API.
 
 ### Schemas
 
-**MatchState** (Pydantic, `api/schemas/schema.py`). Rebuilt every 30 seconds by `hybrid_producer.py`. 
+**MatchState** (Pydantic, `api/schemas/schema.py`). Rebuilt every 30 seconds by `match_producer.py`.
 
 ```python
 class MatchState(BaseModel):
@@ -353,6 +479,7 @@ class MatchState(BaseModel):
     status_short: str = "NS"
     status_long: str = "Not Started"
     elapsed: Optional[int] = None
+    elapsed_extra: Optional[int] = None
     elapsed_estimated: bool = False
     kickoff_time: Optional[datetime] = None
     home_id: int = 0
@@ -366,12 +493,13 @@ class MatchState(BaseModel):
     away_score: int = 0
     away_stats: TeamStats = Field(default_factory=TeamStats)
     events: list[MatchEvent] = Field(default_factory=list)
-    stats_source: str = "unknown"
-    stats_proxy_match_id: Optional[int] = None
+    stats_source: str = "unavailable"   # "espn" | "unavailable"
+    home_pens: Optional[int] = None
+    away_pens: Optional[int] = None
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 ```
 
-**MatchEvent** (Pydantic, nested in `MatchState.events`). 
+**MatchEvent** (Pydantic, nested in `MatchState.events`).
 
 ```python
 class MatchEvent(BaseModel):
@@ -382,9 +510,10 @@ class MatchEvent(BaseModel):
     player_name: Optional[str] = None
     type: str
     detail: Optional[str] = None
+    source: str = "espn"   # "espn" | "synthesised" (from a score delta)
 ```
 
-**TeamStats** (Pydantic, nested in `MatchState.home_stats` / `away_stats`). Built from replayed StatsBomb events.
+**TeamStats** (Pydantic, nested in `MatchState.home_stats` / `away_stats`). Real ESPN match stats; `expected_goals` is the shot model's xG over the match's real shots.
 
 ```python
 class TeamStats(BaseModel):
@@ -404,29 +533,32 @@ class TeamStats(BaseModel):
     expected_goals: float = 0.0
 ```
 
-**MomentumState** (dataclass, `ml/momentum_model.py`).
+**Momentum features** (`ml/momentum_features.py`). The model is stateless: every tick recomputes features from the match's shot list and events, using the same function the trainer replays over ESPN play-by-play.
 
 ```python
-@dataclass
-class TeamMomentumState:
-    ewma_poss: float = 50.0
-    ewma_pass_acc: float = 75.0
-    ewma_pressure: float = 0.1
-    shot_window: deque = field(default_factory=lambda: deque(maxlen=WINDOW_SLOTS))
-    last_shots_total: int = 0
-    last_shots_on: int = 0
-
-@dataclass
-class MatchMomentumState:
-    fixture_id: int
-    home: TeamMomentumState = field(default_factory=TeamMomentumState)
-    away: TeamMomentumState = field(default_factory=TeamMomentumState)
+FEATURES = [
+    "xg15_for", "xg15_against",      # model xG in the last 15 minutes
+    "shots15_for", "shots15_against",
+    "xg_for", "xg_against",          # cumulative model xG
+    "score_diff", "red_diff", "minute_norm",
+]
 ```
-
 
 
 ## The ML Core
 
+**Point-in-time Elo** (`ml/elo_ratings.py`) is built from 49.5k martj42 international results, every team starting at 1500. After each match:
+
+$$
+R_h' = R_h + K\,G\,(W-W_e),\qquad R_a' = R_a - K\,G\,(W-W_e),\qquad W_e=\frac{1}{1+10^{-(R_h-R_a+H)/400}}
+$$
+
+- $W$ = result for the home side (1 win, 0.5 draw, 0 loss); $W_e$ = expected result
+- $H$ = 100 home advantage, 0 at a neutral venue
+- $K$ = 60 (World Cup), 50 (continental finals), 40 (qualifiers, Nations League), 30 (other tournaments), 20 (friendlies)
+- $G$ = goal-difference multiplier: 1 for $|gd|\le1$, 1.5 for $|gd|=2$, $(11+|gd|)/8$ for $|gd|\ge3$
+
+---
 
 **Team strength to outcome probability.** Elo expectation:
 
@@ -440,10 +572,10 @@ Where:
 - $R_a$ = Elo rating of Team A
 - $R_b$ = Elo rating of Team B
 
-Converted into a full three-outcome distribution with a rating-gap-sensitive draw model:
+Three-outcome distribution with a rating-gap-sensitive draw model:
 
 $$
-p_{\text{draw}}=\mathrm{clip}\left(0.25e^{-\Delta R/450}+0.05,\;0.10,\;0.30\right)
+p_{\text{draw}}=\mathrm{clip}\left(0.25e^{-\Delta R/450}+0.05,\;0.03,\;0.30\right)
 $$
 
 $$
@@ -458,74 +590,99 @@ where $\Delta R = |R_a - R_b|$ is the absolute rating gap between the two teams.
 
 ---
 
-**Market odds** are preferred over Elo when available and de-vigged with **Shin's (1993) method**, which discounts longshot prices less aggressively than a proportional split:
+**Market odds** replace Elo when available and are de-vigged with **Shin's (1993) method**, which assigns more of the bookmaker margin to longshots than to favourites:
 
 $$
-p_i=\frac{\sqrt{z^2+4(1-z)\left(\frac{1}{o_i}\right)^2}-z}{2(1-z)}
+p_i(z)=\frac{\sqrt{z^2+4(1-z)\,\dfrac{\pi_i^2}{\Pi}}-z}{2(1-z)},\qquad \pi_i=\frac{1}{o_i},\qquad \Pi=\sum_j \pi_j
 $$
 
-where
-
-$$
-z=\frac{\Omega}{\Omega+2}
-$$
-
-$$
-\Omega=\sum_i\frac{1}{o_i}-1
-$$
+$z$ is solved by bisection on $[0, 0.5]$ so that $\sum_i p_i(z)=1$; $\sum_i p_i$ is strictly decreasing in $z$, so the root is unique.
 
 - $p_i$ = fair, de-vigged probability for outcome $i$ (home / draw / away)
-- $o_i$ = quoted decimal odds for outcome $i$
-- $\Omega$ = overround, the sum of implied probabilities across all outcomes, minus 1
-- $z$ = Shin's insider-trading parameter, derived from $\Omega$
+- $o_i$ = quoted decimal odds for outcome $i$; $\pi_i$ = raw implied probability
+- $\Pi$ = booksum; $\Pi-1$ is the overround
+- $z$ = Shin's insider-trading share, $0 < z \le \Pi-1$ for a book with margin; a book with no overround reduces to plain normalisation
 
 ---
 
-**In-play win probability** updates live from score, minute, and red cards using two independent Poisson goal processes:
+**In-play win probability** (`ml/in_play.py`)
+
+* Updates from score, minute, and red cards using two independent Poisson goal processes.
+* Full-match rates are **calibrated to the pre-match prior**: the 90-minute rates are fitted so the Poisson W/D/L reproduces the prior.
+* Fit: least squares over a vectorised grid of total goals × home share, then local refinement; cached per prior.
 
 $$
-\lambda_{\text{home}}=\max\left(0.02,\;1.3f(1+0.65\sigma)\right)\qquad\lambda_{\text{away}}=\max\left(0.02,\;1.3f(1-0.65\sigma)\right)
+(\lambda_h^{90},\lambda_a^{90})=\arg\min_{\lambda_h,\lambda_a}\;\big\lVert \mathrm{WDL}_{\text{Pois}}(\lambda_h,\lambda_a)-(p_{\text{win}},p_{\text{draw}},p_{\text{loss}})\big\rVert_2^2
 $$
 
+Remaining goals are Poisson at those rates scaled by the time left and by red-card multipliers, and the final margin is enumerated from the current score:
+
 $$
-P(g_h,g_a)=\mathrm{Pois}(g_h;\lambda_{\text{home}})\cdot\mathrm{Pois}(g_a;\lambda_{\text{away}}),\qquad g_h,g_a\in[0,8]
+\lambda_{\text{home}}=f\,\lambda_h^{90},\qquad\lambda_{\text{away}}=f\,\lambda_a^{90},\qquad P(g_h,g_a)=\mathrm{Pois}(g_h;\lambda_{\text{home}})\cdot\mathrm{Pois}(g_a;\lambda_{\text{away}}),\qquad g_h,g_a\in[0,12]
 $$
 
 where
 
-- $\lambda_{\text{home}}$, $\lambda_{\text{away}}$ = expected in-play goal rate for each team over the remaining match
-- $f$ is the fraction of the match remaining.
-- $\sigma$ is the pre-match win-probability differential.
-- $g_h$, $g_a$ = candidate home/away goal counts for the remainder of the match, enumerated over $[0,8]$
-- $P(g_h,g_a)$ = joint probability that the match finishes with exactly $g_h$ further home goals and $g_a$ further away goals
+- $\lambda_{\text{home}}$, $\lambda_{\text{away}}$ = expected goals for each team over the remaining match
+- $f$ is the fraction of the match remaining
+- $g_h$, $g_a$ = candidate further home/away goals, enumerated over $[0,12]$ (truncated tail renormalised)
+- a red card multiplies the offending side's rate by 0.72 and the opponent's by 1.12
 
+With $\ell$ the current home lead, the enumerated scorelines aggregate into W/D/L:
 
+$$
+P(\text{home})=\sum_{g_h-g_a>-\ell}P(g_h,g_a),\qquad
+P(\text{draw})=\sum_{g_h-g_a=-\ell}P(g_h,g_a),\qquad
+P(\text{away})=\sum_{g_h-g_a<-\ell}P(g_h,g_a)
+$$
+
+At 0-0 kickoff ($f=1$) the model returns the prior. At full time the result is read from the final score.
+
+`elo_deltas()` converts the change in each side's expected group points into a bounded Elo adjustment for the counterfactual engine and live-adjusted tournament simulations:
+
+$$
+\mathrm{EP}=3\,p_{\text{win}}+p_{\text{draw}},\qquad
+\Delta R=\mathrm{clip}\big(40\,(\mathrm{EP}_{\text{now}}-\mathrm{EP}_{\text{pre}}),\;-80,\;80\big)
+$$
 
 ---
 
-**Momentum** is EWMA-smoothed and scored by logistic regression, executing in microseconds with fully inspectable inputs:
+**Shot xG** (`ml/shot_xg.py`) is a logistic model over shot geometry and play type:
 
 $$
-\mathrm{EWMA}_t=\alpha x_t+(1-\alpha)\mathrm{EWMA}_{t-1},\qquad\alpha=0.3
+\mathrm{xG}=\sigma\Big(\beta_0+\beta_1\log d+\beta_2\,\theta+\beta_3 h+\beta_4\,h\log d+\sum_k\gamma_k c_k\Big),\qquad
+\theta=\operatorname{atan2}\!\Big(w\,d_x,\;d_x^2+d_y^2-\big(\tfrac{w}{2}\big)^2\Big)
 $$
 
+- $d_x$, $d_y$ = metres from the goal line and from the goal's centre line; $d=\sqrt{d_x^2+d_y^2}$
+- $\theta$ = angle subtended by the goal mouth, $w=7.32$ m
+- $h$ = header flag; $c_k$ = cross, through ball, corner, set piece, fast break, direct free kick
+- Penalties take a fixed xG of 0.7711; coefficients are in `ml/shot_xg_coef.json`
+
+---
+
+**Momentum** (`ml/momentum_model.py`) is a stateless logistic model:
+
 $$
-P(\text{goal within 5 min})=\sigma\left(\beta_0+\sum_i\beta_i\,\mathrm{feature}_i\right)+\sum_k\mathrm{bump}_k(0.8)^{\Delta t_k}
+p_{\text{team}}=P(\text{team scores within 5 min})=\sigma\left(\beta_0+\sum_i\beta_i\,\mathrm{feature}_i\right),\qquad
+\mathrm{momentum}_{\text{home}}=\frac{p_{\text{home}}}{p_{\text{home}}+p_{\text{away}}}
 $$
 
-- $x_t$ = raw input signal at tick $t$ (possession, pass accuracy, or pressure)
-- $\mathrm{EWMA}_{t-1}$ = previous smoothed value of that signal
-- $\alpha$ = smoothing factor
 - $\sigma(\cdot)$ = logistic sigmoid function
-- $\beta_0$ = intercept; $\beta_i$ = trained coefficient for $\mathrm{feature}_i$ (EWMA-smoothed pressure, possession, pass accuracy, match minute, score differential)
-- $\mathrm{bump}_k$ = initial magnitude of the $k$-th active event bump (goal or red card)
-- $\Delta t_k$ = ticks elapsed since event $k$ occurred
+- $\beta_0$ = intercept; $\beta_i$ = trained coefficient for $\mathrm{feature}_i$: model xG and shots for and against in the last 15 minutes, cumulative xG for and against, score differential, red-card differential, and match minute
 
-$\Delta t_k$ is measured in 30-second ticks (two per minute). Event contributions decay exponentially over time, allowing impactful events to influence predictions immediately while their effect gradually diminishes. Goals and red cards inject the largest momentum shifts into the model. Coefficients are trained offline on historical StatsBomb World Cup data and promoted only after outperforming a baseline on held-out evaluation matches.
+* Features are recomputed each tick from the match's shot list by `ml/momentum_features.py`, the same function the trainer uses.
+* No per-process state and no hand-set event bumps.
+* Coefficients (`ml/momentum_coef.json`) are trained on 1,388 ESPN club matches by `ml/momentum_trainer.py` (report: `ml/momentum_report.json`).
+* WC 2026 log-loss: 0.2371, against 0.2403 for a score-and-clock-only model and 0.2420 for the base rate (ECE 0.011).
 
 ---
 
-**Tournament simulation** resolves every simulated match and knockout round for all $N$ runs simultaneously through vectorized NumPy operations:
+**Tournament simulation** (`ml/tournament_sim.py`)
+
+* Resolves every group match and knockout round for all $N$ runs at once with vectorized NumPy operations.
+* Third-place slotting follows FIFA Annex C; the knockout bracket follows matches 73–104 (`ml/wc2026_format.py`).
+* Each stage probability carries a confidence margin:
 
 $$
 \text{margin}=1.96\sqrt{\frac{\hat{p}(1-\hat{p})}{N}}
@@ -537,7 +694,7 @@ $$
 
 ---
 
-**Tactical identity** is derived through feature engineering and cosine retrieval:
+**Tactical identity** is computed from pressing features and matched by cosine similarity:
 
 $$
 \mathrm{PPDA}=\frac{\text{Opponent completed passes in press zone}}{\text{Defensive actions in press zone}}
@@ -547,24 +704,35 @@ $$
 \text{press}\_\text{intensity}=0.7\,\min\left(1,\frac{8}{\mathrm{PPDA}}\right)+0.3\,\min\left(1,\frac{\text{pressures}}{150}\right)
 $$
 
-- $\mathrm{PPDA}$ = passes per defensive action. A lower value indicates more aggressive pressing.
-- $\text{pressures}$ = count of raw pressure events recorded in the press zone.
+- $\mathrm{PPDA}$ = passes per defensive action; lower values mean more aggressive pressing
+- $\text{pressures}$ = count of pressure events in the press zone
 
 ---
 
-**Narrative anomaly detection** fits a separate `IsolationForest` (`contamination=0.05`, 100 estimators) per tracked topic, refit every 30 ticks on a rolling 72-hour window of four-source activity, scoring every new observation against it. Per-topic baselines correct for activity volume differences between heavily-followed and lightly-followed teams:
+**Narrative surge detection** (`agents/spike_scorer.py`) scores each live source per topic against its own 3-hour baseline (180 ticks, live values only).
+
+* Per-hour rates:
+    - Mastodon: posts in the last 30 min
+    - Bluesky: posts in the last 15 min
+    - Wikipedia: edits to the topic's article in the last hour
+* Trends: lift of the last 5 minutes over the earlier median of the same hourly query.
+* With $x=\log(1+\text{rate})$ (or $\log\text{lift}$):
 
 $$
-\mathrm{severity}=\mathrm{clip}\left(\frac{-s-0.10}{0.5},0,1\right)
+z=\frac{x-\mathrm{median}(h_{:-5})}{\max(1.4826\cdot\mathrm{MAD}(h_{:-5}),\,0.35)}
 $$
 
-where $s$ is the raw anomaly score. A spike fires when:
+* $h$ = the source's live history with the 5 most recent points excluded.
+* A source is *surging* when $z\ge 3$ and its raw rate clears a per-source floor.
+* A topic alerts when:
 
 $$
-s < -0.10
+|\text{surging}|\ge 2 \quad\text{or}\quad \max z \ge 6,
 $$
 
-outside a 300-second per-topic cooldown window.
+* Alerts fire once per episode; an episode ends after 5 ticks with no source at $z\ge1.5$.
+* Severity is $\mathrm{clip}((\bar z_{\text{top2}}-3)/5,0,1)$, using the max $z$ for a single-source alert.
+* At most 3 topics alert per tick; the rest stay pending for the next tick.
 
 <br />
 
@@ -572,47 +740,101 @@ outside a 300-second per-topic cooldown window.
 
 ## The Agent Layer
 
-Every agent computes a deterministic analytical result before any generation step. The language model is used only to narrate and explain precomputed outputs, not to determine conclusions. Agents use retrieval grounding or simulation outputs depending on their role, with deterministic fallbacks available when generation is unavailable.
+Each agent computes a deterministic result before any generation step; the LLM narrates the precomputed outputs. Every agent has a deterministic template fallback built from the same outputs.
+
+| Agent | Inference |
+|:---|:---|
+| Match intelligence | Local-first (Ollama → Groq → template), LangGraph narration graph |
+| Counterfactual | Local-first (Ollama → Groq → template) |
+| Narrative | Local-first (Ollama → Groq → template) |
+| Briefing | Groq, then template |
+| Tactical | No generation |
 
 ### Match Intelligence Agent
 
-* Runs every 30 seconds against the live `MatchState` and momentum snapshot.
-* Detects high-impact match developments by scanning uncovered events (goals/cards), momentum changes, and xG-versus-scoreline divergence, including situations where no discrete event has occurred.
-* During lower-activity periods, performs periodic tactical reads using live possession and pressure signals.
-* Selects retrieval context based on the detected scenario: event-driven analysis uses goal/card narrative data, xG divergence uses broader historical match context, and tactical analysis uses pressing-fingerprint data.
-* Retrieved context is combined with live scoreline, xG, and momentum features to produce grounded match intelligence.
-* Uses local-first LLM inference for high-priority insights (goals, cards, scheduled tactical reads, or high-relevance situations), while deterministic numeric templates provide fallback responses when generation is skipped or unavailable.
+Runs every 30 seconds per fixture against the live `MatchState` and momentum snapshot.
+
+**Relevance scoring**
+
+* Priority score inputs:
+    - Uncovered goals and red cards
+    - Momentum change since the last narrated snapshot
+    - xG-versus-scoreline divergence
+    - Stoppage-time and extra-time context
+* A content hash over the scoreline, momentum state, and latest event skips unchanged states.
+* Ticks below the relevance threshold are skipped unless a forced trigger fires:
+    - a baseline narrative once the fixture reaches an initial live-state milestone
+    - a tactical read every 5 match minutes (scheduled on the match clock, not wall time)
+
+**Narrative categories and retrieval**
+
+| Category | Trigger | Retrieval |
+|:---|:---|:---|
+| Event reaction | Goal or card | `NarrativeArcs` |
+| xG divergence | xG well above actual goals | `NarrativeArcs` |
+| Tactical analysis | Forced tactical read or momentum shift | `TacticalProfiles` |
+
+**Generation**
+
+* LLM generation runs for major events, forced tactical reads, and high-relevance states. Other updates use deterministic numeric templates.
+* Narration is a LangGraph `StateGraph` (`agents/intel_graph.py`): retrieve → generate → grounding check → one retry with the violations in the prompt → template fallback.
+* The grounding check (`agents/grounding.py`) validates teams, players, scorelines, percentages, decimals, and minutes against `MatchState` and the prompt facts.
+* Outcomes are counted in `wc2026_intel_narrations_total{kind,outcome}`.
+
+**Event timeline**
+
+* A separate event timeline holds a retrieval-grounded reaction for every goal and red card.
+* Every fixture gets a full-time summary; matches without major events use xG and possession.
 
 ### Counterfactual Agent
 
-* Triggers on major match events (goals, cards, penalties, own goals, and substitutions) with a 45-second minimum gap per fixture to prevent duplicate analysis.
-* Reconstructs the pre-event match state by reversing the impact of the triggering event on score and disciplinary state.
-* Converts the observed in-play probability change into a bounded Elo adjustment representing the event's impact.
-* Runs paired 20,000-run tournament simulations using identical deterministic seeds, isolating the effect of the event-driven adjustment between pre-event and post-event scenarios.
-* Identifies the teams and outcomes with the largest probability shifts and passes the simulation results, along with the in-play win-probability change, into the local-first generation pipeline.
-* A deterministic fallback template reproduces the same explanation using the computed simulation outputs when generation is unavailable.
+* Triggers on goals, cards, penalties, own goals, and substitutions, with a 45-second minimum gap per fixture.
+* Reconstructs the pre-event match state by reversing the event's effect on score and cards.
+* Computes in-play W/D/L before and after the event and converts the change into a bounded Elo adjustment.
+* An event that changes neither the score nor the number of players on the pitch skips the simulations and the LLM call.
+* Runs paired 20,000-run tournament simulations (`CF_SIMS`) with shared seeds for the pre-event and post-event states.
+* Teams whose championship probability moves by at least 0.003 are listed; if none moves, the template is used without an LLM call.
+
+Per-team change and aggregate tournament impact:
+
+$$
+\Delta p_i = p_i^{after} - p_i^{before}
+$$
+
+$$
+\text{path shift} = \min\left(1,\frac{\sum_i |\Delta p_i|}{2}\right)
+$$
+
+Both legs use the same seed (common random numbers), so their estimates are positively correlated and the variance of $\Delta p_i$ drops:
+
+$$
+\mathrm{Var}(\hat p_i^{after}-\hat p_i^{before})=\mathrm{Var}(\hat p_i^{after})+\mathrm{Var}(\hat p_i^{before})-2\,\mathrm{Cov}(\hat p_i^{after},\hat p_i^{before})
+$$
+
+The largest movers and the in-play win-probability swing go to local-first generation.
 
 ### Tactical Agent
 
-* Uses a fully deterministic pipeline with no generative step.
-* Converts live possession, shot volume, and passing accuracy into a tactical style descriptor that approximates unavailable pressing metrics from the live feed.
-* Embeds the descriptor and retrieves the closest historical pressing fingerprints from Weaviate using cosine similarity, including additional comparable profiles for context.
-* Returns the best available tactical match from the indexed profiles, with live-statistics fallback when tactical retrieval data is unavailable.
+* Deterministic; no generation step.
+* Converts live possession, shot volume, and passing accuracy into a tactical style descriptor.
+* Embeds the descriptor and retrieves the closest pressing fingerprints from `TacticalProfiles` by cosine similarity, with additional comparable profiles.
+* Falls back to live statistics when tactical retrieval is unavailable.
 
 ### Narrative Intelligence Agent
 
-* Consumes trending topics and anomaly signals generated by the external-signal pipeline, which aggregates multiple social and search sources and scores topic activity using per-topic `IsolationForest` models.
-* Builds topic-aware queries and retrieves historical narrative context from the narrative retrieval collection.
-* Uses source-level activity patterns to distinguish isolated viral signals from broader real-world events, grounding generated narratives in the observed signal distribution rather than raw volume alone.
-* Applies output validation and filtering before serving results, with a rule-based fallback that reproduces the same reasoning path when generation is unavailable or fails validation.
+* Reads spikes and trending topics from the surge detector ([External Signals](#external-signals)).
+* Collects from Mastodon (authenticated search), Bluesky (authenticated `searchPosts` with session recovery), Google Trends (`pytrends` on the I/O thread pool), and Wikipedia (article revision history).
+* Keeps a separate trending ranking from relative activity changes across tracked topics.
+* Builds topic-aware queries against `NarrativeArcs` and generates a narrative from the retrieved context and per-source activity.
+* Validates output against banned-phrasing rules; failed or unavailable generation uses a rule-based fallback.
+* Output per spike: anomaly score, source attribution, narrative summary.
+
 ### Briefing Agent
 
-* Generates pre-match briefings within a scheduled pre-kickoff window, once per match status, or on demand using team context and retrieved historical precedent. It does not consume live match-state signals.
-* Retrieves relevant historical context from the narrative collection and constrains generation to retrieved evidence.
-* Uses a deterministic fallback that summarizes available retrieved context when generation is unavailable, ensuring the agent always returns a valid briefing.
-* Uses Groq-based inference directly for generation, while the other live agents follow the platform's local-first inference strategy.
-
-Three of the five agents operate continuously during live play using local-first inference, reducing network latency and external API dependency for time-sensitive match intelligence. All agents include deterministic template fallbacks built from the same computed outputs, ensuring graceful degradation without fabricated statistics or empty responses.
+* Generates pre-match briefings inside a scheduled pre-kickoff window, once per match status, or on demand.
+* Inputs: team context, as-of-kickoff facts (`agents/briefing_facts.py`), up to three head-to-head meetings from Neo4j, and retrieved precedent from `NarrativeArcs`.
+* Uses no live match-state signals.
+* Calls Groq directly; the deterministic fallback summarizes the retrieved context.
 
 
 
@@ -620,39 +842,55 @@ Three of the five agents operate continuously during live play using local-first
 
 ### Knowledge Construction
 
-1. Historical StatsBomb event streams power both retrieval collections used by the intelligence agents.
-2. Historical events are transformed into structured natural-language documents with metadata such as `match_id`, competition, season, minute, and event type for grounded retrieval.
-3. Tactical knowledge is built separately by computing team-level pressing features, including PPDA and pressing-zone statistics, into dedicated tactical profiles.
-4. Knowledge indexing runs offline through CLI workflows, with the tactical index supporting automatic population on startup when no indexed profiles are available.
+1. StatsBomb WC 2018/2022 event streams feed both retrieval collections.
+2. Goal and red-card situations become natural-language documents with `match_id`, competition, season, minute, and event-type metadata, plus `situation` metadata (game state, minute band) used as the retrieval eval label.
+3. Tactical profiles hold team-level pressing features per match, including PPDA and pressing by pitch third.
+4. Indexing runs offline through CLIs. The tactical index and the knowledge graph also populate on startup when empty.
 
 ### Embedding Pipeline
 
-1. Documents are stored as self-contained retrieval passages, eliminating the need for additional chunking during indexing.
-2. Embeddings are generated using `sentence-transformers/all-MiniLM-L6-v2` with normalized vectors for similarity search.
-3. Vectors and structured metadata are stored together in Weaviate for retrieval and filtering.
-4. Embedding workloads execute asynchronously through a dedicated thread pool to avoid blocking the main application loop.
+1. Each document is a self-contained passage; there is no chunking step.
+2. Embeddings come from `sentence-transformers/all-MiniLM-L6-v2` with normalized vectors, loaded once in `ml/embedding_model.py`.
+3. Vectors and metadata are stored together in Weaviate.
+4. Embedding runs on a dedicated thread pool.
 
 ### Hybrid Retrieval
 
-1. Dense retrieval uses cosine similarity over embedding vectors to capture semantic relevance.
-2. BM25 retrieval provides keyword-based matching over the same document corpus.
-3. Hybrid retrieval combines both approaches using weighted fusion with a 75% dense retrieval preference (`alpha=0.75`).
-4. Narrative retrieval applies event-type filtering (such as `goal` or `red_card`) when context is known, improving precision over similarity search alone.
+1. Dense retrieval: cosine similarity over embedding vectors.
+2. Sparse retrieval: BM25 over the same corpus.
+3. Fusion: Weaviate relative-score fusion with `alpha=0.75` (75% dense). Each result list is min-max normalized per query, then combined:
+
+$$
+s(d)=\alpha\,\hat s_{\text{dense}}(d)+(1-\alpha)\,\hat s_{\text{BM25}}(d),\qquad
+\hat s_{\text{dense}}\propto\cos(q,d)=\frac{q\cdot d}{\lVert q\rVert\,\lVert d\rVert}
+$$
+
+4. Narrative retrieval filters by event type (`goal`, `red_card`) when the event is known.
 
 ### Vector Database
 
-Weaviate 1.27 is configured without a built-in vectorizer. All embeddings are generated externally and supplied with each insert, giving the application full control over the embedding pipeline.
+Weaviate 1.27 runs without a built-in vectorizer; embeddings are computed by the application and supplied with each insert.
 
-* `NarrativeArcs` stores historical goal, red-card, and momentum-shift narratives used for retrieval-grounded analysis.
-* `TacticalProfiles` stores team-level tactical fingerprints, including PPDA and pressing features, for similarity-based tactical retrieval.
-* Index population is controlled through offline ingestion workflows, with collection size determined by successfully processed historical data.
+| Collection | Contents |
+|:---|:---|
+| `NarrativeArcs` | Goal and red-card narratives from every StatsBomb WC 2018/2022 match (348 docs) |
+| `TacticalProfiles` | Team-level pressing fingerprints (PPDA, pressing by third) |
+
+### Knowledge Graph
+
+Neo4j 5 stores tournament structure and head-to-head history.
+
+* Nodes: `Team`, `Group`, `BracketRound`, `HistoricalMatch`. Relationships: `PLAYS_IN`, `ADVANCES_TO`, `HEAD_TO_HEAD`.
+* Teams, groups, and bracket rounds come from the same configuration as the simulator.
+* `HEAD_TO_HEAD` edges come from StatsBomb historical matches between teams in the simulator field.
+* `kg/graph_builder.py` builds the graph offline and on startup when the store is empty.
 
 ### Grounded Generation
 
-1. Retrieval returns the most relevant historical context for each query, with top-ranked passages incorporated into generation prompts.
-2. Prompts combine retrieved evidence with computed match metrics such as scoreline, xG, probability changes, and activity signals.
-3. Narrative and briefing generation are constrained to retrieved context and computed outputs to reduce unsupported claims.
-4. When generation is unavailable, deterministic templates reuse the same computed values to provide a reliable fallback response.
+1. Top-ranked retrieved passages go into the generation prompt with computed metrics: scoreline, xG, probability changes, and activity signals.
+2. Narrative and briefing prompts restrict the model to retrieved context and computed outputs.
+3. Match-intel drafts pass the grounding check described in [Match Intelligence Agent](#match-intelligence-agent).
+4. Unavailable generation falls back to deterministic templates over the same values.
 
 
 
@@ -662,241 +900,55 @@ Weaviate 1.27 is configured without a built-in vectorizer. All embeddings are ge
 
 | Worker | Cadence | Responsibility |
 |:---|:---|:---|
-| Producer | 30s | Polls the live feed, reconstructs `MatchState` |
-| Momentum | 30s | EWMA and logistic inference |
+| Producer | 30s | Polls the live feed, builds `MatchState` |
+| Momentum | 30s | Logistic inference from recent shot xG |
 | Intel | 30s | Event, xG, and tactical scoring; live narration |
 | Counterfactual | 30s | Trigger detection; paired Monte Carlo; bracket-impact narration |
 | Tactical | 120s | Style descriptor; cosine match against history |
 | Briefing | 300s | Pre-match window gating; tactical preview |
 | Narrative | 60s | Social signal aggregation; anomaly scoring; arc synthesis |
+| Prediction | 1800s | Background tournament-simulation refresh |
 
-Only seven recurring workers operate in the system, with additional one-time startup tasks for initial intelligence seeding and tactical-index initialization. Simulation requests create short-lived tasks on demand through `predict.py`.
+Two one-time startup tasks populate the tactical index and the knowledge graph when empty. Simulation requests create short-lived tasks on demand through `predict.py`.
 
 ### Redis State Layer
 
-* Redis serves as the central state layer for live match state, momentum snapshots, intelligence feeds, counterfactual results, narrative signals, and simulation outputs.
-* State is managed with TTL-based expiration policies across different match lifecycle stages, from pre-kickoff preparation through completed analysis history.
-* Redis pub/sub channels distribute real-time updates for match state, momentum, intelligence, counterfactual analysis, and narrative events. Tactical and briefing outputs are consumed through their respective state access paths.
+* Redis holds live match state, momentum snapshots, intelligence feeds, counterfactual results, narrative signals, and simulation outputs.
+* Keys carry TTLs per match lifecycle stage, from pre-kickoff through completed-match history.
+* Pub/sub channels carry match state, momentum, intelligence, counterfactual, and narrative updates. Tactical and briefing outputs are read from their Redis keys.
 
-### Event Sourcing
+### State Recovery
 
-* The system uses state reconstruction rather than full event sourcing: `MatchState` is updated in place rather than stored as a durable event log.
-* Worker restarts recover tracking state from persisted Redis snapshots, preventing duplicate processing of previously handled match events.
-* Live timeline changes are detected through match-state validation, allowing workers to reset fixture-specific caches when stale state is detected.
+* `MatchState` is updated in place; there is no durable event log.
+* On restart, workers reload tracking state from Redis and skip already-processed events.
+* Workers reset per-fixture caches when a fixture's match state moves backwards.
 
 ### Async Execution
 
-1. All seven recurring workers and startup initialization tasks run as `asyncio` tasks within a shared event loop and Redis connection rather than separate processes.
-2. Worker failures are isolated through per-task exception handling, preventing a single malformed fixture or failed execution from stopping the broader pipeline.
-3. Blocking and CPU-intensive operations are moved off the event loop through dedicated thread pools for simulations, embeddings, and external API operations.
+1. The producer, the seven workers, and the startup tasks are `asyncio` tasks sharing one event loop and Redis connection, running only on the leader instance.
+2. Each task catches its own exceptions, and a supervisor restarts failed workers with backoff.
+3. Simulations, embeddings, and blocking external API calls run on dedicated thread pools (`ml/executors.py`).
 
 ### Streaming Layer
 
-* SSE endpoints subscribe to Redis pub/sub channels and hydrate initial state from Redis, allowing clients to receive the latest match context immediately after connecting.
-* Frontend consumers use the browser's native `EventSource` reconnection behavior for connection recovery.
-* Real-time match intelligence, momentum, counterfactual, and narrative updates are streamed through SSE, while social-comment data follows a separate polling-based path backed by cached provider results.
-
-
-## Deep Dive: The Six Core Intelligence Engines
-
-These subsystems operate as dedicated reasoning and simulation engines rather than simple LLM wrappers.### 1. Historical Fixture Pairing Engine
-
-The free live feed (`worldcup26.ir`) provides only basic match state such as score, clock, and status, without possession, shots, xG, or tactical telemetry. `StatsBank`, integrated into `hybrid_producer.py`, bridges this gap by mapping each live 2026 fixture to a structurally similar historical match from StatsBomb WC 2018/2022 Open Data and replaying that event stream as a statistical proxy.
-
-**Fixture Matching Pipeline**
-
-* Matching is resolved once per fixture and cached for the full match lifecycle.
-* Uses a three-stage matching strategy:
-    - **Exact pairing:** Matches live team combinations directly against historical StatsBomb fixtures when a previous meeting exists.
-    - **Elo-distance nearest neighbor:** When no direct historical match exists, ranks candidate fixtures by combined Elo similarity:
-
-$$
-\text{cost}=
-\left|\mathrm{Elo}^{sb}_{h}-\mathrm{Elo}^{live}_{h}\right|
-+
-\left|\mathrm{Elo}^{sb}_{a}-\mathrm{Elo}^{live}_{a}\right|
-$$
-
-- Selects the historical fixture with the closest team-strength profile rather than an arbitrary match.
-- **Orientation correction:** Normalizes historical home/away ordering to match the live fixture without modifying the shared historical cache.
-
-**Historical Event Replay**
-
-* After pairing, the historical event stream is processed into chronological match snapshots.
-* Snapshots include derived statistics such as:
-    - Shots and shot quality metrics
-    - Expected goals (xG)
-    - Passing activity
-    - Corners
-    - Fouls and cards
-    - Goalkeeper actions
-* Cards and substitutions are integrated as anonymized proxy events because historical player identities do not correspond to live fixtures.
-
-**Live Integration**
-
-* Each 30-second live update retrieves the historical snapshot corresponding to the current match minute.
-* This keeps derived statistics, xG trends, and momentum signals consistent throughout the full match lifecycle instead of changing proxies between updates.
-### 2. Live Win Probability and Momentum Engine
-
-Two independent low-latency probabilistic models convert live match signals into real-time intelligence: one estimates match outcome probabilities, while the other measures short-term attacking pressure and momentum.
-
-**In-play Win Probability** (`ml/in_play.py`)
-
-* Updates pre-match win/draw/loss priors using live match context including game minute, scoreline, and disciplinary state.
-* Models remaining goals using adjusted Poisson processes that account for team strength and match-state effects.
-* Enumerates possible final score outcomes and aggregates probabilities into win/draw/loss estimates based on the current score differential.
-* Resolves directly from the final score when the match reaches full time instead of relying on probabilistic projections.
-* Converts probability movement into bounded Elo adjustments through `elo_deltas()`.
-* Provides the event-impact signal used by the Counterfactual Engine and live-adjusted tournament simulations.
-
-**Momentum Model** (`ml/momentum_model.py`)
-
-* Produces a separate short-term pressure signal representing which team is currently more likely to create danger.
-* Builds shot pressure through a multi-stage pipeline:
-    - Tracks recent shot activity through a rolling time window.
-    - Converts shot volume into a shots-per-minute rate.
-    - Adjusts for shot quality using on-target ratios.
-    - Applies EWMA smoothing to prevent single-tick spikes from creating unstable momentum swings.
-* Incorporates possession and passing signals with early-match noise controls.
-* Uses a logistic regression model to estimate near-term scoring probability from smoothed match features.
-* Applies exponentially decaying event impacts:
-    - Goals and red cards create immediate momentum shifts.
-    - Effects gradually decay over subsequent minutes instead of persisting indefinitely.
-* Loads trained coefficients from calibration artifacts when available.
-* Falls back to calibrated defaults when model parameters are unavailable or unreliable.
-
-### 3. Live Match Intelligence Engine
-
-Runs a relevance-gating pipeline every 30 seconds per fixture. Most updates are filtered without an LLM call, making generation an exception for high-value moments rather than the default execution path.
-
-**Relevance Scoring Pipeline**
-
-* Computes a priority score using:
-    - Uncovered goals and red cards
-    - Momentum changes since the last narrated snapshot
-    - xG-versus-scoreline divergence
-    - Stoppage-time and extra-time context
-* Uses a content hash over the current scoreline, momentum state, and latest event to detect unchanged states.
-* Prevents repeated narratives when the underlying match context has not meaningfully changed.
-
-**Narrative Gating**
-
-* Low-priority ticks are skipped below the relevance threshold unless a forced trigger occurs.
-* Forced generation paths include:
-    - A baseline match narrative after the fixture reaches an initial live-state milestone.
-    - Periodic tactical analysis based on match-time progression rather than wall-clock time.
-* Match-time scheduling keeps narration cadence consistent even when replay speed or execution timing changes.
-
-**Retrieval-Grounded Analysis**
-
-* Surviving updates are classified into three narrative categories:
-    - **Event reaction:** Triggered by goals or cards.
-    - **xG divergence:** Detects when performance differs from the scoreline.
-    - **Tactical analysis:** Generates broader match-style insights.
-* Each category uses a specialized retrieval path:
-    - Event and xG analysis retrieve from `NarrativeArcs` weaviate vectorDB.
-    - Tactical analysis retrieves from `TacticalProfiles`  weaviate vectorDB.
-* Retrieved context is combined with live match metrics before generation.
-
-**Generation and Fallback Strategy**
-
-* Local LLM generation is reserved for high-value updates such as:
-    - Major events
-    - Forced tactical reads
-    - High-relevance match states
-* Lower-value updates use deterministic templates built from the same computed metrics.
-* Failed generation also falls back to deterministic output, ensuring the intelligence feed remains available without fabricated information.
-
-**Post-Match Event Timeline**
-
-* Maintains a separate event-driven timeline independent of the rolling live narrative stream.
-* Generates retrieval-grounded reactions for every major event, including:
-    - Goals
-    - Red cards
-* Produces a full-time summary for every fixture, including matches without major events by using xG and possession-based analysis.
-### 4. Narrative Intelligence Hub
-
-A 60-second worker aggregates Mastodon, Bluesky, Google Trends, and Wikipedia signals into topic-level feature vectors for anomaly detection. The pipeline operates independently from `MatchState` and live-match processing, using multi-source activity patterns to identify broader real-world events rather than isolated spikes.
-
-**External Signal Collection**
-
-* Four sources are processed concurrently for each tracked topic:
-    - **Mastodon:** Authenticated social search signals with automatic fallback handling.
-    - **Bluesky:** Social activity signals through authenticated API search with session recovery.
-    - **Google Trends:** Search-interest signals collected through `pytrends` with isolated blocking I/O execution.
-    - **Wikipedia:** Recent-change velocity used as a reference activity signal.
-* When providers are unavailable, deterministic mock signals maintain pipeline continuity while preserving topic-specific activity patterns with controlled variability.
-
-**Anomaly Detection Pipeline**
-
-* Maintains topic-specific rolling activity histories to model normal behavior.
-* Uses independent topic-level `IsolationForest` models rather than a shared global baseline, allowing different topics to maintain their own activity profiles.
-* Continuously scores incoming observations to identify unusual activity patterns.
-* Applies rate limiting to avoid repeatedly triggering alerts for the same event.
-
-**Signal Attribution and Narrative Generation**
-
-* Identifies contributing sources by comparing current activity against historical baselines.
-* Maintains a separate trending ranking based on relative activity changes across tracked topics.
-* Converts detected anomalies and trending topics into retrieval queries against the narrative knowledge collection.
-* Combines retrieved historical context with observed signal patterns to generate grounded narratives.
-* Uses output validation and deterministic fallback templates to keep narratives aligned with computed signals and retrieved evidence.
-
-Each execution produces:
-- Anomaly score
-- Source attribution
-- Retrieval-grounded narrative summary
-### 5. Counterfactual What-If Engine
-
-* Evaluates tournament impact beyond simple scoreline changes by measuring how individual match events alter championship probabilities.
-* Converts live events into tournament-wide probability shifts through paired Monte Carlo simulations, powering the match page's "What If?" analysis and bracket-impact predictions.
-* Detects major events such as goals, cards, penalties, and substitutions, then reconstructs the pre-event match state before calculating impact.
-* Computes in-play win probabilities before and after the event and converts the change into a bounded Elo adjustment.
-* Compares pre-event and post-event tournament simulations to quantify each team's championship probability movement.
-* Uses deterministic seeding across simulations to isolate the effect of the event-driven adjustment from random Monte Carlo variance.
-
-$$
-\Delta p_i = p_i^{after} - p_i^{before}
-$$
-
-The aggregate tournament impact is derived from the total probability movement across teams:
-
-$$
-\text{path shift} = \min\left(1,\frac{\sum_i |\Delta p_i|}{2}\right)
-$$
-
-
-### 6. Tournament Simulation Engine
-
-* Simulates the complete 48-team World Cup structure across group and knockout stages, including third-place advancement and complex knockout paths.
-* Provides the prediction backend for tournament forecasts and the Counterfactual Engine without requiring LLM generation or retrieval.
-* Uses fully vectorized NumPy execution for group-stage and knockout simulations instead of sequential per-match loops.
-* Applies optimized array-based processing for bracket advancement and probability aggregation across large Monte Carlo runs.
-* Achieves approximately 0.70 seconds for 50,000 tournament simulations, enabling low-latency prediction and live counterfactual analysis.
+* SSE endpoints subscribe to Redis pub/sub and send the current Redis state on connect.
+* The frontend uses native `EventSource` reconnection.
+* Match intelligence, momentum, counterfactual, and narrative updates stream over SSE. Social-comment samples use a polling endpoint backed by cached provider results.
 
 
 
 ## Performance Optimizations
 
-* **Vectorized Monte Carlo simulation.** Tournament simulation uses NumPy vectorization across group and knockout stages instead of per-simulation loops, enabling 50,000 tournament runs in approximately 0.70 seconds.
-
-* **Dedicated execution pools.** Separate thread pools isolate simulation workloads, embedding operations, and blocking I/O, preventing expensive tasks from delaying real-time asyncio workers and SSE delivery.
-
-* **TTL-based caching with failure resilience.** External data such as bookmaker odds and roster information use cached snapshots with stale-on-failure behavior, reducing dependency on external API latency.
-
-* **Redis-backed caching for expensive computations.** Tactical fingerprints, external lookups, and derived intelligence artifacts are cached to avoid repeated computation and retrieval work.
-
-* **Change-aware state publishing.** Redis writes and pub/sub notifications are only triggered when serialized match state changes, reducing unnecessary SSE updates during idle periods.
-
-* **Rate-limited intelligence generation.** Expensive simulation and LLM generation paths use fixture-level and topic-level cooldowns, preventing redundant inference and computation.
-
-* **Deterministic simulation optimization.** Counterfactual simulations use shared random seeds to isolate event impact and avoid unnecessary recomputation when the adjustment is insignificant.
-
-* **Lazy model initialization.** Embedding models are loaded once and reused across requests through shared module-level instances.
-
-* **Batched offline indexing.** RAG and tactical indexing pipelines encode documents in batches to reduce embedding overhead during knowledge construction.
-
-* **Hybrid retrieval optimization.** Weaviate hybrid search combines dense vector similarity and BM25 retrieval in a single query, avoiding separate retrieval pipelines and client-side merging.
+* **Vectorized Monte Carlo simulation:** group and knockout stages run as NumPy array operations across all simulations.
+* **Dedicated execution pools:** separate thread pools for simulation, embedding, and blocking I/O.
+* **TTL caches with stale-on-failure:** bookmaker odds and rosters are cached and reused when the provider fails.
+* **Redis caching:** tactical fingerprints, external lookups, and derived intelligence artifacts.
+* **Change-aware publishing:** Redis writes and pub/sub notifications fire only when serialized match state changes.
+* **Cooldowns:** fixture-level and topic-level cooldowns on simulation and LLM generation paths.
+* **No-impact skip:** counterfactual events that change neither the score nor the number of players on the pitch skip simulation.
+* **Shared embedding model:** one module-level `SentenceTransformer` instance.
+* **Batched offline indexing:** RAG and tactical indexers encode documents in batches.
+* **Single-query hybrid search:** Weaviate fuses dense and BM25 results server-side.
 
 
 
@@ -906,18 +958,26 @@ $$
 backend/
 ├── agents/
 │   ├── briefing_agent.py            Pre-match briefing generation, Groq only, no local-first tier
+│   ├── briefing_facts.py            As-of-kickoff facts a briefing may cite
 │   ├── counterfactual_agent.py      Paired CRN Monte Carlo simulation and bracket-impact narration
+│   ├── grounding.py                 Deterministic claim check for narration (teams, players, numbers)
+│   ├── intel_graph.py               LangGraph narration graph: retrieve, generate, check, retry, template
 │   ├── match_intel_agent.py         Live event/xG/tactical scoring and narrative generation
 │   ├── narrative_arc_agent.py       Evidence-grounded narrative synthesis for detected spikes
-│   ├── narrative_spike_detector.py  Four-source signal aggregation and per-topic IsolationForest
-│   ├── narrative_topics.py          Fixture-aware dynamic topic tracking, defined but unused
-│   ├── ollama_client.py             Local Ollama call with Groq fallback, shared by three
-│   │                                agents (match intel, counterfactual, narrative arc)
+│   ├── narrative_spike_detector.py  Four-source signal collection (per-hour rates, Trends lift)
+│   ├── narrative_topics.py          Fixture-aware topic tracking for the Narrative Hub
+│   ├── spike_scorer.py              Robust z-score surge scorer with cross-source corroboration
+│   ├── langsmith_tracing.py         Standalone LangSmith @traceable
+│   ├── llm_queue.py                 Priority gates for Ollama and Groq calls
+│   ├── ollama_client.py             Local Ollama call with Groq fallback
 │   ├── rag_indexer.py               Offline StatsBomb narrative document extraction and indexing
 │   ├── tactical_agent.py            Live style descriptor and cosine match against TacticalProfiles
 │   └── weaviate_client.py           Weaviate connection, collection schema, hybrid search wrapper
 ├── api/
-│   ├── main_hybrid.py               FastAPI app, lifespan worker orchestration, single-process guard
+│   ├── main_hybrid.py               FastAPI app and lifespan startup
+│   ├── match_timeline.py            Match state as of a given event, from the event timeline
+│   ├── supervisor.py                Redis leader lock and supervised workers
+│   ├── tournament_state.py          Played results and live matches for the simulator
 │   ├── routes/
 │   │   ├── _security.py             Trigger-token dependency for debug endpoints
 │   │   ├── _sse.py                  Shared Redis pub/sub-backed SSE generator
@@ -926,9 +986,9 @@ backend/
 │   │   ├── counterfactual_routes.py Counterfactual feed, prediction, and live-prob endpoints
 │   │   ├── group_table.py           Live group-stage standings from completed fixtures
 │   │   ├── intel.py                 Intel feed and SSE stream endpoints
-│   │   ├── lineups.py                Tiered lineup resolution across four providers
+│   │   ├── lineups.py               Tiered lineup resolution: ESPN, API-Sports, then Zafronix projected XI
 │   │   ├── match.py                 Fixture list and summary endpoints
-│   │   ├── match_stream.py           Match-state SSE stream
+│   │   ├── match_stream.py          Match-state SSE stream
 │   │   ├── momentum.py              Momentum snapshot and SSE stream
 │   │   ├── narrative.py             Spike, trending, arc, and narrative SSE endpoints
 │   │   ├── narrative_comments.py    Comment sample storage and retrieval
@@ -943,28 +1003,61 @@ backend/
 │   └── workers/
 │       ├── briefing_worker.py       300s kickoff-window scan and briefing trigger
 │       ├── counterfactual_worker.py 30s trigger detection and simulation dispatch
-│       ├── hybrid_producer.py       30s live-feed poll and MatchState reconstruction
 │       ├── intel_worker.py          30s event/momentum scoring and narration dispatch
-│       ├── momentum_worker.py       30s EWMA and logistic inference per fixture
+│       ├── match_producer.py        30s ESPN poll with snapshot fallback, MatchState build
+│       ├── momentum_worker.py       30s logistic momentum inference per fixture
 │       ├── narrative_worker.py      60s signal aggregation, anomaly scoring, arc synthesis
+│       ├── prediction_worker.py     1800s background tournament-simulation refresh
 │       └── tactical_worker.py       120s tactical fingerprint refresh
+├── eval/
+│   ├── eval_anomaly_threshold.py    Surge-detector eval on simulated topic-days
+│   ├── eval_crn_variance.py         CRN variance-reduction eval
+│   ├── eval_generation_ragas.py     RAGAS faithfulness eval (generate / judge stages)
+│   ├── eval_inplay_calibration.py   In-play W/D/L calibration eval
+│   └── eval_retrieval.py            Retrieval eval against the live NarrativeArcs index
+├── feeds/
+│   ├── build_snapshot.py            Builds the committed WC 2026 snapshot
+│   ├── espn.py                      ESPN public API client and pure parsers
+│   └── snapshot.py                  Read side of the snapshot
 ├── ml/
 │   ├── backtest_elo_wdl.py          Elo calibration backtest against real WC 2018/2022 results
+│   ├── elo_ratings.py               Point-in-time World Football Elo from martj42 results
+│   ├── embedding_model.py           Shared all-MiniLM-L6-v2 instance, loaded once
 │   ├── executors.py                 Dedicated thread pools for simulation, embedding, and I/O
-│   ├── in_play.py                   Poisson in-play W/D/L model and Elo delta conversion
-│   ├── momentum_model.py            Online EWMA and logistic momentum inference
+│   ├── fit_shot_xg.py               Fits and validates the shot xG model
+│   ├── in_play.py                   Prior-calibrated Poisson in-play W/D/L model and Elo delta conversion
+│   ├── momentum_features.py         Momentum features shared by trainer and live model
+│   ├── momentum_model.py            Stateless logistic momentum inference
 │   ├── momentum_trainer.py          Offline momentum coefficient training and validation gate
 │   ├── odds_api_client.py           Odds API client with TTL cache and stale-on-failure fallback
-│   ├── prior_builder.py             Elo-to-WDL and Shin de-vig probability construction
+│   ├── prior_builder.py             Elo-to-WDL and exact Shin de-vig probability construction
+│   ├── shot_xg.py                   Shot-level model xG for ESPN plays
 │   ├── schemas/
 │   │   └── momentum_schema.py       Pydantic momentum schema, defined but unused at runtime
 │   ├── statsbomb.py                 Shared StatsBomb parsing constants and helpers
 │   ├── tactical_indexer.py          Offline PPDA feature extraction and TacticalProfiles indexing
 │   ├── team_names.py                Team name alias mapping across three naming systems
 │   ├── tournament_sim.py            Vectorized Monte Carlo group and knockout simulator
-│   └── wc_2026_config.py            Static 48-team Elo configuration, groups, and bracket
+│   ├── wc2026_format.py             FIFA WC 2026 knockout format (matches 73-104)
+│   └── wc_2026_config.py            Real 48-team field, groups and Elo, loaded from the snapshot
+├── kg/
+│   ├── schema.py                    Node/relationship constants + idempotent constraint DDL
+│   ├── neo4j_client.py              Degrade-on-failure driver wrapper (mirrors weaviate_client.py)
+│   └── graph_builder.py             Static graph + head-to-head edge population, CLI entrypoint
+├── monitoring/
+│   └── metrics.py                   Prometheus Counter/Histogram/Gauge objects for the workers + SSE
+├── tests/                           pytest suite (math models, runtime, producer, snapshot, KG schema)
+├── data/wc2026/                     Committed WC 2026 snapshot (fallback feed)
+├── *_report.json                    Eval reports the Evaluation Results tables are built from
 ├── Dockerfile
-└── requirements.txt
+├── requirements.txt
+└── requirements-dev.txt             pytest, ruff, RAGAS (offline eval only)
+
+monitoring/                          Prometheus scrape config + Grafana provisioning/dashboards
+
+.github/workflows/ci.yml             ruff lint gate + pytest + Docker build check on push/PR to main
+
+data/                                README demo GIF and screenshots
 
 ui/
 ├── app/
@@ -984,12 +1077,14 @@ ui/
 │   ├── useMatchBriefing.ts, useMatchPrediction.ts, usePredictStream.ts, useTactical.ts
 │   │                                Polling hooks for non-SSE endpoints
 │   └── useTheme.ts                  Light/dark theme state
-├── lib/flag.ts
+├── lib/api.ts, flag.ts, via.ts
 ├── types/match.ts, predict.ts       TypeScript mirrors of the backend Pydantic schemas
 └── package.json, next.config.js, tsconfig.json
 
-docker-compose.yml     Redis 7 + Weaviate 1.27 + API, single replica; UI runs separately
-weaviate_data/         Bind-mounted Weaviate volume, runtime data, not source
+docker-compose.yml     Redis 7 + Weaviate 1.27 + Neo4j 5 + Prometheus + Grafana + API,
+                       single API replica; UI runs separately
+weaviate_data/         Bind-mounted Weaviate volume, runtime data, git-ignored (rebuilt by the indexers)
+neo4j_data/            Bind-mounted Neo4j volume, runtime data, git-ignored (rebuilt by the graph builder)
 ```
 
 
@@ -998,39 +1093,60 @@ weaviate_data/         Bind-mounted Weaviate volume, runtime data, not source
 
 ### Prerequisites
 
-* Docker (for Redis 7 and Weaviate 1.27)
+* Docker (for Redis 7, Weaviate 1.27, Neo4j 5, Prometheus, and Grafana)
 * Python 3.12
 * Node.js (for the Next.js UI)
-* Ollama, optional, required only to engage the local-first LLM tier (`mistral:7b-instruct-q4_K_M`)
+* Ollama (optional, for the local-first LLM tier: `mistral:7b-instruct-q4_K_M`)
 
 ### Install and Run
 
 ```bash
-# infrastructure
-docker compose up -d redis weaviate
+# secrets: docker compose requires the four values marked required
+cp .env.example .env
 
-# backend
+# infrastructure
+docker compose up -d redis weaviate neo4j prometheus grafana
+
+# backend (outside compose, set REDIS_URL in .env with the Redis password)
 cd backend
 pip install -r requirements.txt
 ollama pull mistral:7b-instruct-q4_K_M   # optional
 uvicorn api.main_hybrid:app --reload --port 8000
 
 # frontend
-cd ui
+cd ../ui
 npm install
 npm run dev
 ```
 
+**Environment**
+
+* `GROQ_API_KEY` enables the cloud LLM tier and the briefing agent.
+* The other keys in `.env.example` are optional; without them the system uses Elo instead of market odds, mock social signals, and fewer lineup tiers.
+* Without `TRIGGER_TOKEN` the debug trigger endpoints are unauthenticated.
+
+**Local dashboards**
+
+* Grafana: `localhost:3001` (dashboard: **PitchPulse → PitchPulse — API & Worker Health**)
+* Prometheus: `localhost:9090`
+* Neo4j Browser: `localhost:7474`
+
 ### Populate the Knowledge Base (offline, one time)
 
+`weaviate_data/` is not committed. Build the stores once:
+
 ```bash
-python -m agents.rag_indexer        # NarrativeArcs, ~500 StatsBomb matches
+python -m agents.rag_indexer        # NarrativeArcs, every StatsBomb WC 2018/2022 match (348 docs)
 python -m ml.tactical_indexer       # TacticalProfiles, also auto-runs on first empty-collection startup
+python -m kg.graph_builder          # Neo4j: teams/groups/bracket + head-to-head edges, also auto-runs on first empty-graph startup
 ```
 
-### Run the Elo Calibration Backtest
+### Run the Tests and Elo Calibration Backtest
 
 ```bash
+cd backend
+pip install -r requirements-dev.txt
+PYTHONPATH=. pytest tests/
 PYTHONPATH=. python ml/backtest_elo_wdl.py --json report.json
 ```
 
@@ -1039,31 +1155,25 @@ PYTHONPATH=. python ml/backtest_elo_wdl.py --json report.json
 | Category | Stack |
 |:---|:---|
 | Languages | Python 3.12, TypeScript |
-| ML | NumPy, scikit-learn (`IsolationForest`), `sentence-transformers` (`all-MiniLM-L6-v2`) |
-| Backend | FastAPI, Uvicorn, `sse-starlette`, Pydantic v2, `httpx`, `redis.asyncio`, `weaviate-client` |
+| ML | NumPy (vectorized simulator, logistic shot-xG and momentum fits), `sentence-transformers` (`all-MiniLM-L6-v2`) on PyTorch |
+| Backend | FastAPI, Uvicorn, `sse-starlette`, Pydantic v2, `httpx`, `redis.asyncio`, `weaviate-client`, `neo4j`, `prometheus-fastapi-instrumentator` |
 | Frontend | Next.js 14 App Router, React 18, `next-themes` |
-| Data | Redis 7, Weaviate 1.27 |
+| Data | Redis 7, Weaviate 1.27, Neo4j 5 |
+| Observability | Prometheus, Grafana, LangSmith (agent/LLM tracing, standalone SDK) |
+| Orchestration | LangGraph (match-intel narration graph) |
 | Infra | Docker Compose, `python-dotenv`, `python:3.12-slim` base image, `gcc` (build-time, scientific Python wheels) |
-| Dev / Testing | `pytest`, `ruff` |
-| External data | StatsBomb Open Data, `worldcup26.ir`, The Odds API, API-Sports, Zafronix, Mastodon, Bluesky, Google Trends (`pytrends`), Wikipedia REST |
-| AI | Ollama (`mistral:7b-instruct-q4_K_M`), Groq (`llama-3.3-70b-versatile`) |
+| Dev / Testing / CI | `ruff`, `pytest`, `fakeredis`, GitHub Actions, RAGAS (offline eval) |
+| External data | ESPN public API, StatsBomb Open Data, martj42 results, The Odds API, API-Sports, Zafronix, Mastodon, Bluesky, Google Trends (`pytrends`), Wikipedia REST |
+| AI | Ollama (`mistral:7b-instruct-q4_K_M`), Groq (`llama-3.1-8b-instant`, `llama-3.3-70b-versatile` on 429) |
 
 ## Limitations
 
-* **Predictions remain probabilistic.** Tournament simulations produce probability distributions with confidence intervals rather than deterministic outcomes. Model performance depends on calibration quality and historical data coverage.
-
-* **The architecture requires persistent execution.** Long-running workers, in-memory analytical state, and background processing make the platform better suited for persistent services than request-based serverless environments.
-
-* **Live updates are bounded by upstream data availability.** Match state refreshes depend on the polling interval of the external feed, so events occurring between polls may not appear immediately.
-
-* **External signal quality depends on provider availability.** Social and search sources operate under external API limits and may fall back to synthetic signals when unavailable.
-
-* **Live 2026 match statistics use historical proxies.** When real-time telemetry is unavailable, live analytics such as possession, shots, and xG are approximated using historically similar StatsBomb matches rather than actual in-game tracking data.
-
-* **The platform uses a hybrid free-data strategy.** The system combines StatsBomb Open Data with free live match feeds instead of relying on paid providers, trading complete live telemetry coverage for broader accessibility and reproducibility.
-
-* **Counterfactual analysis estimates probability impact rather than replaying alternate match decisions.** The engine models event-driven changes in team strength and tournament outcomes, not alternate tactics or coaching decisions.
-
-* **Retrieval grounding improves reliability but does not guarantee factual generation.** Prompt constraints, filtering, and deterministic fallbacks reduce unsupported outputs, but generated narratives are not independently scored with a faithfulness metric.
-
-* **Single-process execution limits scaling strategy.** Horizontal scaling is achieved through independent application instances sharing Redis and Weaviate rather than increasing worker count within one process.
+* StatsBomb Open Data contains World Cup matches from 2018 and 2022.
+* ESPN's public API is undocumented and keyless. ESPN publishes no xG; all xG comes from `ml/shot_xg.py`.
+* Match state updates at the 30-second poll interval.
+* Social and search sources are rate-limited. Unavailable sources show mock values, which are not scored.
+* The surge detector is evaluated on synthetic data only.
+* Counterfactuals model event-driven changes in team strength, not alternate tactics or coaching decisions.
+* Raw narration scores 0.684 RAGAS faithfulness; 82% of sampled narrations contain at least one unsupported claim.
+* The producer, workers, and LLM calls run on the leader instance. Extra instances add HTTP and SSE capacity only.
+* The workers require a long-running host; the backend does not run on request-based serverless platforms.
