@@ -1,112 +1,65 @@
 """
-FIFA World Cup 2026 Tournament Configuration
+WC 2026 tournament configuration.
 
-Central configuration module defining the team universe, group assignments,
-and knockout bracket structure used across the simulation pipeline.
+Loaded from the committed snapshot (data/wc2026/tournament.json, built by
+feeds/build_snapshot.py from ESPN, martj42 and FIFA Annex C).
 
-The configuration provides:
-    - Team metadata (name, group, Elo rating, FIFA ranking)
-    - Lookup mappings for fast team access
-    - Group-stage composition
-    - Round-of-32 bracket ordering
-
-All downstream simulation components consume these definitions to ensure a
-consistent tournament structure across probability generation, Monte Carlo
-simulation, and API responses.
+    WC2026_TEAMS       48 teams with group and point-in-time Elo (as of the
+                       opening match; see ml/elo_ratings.py)
+    GROUPS             letter → teams in the group
+    FIXTURES           all 104 fixtures (group + knockout, with FIFA match_no)
+    GROUP_FIXTURES     the 72 group matches, real home/away and neutral flag
+    THIRD_PLACE_TABLE  Annex C: sorted qualifying-third groups → {"1A": "E", ...}
 """
 
+from __future__ import annotations
+
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, List
+
+DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "wc2026"
 
 
 @dataclass
 class TeamConfig:
     name: str
-    group: str
-    elo: float
-    fifa_rank: int = 0
+    group: str  # 'A' .. 'L'
+    elo: float  # World Football Elo before the opening match
+    fifa_rank: int = 0  # Elo rank within the field, for display / sorting
+    espn_id: str = ""
 
+
+def _load() -> dict:
+    return json.loads((DATA_DIR / "tournament.json").read_text(encoding="utf-8"))
+
+
+_SNAPSHOT = _load()
 
 WC2026_TEAMS: List[TeamConfig] = [
-    # Pot 1 — group seeds
-    TeamConfig("Argentina", "A", 1950, 1),
-    TeamConfig("France", "B", 1900, 2),
-    TeamConfig("England", "C", 1870, 4),
-    TeamConfig("USA", "D", 1720, 11),
-    TeamConfig("Spain", "E", 1850, 3),
-    TeamConfig("Mexico", "F", 1700, 15),
-    TeamConfig("Germany", "G", 1820, 6),
-    TeamConfig("Netherlands", "H", 1810, 7),
-    TeamConfig("Canada", "I", 1670, 14),
-    TeamConfig("Croatia", "J", 1780, 9),
-    TeamConfig("Italy", "K", 1770, 10),
-    TeamConfig("Morocco", "L", 1760, 12),
-    # Pot 2
-    TeamConfig("Colombia", "A", 1750, 13),
-    TeamConfig("Uruguay", "B", 1740, 16),
-    TeamConfig("Japan", "C", 1730, 17),
-    TeamConfig("Brazil", "D", 1860, 5),
-    TeamConfig("Senegal", "E", 1710, 18),
-    TeamConfig("Portugal", "F", 1830, 8),
-    TeamConfig("South Korea", "G", 1690, 22),
-    TeamConfig("Denmark", "H", 1680, 21),
-    TeamConfig("Belgium", "I", 1790, 20),
-    TeamConfig("Switzerland", "J", 1660, 19),
-    TeamConfig("Austria", "K", 1650, 23),
-    TeamConfig("Ecuador", "L", 1640, 24),
-    # Pot 3
-    TeamConfig("Peru", "A", 1630, 25),
-    TeamConfig("Iran", "B", 1620, 26),
-    TeamConfig("Australia", "C", 1610, 27),
-    TeamConfig("Nigeria", "D", 1600, 28),
-    TeamConfig("Poland", "E", 1590, 29),
-    TeamConfig("Serbia", "F", 1580, 30),
-    TeamConfig("Turkey", "G", 1570, 31),
-    TeamConfig("Chile", "H", 1560, 32),
-    TeamConfig("Ivory Coast", "I", 1550, 33),
-    TeamConfig("Egypt", "J", 1540, 34),
-    TeamConfig("Saudi Arabia", "K", 1530, 35),
-    TeamConfig("Ghana", "L", 1520, 36),
-    # Pot 4
-    TeamConfig("Venezuela", "A", 1500, 37),
-    TeamConfig("Algeria", "B", 1490, 38),
-    TeamConfig("South Africa", "C", 1480, 39),
-    TeamConfig("Qatar", "D", 1510, 40),
-    TeamConfig("Tunisia", "E", 1470, 41),
-    TeamConfig("Paraguay", "F", 1460, 42),
-    TeamConfig("Panama", "G", 1450, 43),
-    TeamConfig("Costa Rica", "H", 1440, 44),
-    TeamConfig("Wales", "I", 1430, 45),
-    TeamConfig("Scotland", "J", 1420, 46),
-    TeamConfig("Honduras", "K", 1410, 47),
-    TeamConfig("Cameroon", "L", 1400, 48),
+    TeamConfig(t["name"], t["group"], float(t["elo"]), espn_id=t.get("espn_id", ""))
+    for t in _SNAPSHOT["teams"]
 ]
+for _rank, _t in enumerate(sorted(WC2026_TEAMS, key=lambda t: -t.elo), start=1):
+    _t.fifa_rank = _rank
 
 TEAM_BY_NAME: Dict[str, TeamConfig] = {t.name: t for t in WC2026_TEAMS}
 
 GROUPS: Dict[str, List[TeamConfig]] = {}
 for _t in WC2026_TEAMS:
     GROUPS.setdefault(_t.group, []).append(_t)
+GROUPS = dict(sorted(GROUPS.items()))
 
+FIXTURES: List[dict] = _SNAPSHOT["fixtures"]
+FIXTURE_BY_ID: Dict[int, dict] = {f["fixture_id"]: f for f in FIXTURES}
+GROUP_FIXTURES: List[dict] = [f for f in FIXTURES if f["stage"] == "group"]
+KO_FIXTURE_BY_MATCH_NO: Dict[int, dict] = {
+    f["match_no"]: f for f in FIXTURES if f.get("match_no")
+}
+FINAL_STANDINGS: Dict[str, List[dict]] = _SNAPSHOT["groups"]
+ELO_ASOF: str = _SNAPSHOT["elo_asof"]
 
-R32_BRACKET = [
-    # Winners A-H vs best-8 thirds .
-    (0, 31),
-    (1, 30),
-    (2, 29),
-    (3, 28),
-    (4, 27),
-    (5, 26),
-    (6, 25),
-    (7, 24),
-    # Winners I-L vs runners-up A-D.
-    (8, 12),
-    (9, 13),
-    (10, 14),
-    (11, 15),
-    # Runners-up E-L vs each other.
-    (16, 17),
-    (18, 19),
-    (20, 21),
-    (22, 23),
-]
+THIRD_PLACE_TABLE: Dict[str, Dict[str, str]] = json.loads(
+    (DATA_DIR / "third_place_table.json").read_text(encoding="utf-8")
+)["table"]

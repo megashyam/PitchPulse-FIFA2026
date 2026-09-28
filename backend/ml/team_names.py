@@ -1,59 +1,57 @@
-"""Canonical team-name aliases shared by the simulator, feeds, and StatsBomb.
+"""
+Team name aliases.
 
-The project uses three naming universes: simulator names, live-feed variants,
-and StatsBomb open-data names. This module provides the single mapping layer
-between them and validates the feed aliases against the simulator's canonical
-team set at import time.
+Canonical names are ESPN's displayName (used by the feed and the snapshot).
+Other spellings (martj42 results, StatsBomb, Opta commentary, simulator
+names) resolve through canonical().
 """
 
 from __future__ import annotations
 
 from typing import Dict, Set
 
-from ml.wc_2026_config import WC2026_TEAMS
-
-SIM_NAMES: Set[str] = {t.name for t in WC2026_TEAMS}
-
-_TO_SIM: Dict[str, str] = {
-    "United States": "USA",
-    "United States of America": "USA",
-    "US": "USA",
-    "Korea Republic": "South Korea",
-    "IR Iran": "Iran",
+_ALIASES: Dict[str, str] = {
+    # martj42 / commentary / StatsBomb / legacy spellings → ESPN
+    "USA": "United States",
+    "US": "United States",
+    "United States of America": "United States",
+    "Turkey": "Türkiye",
+    "Turkiye": "Türkiye",
+    "Czech Republic": "Czechia",
+    "DR Congo": "Congo DR",
+    "Democratic Republic of the Congo": "Congo DR",
+    "Bosnia and Herzegovina": "Bosnia-Herzegovina",
     "Côte d'Ivoire": "Ivory Coast",
     "Cote d'Ivoire": "Ivory Coast",
-    "Holland": "Netherlands",
-    "Türkiye": "Turkey",
-    "Turkiye": "Turkey",
-}
-
-_TO_STATSBOMB: Dict[str, str] = {
-    "USA": "United States",
-    "United States": "United States",
+    "Cabo Verde": "Cape Verde",
+    "Curacao": "Curaçao",
     "Korea Republic": "South Korea",
     "IR Iran": "Iran",
-    "Ivory Coast": "Côte d'Ivoire",
-    "Cote d'Ivoire": "Côte d'Ivoire",
     "Holland": "Netherlands",
-    "Türkiye": "Turkey",
-    "Turkiye": "Turkey",
 }
 
-_bad = {v for v in _TO_SIM.values() if v not in SIM_NAMES}
-assert not _bad, f"team_names._TO_SIM maps to names outside WC2026_TEAMS: {_bad}"
+
+def canonical(name: str) -> str:
+    return _ALIASES.get(name, name)
 
 
 def to_sim(name: str) -> str:
-    """Resolve a feed or display name to the simulator's canonical name."""
-    if name in SIM_NAMES:
-        return name
-    return _TO_SIM.get(name, name)
-
-
-def to_statsbomb(name: str) -> str:
-    """Resolve a simulator or feed name to the StatsBomb open-data name."""
-    return _TO_STATSBOMB.get(name, name)
+    """Any spelling → simulator name; unknown names pass through unchanged."""
+    return canonical(name)
 
 
 def is_sim_team(name: str) -> bool:
-    return to_sim(name) in SIM_NAMES
+    return canonical(name) in _sim_names()
+
+
+def _sim_names() -> Set[str]:
+    # Lazy: the snapshot builder imports this module before a snapshot exists.
+    from ml.wc_2026_config import WC2026_TEAMS
+
+    return {t.name for t in WC2026_TEAMS}
+
+
+def __getattr__(attr: str):
+    if attr == "SIM_NAMES":
+        return _sim_names()
+    raise AttributeError(attr)

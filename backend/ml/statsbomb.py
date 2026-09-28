@@ -1,54 +1,56 @@
 """
-Shared StatsBomb data utilities used across the football intelligence pipeline.
-
-This module provides the canonical source for:
-
-    StatsBomb Dataset
-            |
-            |
-    ----------------------
-    |         |          |
- Producer  Trainer  Indexers
-    |         |          |
-    ----------------------
-            |
-      Consistent Features
-
-
-Core responsibilities:
-    - Maintain shared StatsBomb dataset configuration.
-    - Normalize event parsing across training and inference pipelines.
-    - Provide shot-quality and goalkeeper event classifiers.
-    - Handle card extraction from different StatsBomb event schemas.
-    - Ensure identical preprocessing logic between ML training and serving.
-
-
-Design goal:
-
-Centralizing these utilities prevents feature drift between:
-
-    Training Pipeline
-            |
-            |
-     Momentum Model
-            |
-            |
-    Runtime Inference
-
-
-The module acts as the data contract layer between raw StatsBomb
-events and downstream ML systems.
+StatsBomb open-data constants and event parsing helpers.
 """
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Optional
 
+import httpx
+
 SB_BASE = "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
-COMPETITION_ID = 43  # FIFA World Cup
-SEASON_IDS = [106, 3]  # WC 2022, WC 2018
+COMPETITION_ID = 43            # FIFA World Cup
+SEASON_IDS = [106, 3]          # WC 2022, WC 2018
+CACHE_DIR = Path(__file__).resolve().parent.parent / ".cache" / "statsbomb"
 
 
+def load(path: str, client: Optional[httpx.Client] = None) -> list | dict:
+    """GET {SB_BASE}/{path} with an on-disk cache. Blocking."""
+    f = CACHE_DIR / path
+    if f.exists():
+        return json.loads(f.read_text(encoding="utf-8"))
+    own = client is None
+    client = client or httpx.Client(timeout=60.0, follow_redirects=True)
+    try:
+        r = client.get(f"{SB_BASE}/{path}")
+        r.raise_for_status()
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(r.text, encoding="utf-8")
+        return r.json()
+    finally:
+        if own:
+            client.close()
+
+
+def goals_in_regulation(events: list[dict], home: str, away: str) -> tuple[int, int]:
+    """Score after 90 minutes (periods 1-2), own goals ("Own Goal For") included."""
+    score = {home: 0, away: 0}
+    for e in events:
+        if e.get("period", 1) > 2:
+            continue
+        etype = (e.get("type") or {}).get("name", "")
+        team = (e.get("team") or {}).get("name", "")
+        is_goal = etype == "Own Goal For" or (
+            etype == "Shot" and ((e.get("shot") or {}).get("outcome") or {}).get("name") == "Goal"
+        )
+        if is_goal and team in score:
+            score[team] += 1
+    return score[home], score[away]
+
+# Shot outcomes that count as "on target". Compared case-insensitively —
+# StatsBomb data contains both "Saved to Post" and "Saved To Post" variants.
 ON_TARGET_SHOT_OUTCOMES = {
     "goal",
     "saved",
@@ -67,65 +69,17 @@ GK_SAVE_OUTCOMES = {
 
 
 def shot_is_on_target(outcome_name: str) -> bool:
-    """
-    Determine whether a shot outcome represents an on-target attempt.
-
-    StatsBomb contains multiple naming variations for goalkeeper saves and
-    post saves, so outcomes are normalized before lookup.
-
-    Args:
-        outcome_name:
-            Raw StatsBomb shot outcome label.
-
-    Returns:
-        True if the shot counts as on target, otherwise False.
-    """
     return (outcome_name or "").strip().lower() in ON_TARGET_SHOT_OUTCOMES
 
 
 def gk_is_save(outcome_name: str) -> bool:
-    """
-    Determine whether an event represents a goalkeeper save action.
-
-    Handles multiple StatsBomb goalkeeper outcome labels by normalizing
-    event names before classification.
-
-    Args:
-        outcome_name:
-            Raw StatsBomb goalkeeper outcome label.
-
-    Returns:
-        True if the outcome represents a goalkeeper save, otherwise False.
-    """
     return (outcome_name or "").strip().lower() in GK_SAVE_OUTCOMES
 
 
 def card_from_event(ev: dict) -> Optional[str]:
-    """
-    Extract disciplinary card information from a StatsBomb event.
+    """'red' | 'yellow' | None for a StatsBomb event.
 
-    StatsBomb stores cards under different event containers depending on
-    the event type. This function normalizes those variations into a simple
-    downstream representation.
-
-    Handles:
-        - Foul Committed events
-        - Bad Behaviour events
-        - Second yellow → red conversion
-
-    Args:
-        ev:
-            Raw StatsBomb event dictionary.
-
-    Returns:
-        "red":
-            Player/team received a sending off.
-
-        "yellow":
-            Yellow card event.
-
-        None:
-            Event does not contain a recognized card.
+    Reads Foul Committed and Bad Behaviour cards; a second yellow is red.
     """
     etype = (ev.get("type") or {}).get("name", "")
     if etype == "Foul Committed":
@@ -144,25 +98,7 @@ def card_from_event(ev: dict) -> Optional[str]:
 
 
 def sort_events(events: list[dict]) -> list[dict]:
-    """
-    Sort StatsBomb events into chronological match order.
-
-    Ensures every downstream consumer processes events using the same
-    ordering, preventing subtle differences between training and inference
-    feature generation.
-
-    Sorting priority:
-        1. Match period
-        2. Match minute
-        3. Original event index
-
-    Args:
-        events:
-            Unordered list of raw StatsBomb event dictionaries.
-
-    Returns:
-        Chronologically ordered list of StatsBomb events.
-    """
+    """Events in chronological order, without period 5 (penalty shootout)."""
     return sorted(
         (e for e in events if e.get("period", 1) < 5),
         key=lambda e: (e.get("period", 1), e.get("minute", 0), e.get("index", 0)),
