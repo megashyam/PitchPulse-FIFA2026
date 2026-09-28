@@ -1,12 +1,9 @@
-"""Pydantic models and compatibility aliases for match state.
+"""
+Pydantic models for match state.
 
-Central schema shared by:
-- API ingestion workers
-- Redis match-state storage
-- AI agents (intel/counterfactual/briefing)
-- Frontend response serialization
-
-Keeps every service aligned on the same match representation.
+    MatchState.stats_source       "espn" | "unavailable"
+    MatchState.elapsed_estimated  True when the minute was synthesised from
+                                  a status string (UI renders "≈30'")
 """
 
 from datetime import datetime, timezone
@@ -16,43 +13,33 @@ from pydantic import BaseModel, Field
 
 
 class ApiFixtureStatus(BaseModel):
-    """Raw fixture status received from external football API."""
-
     long: str
     short: str
     elapsed: Optional[int] = None
 
 
 class ApiTeamInfo(BaseModel):
-    """Raw team metadata from external provider."""
-
     id: int
     name: str
     logo: str
     winner: Optional[bool] = None
 
 
-# Backward compatibility for older imports.
+# Alias for older importers.
 ApitTeamInfo = ApiTeamInfo
 
 
 class ApiGoals(BaseModel):
-    """Raw score payload."""
-
     home: Optional[int] = None
     away: Optional[int] = None
 
 
 class ApiEventTime(BaseModel):
-    """Timestamp information for match events."""
-
     elapsed: int
     extra: Optional[int] = None
 
 
 class ApiEvent(BaseModel):
-    """Raw event format returned by football provider."""
-
     time: ApiEventTime
     team: dict
     player: dict
@@ -63,27 +50,16 @@ class ApiEvent(BaseModel):
 
 
 class ApiStatEntry(BaseModel):
-    """Single statistic entry from API response."""
-
     type: str
     value: Optional[str | int | float] = None
 
 
 class ApiTeamStats(BaseModel):
-    """Raw team statistics payload."""
-
     team: dict
     statistics: list[ApiStatEntry]
 
 
 class TeamStats(BaseModel):
-    """
-    Normalized team statistics used internally.
-
-    Converts inconsistent provider fields into stable names
-    consumed by models, prompts, and frontend components.
-    """
-
     possession: float = 0.0
     shots_total: int = 0
     shots_on_goal: int = 0
@@ -101,16 +77,11 @@ class TeamStats(BaseModel):
 
     @classmethod
     def from_api(cls, raw: ApiTeamStats) -> "TeamStats":
-        """
-        Transform provider-specific statistics into our internal schema.
+        lookup: dict[str, Optional[str | int | float]] = {
+            entry.type: entry.value for entry in raw.statistics
+        }
 
-        Handles missing values, percentage strings, and inconsistent
-        field names from upstream APIs.
-        """
-
-        lookup = {entry.type: entry.value for entry in raw.statistics}
-
-        def _f(v, default=0.0):
+        def _f(v, default: float = 0.0) -> float:
             try:
                 if v is None:
                     return default
@@ -141,16 +112,6 @@ class TeamStats(BaseModel):
 
 
 class MatchEvent(BaseModel):
-    """
-    Normalized match event used by AI agents.
-
-    Examples:
-    - goal
-    - penalty_goal
-    - red_card
-    - substitution
-    """
-
     elapsed: int
     extra: Optional[int] = None
     team_id: int
@@ -158,13 +119,11 @@ class MatchEvent(BaseModel):
     player_name: Optional[str] = None
     type: str
     detail: Optional[str] = None
+    # Provenance: "espn" (real feed) | "synthesised" (from a score delta).
+    source: str = "espn"
 
     @classmethod
     def from_api(cls, raw: ApiEvent) -> "MatchEvent":
-        """
-        Convert external event format into internal event vocabulary.
-        """
-
         return cls(
             elapsed=raw.time.elapsed,
             extra=raw.time.extra,
@@ -177,69 +136,37 @@ class MatchEvent(BaseModel):
 
 
 class MatchState(BaseModel):
-    """
-    Canonical match object stored in Redis.
-
-    This is the main state object consumed by:
-    - live probability models
-    - counterfactual engine
-    - AI narrative agents
-    - frontend match page
-    """
-
     fixture_id: int
-
-    # Tournament metadata
     league_id: int = 1
     season: int = 2026
     round: str = ""
-
-    # Match metadata
     venue: str = ""
     referee: str = ""
-
-    # Current game state
     status_short: str = "NS"
     status_long: str = "Not Started"
     elapsed: Optional[int] = None
-
-    # True when elapsed was estimated instead of directly provided.
-    elapsed_estimated: bool = False
-
+    elapsed_extra: Optional[int] = None  # stoppage minutes ("90'+4'" → 4)
+    elapsed_estimated: bool = False  # minute synthesised from status string
     kickoff_time: Optional[datetime] = None
 
-    # Home team state
     home_id: int = 0
     home_name: str = ""
     home_logo: str = ""
     home_score: int = 0
     home_stats: TeamStats = Field(default_factory=TeamStats)
 
-    # Away team state
     away_id: int = 0
     away_name: str = ""
     away_logo: str = ""
     away_score: int = 0
     away_stats: TeamStats = Field(default_factory=TeamStats)
 
-    # Timeline events driving AI analysis.
     events: list[MatchEvent] = Field(default_factory=list)
 
-    """
-    Data provenance fields.
+    # Provenance of home_stats/away_stats: "espn" (real match stats; xG is
+    # our shot model over real shots, see ml/shot_xg.py) | "unavailable".
+    stats_source: str = "unavailable"
+    home_pens: Optional[int] = None
+    away_pens: Optional[int] = None
 
-    Important because statistics may come from:
-    - live API
-    - StatsBomb historical proxy
-    - unavailable source
-
-    AI responses should disclose proxy data instead of implying
-    live measurements.
-    """
-    stats_source: str = "unknown"
-
-    # Links proxy statistics to the exact historical match used.
-    stats_proxy_match_id: Optional[int] = None
-
-    # Timestamp for Redis freshness checks.
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

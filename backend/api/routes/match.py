@@ -1,11 +1,12 @@
-"""Match state routes.
+"""
+Match state endpoints.
 
-GET /matches/         list active and completed fixture IDs
-GET /matches/summary  bulk fetch all active and recently completed states
-GET /matches/{id}     fetch one fixture state
+    GET /matches/                active + completed fixture IDs
+    GET /matches/summary         every active + completed state (one SUNION
+                                 + one MGET)
+    GET /matches/{fixture_id}    single fixture state
 
-The summary endpoint exists so the match page can hydrate its full column set
-in a single round trip instead of polling every fixture independently.
+/summary must be registered before /{fixture_id}.
 """
 
 import json
@@ -25,7 +26,7 @@ async def list_matches(request: Request):
 
 @router.get("/summary")
 async def match_summary(request: Request):
-    """Return all active and recently completed fixtures in one response."""
+    """All active and recently completed fixtures in one round trip."""
     r = request.app.state.redis
     fixture_ids = await r.sunion("matches:active", "matches:completed")
     if not fixture_ids:

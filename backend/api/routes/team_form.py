@@ -1,10 +1,9 @@
-"""Team-form route for the match page.
+"""
+Team form endpoint.
 
-GET /matches/{fixture_id}/team-form
+    GET /matches/{fixture_id}/team-form
 
-The route reads from both active and completed fixtures, and it orders the
-returned form rows by kickoff time so the history reflects when matches were
-actually played.
+One SUNION(active, completed) plus one MGET; form is sorted by kickoff_time.
 """
 
 from __future__ import annotations
@@ -67,32 +66,24 @@ async def team_form(fixture_id: str, request: Request):
         sort_key = m.kickoff_time.isoformat() if m.kickoff_time else ""
 
         if m.home_name == home_name or m.away_name == home_name:
-            home_form.append(
-                {
-                    "opponent": (
-                        m.away_name if m.home_name == home_name else m.home_name
-                    ),
-                    "home_score": hs,
-                    "away_score": as_,
-                    "result": result_for(home_name),
-                    "was_home": m.home_name == home_name,
-                    "date": sort_key or None,
-                }
-            )
+            home_form.append({
+                "opponent": m.away_name if m.home_name == home_name else m.home_name,
+                "home_score": hs,
+                "away_score": as_,
+                "result": result_for(home_name),
+                "was_home": m.home_name == home_name,
+                "date": sort_key or None,
+            })
 
         if m.home_name == away_name or m.away_name == away_name:
-            away_form.append(
-                {
-                    "opponent": (
-                        m.away_name if m.home_name == away_name else m.home_name
-                    ),
-                    "home_score": hs,
-                    "away_score": as_,
-                    "result": result_for(away_name),
-                    "was_home": m.home_name == away_name,
-                    "date": sort_key or None,
-                }
-            )
+            away_form.append({
+                "opponent": m.away_name if m.home_name == away_name else m.home_name,
+                "home_score": hs,
+                "away_score": as_,
+                "result": result_for(away_name),
+                "was_home": m.home_name == away_name,
+                "date": sort_key or None,
+            })
 
     home_form.sort(key=lambda x: x.get("date") or "", reverse=True)
     away_form.sort(key=lambda x: x.get("date") or "", reverse=True)

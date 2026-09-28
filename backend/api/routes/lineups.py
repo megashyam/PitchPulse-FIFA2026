@@ -1,8 +1,19 @@
-"""Lineup routes for fixture starting XIs and player photos.
+"""
+Lineups endpoint.
 
-The lineup endpoint uses a tiered data strategy: Zafronix rosters first,
-API-Sports live lineups second, a StatsBomb proxy XI third, and a formation
-estimate as the final fallback. Photos are resolved independently.
+    GET /matches/{fixture_id}/lineups
+
+Sources, in priority order:
+    1. ESPN confirmed XI (formation, positions, subs), written to
+       match:{id}:lineups by the match producer. source="espn".
+    2. API-Sports confirmed XI, if API_SPORTS_KEY is set. source="api-sports".
+    3. Zafronix 2026 squad with a projected XI (starter/captain/shirt number
+       heuristic). source="zafronix_squad", projected=True.
+    4. Empty XI, source="unavailable".
+
+Zafronix has no player photos, so headshots come from a best-effort,
+Redis-cached Wikipedia thumbnail lookup, with per-player fallback to the
+numbered circle on the frontend.
 """
 
 from __future__ import annotations
@@ -23,29 +34,27 @@ log = logging.getLogger(__name__)
 
 API_KEY = os.getenv("API_SPORTS_KEY", "")
 BASE_URL = "https://v3.football.api-sports.io"
-SB_BASE = "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
 
 ZAFRONIX_KEY = os.getenv("ZAFRONIX_API_KEY", "")
 ZAFRONIX_BASE = "https://api.zafronix.com/fifa/worldcup/v1"
 ZAFRONIX_SEASON = int(os.getenv("ZAFRONIX_SEASON", "2026"))
 
-PHOTO_CACHE_TTL = 7 * 86_400
+PHOTO_CACHE_TTL = 7 * 86_400  # 7 days — headshots don't change
 PHOTO_LOOKUP_TIMEOUT = 4.0
 ROSTER_CACHE_TTL = 6 * 3600
 
+# Zafronix position codes (GK/DF/MF/FW) → a plausible pitch-role formation.
+# Zafronix rosters aren't ordered as a starting XI, so we pick the most
+# senior 11 (captain + starters first, then by shirt number) and infer a
+# formation from how many of each line that gives us.
 _POS_LINE = {"GK": 0, "DF": 1, "MF": 2, "FW": 3}
 
 
-def _estimate_formation(ppda: float, is_home: bool) -> str:
-    if ppda < 8:
-        return "4-3-3" if is_home else "4-2-3-1"
-    if ppda < 14:
-        return "4-3-3" if is_home else "4-4-2"
-    return "5-3-2" if is_home else "4-5-1"
-
-
 def _formation_from_counts(n_def: int, n_mid: int, n_fwd: int) -> str:
-    """Map defender, midfield, and forward counts to a known formation."""
+    """Nearest pitch-layout formation for a (DF, MF, FW) count.
+
+    Only shapes whose frontend slot split matches the counts are mapped.
+    """
     key = (n_def, n_mid, n_fwd)
     known = {
         (4, 3, 3): "4-3-3",
@@ -58,17 +67,18 @@ def _formation_from_counts(n_def: int, n_mid: int, n_fwd: int) -> str:
     }
     if key in known:
         return known[key]
+    # Nearest by defender count, then a sane default.
     return {3: "3-4-3", 4: "4-3-3", 5: "5-3-2"}.get(n_def, "4-3-3")
 
 
 async def _photo_for(r, client: httpx.AsyncClient, name: str) -> str | None:
-    """Return a cached Wikipedia thumbnail URL for a player name."""
+    """Best-effort Wikipedia summary thumbnail, Redis-cached. Never raises."""
     if not name:
         return None
     cache_key = f"player:photo:{name.lower()}"
     cached = await r.get(cache_key)
     if cached is not None:
-        return cached or None
+        return cached or None  # "" = known no-photo sentinel
 
     url = (
         f"https://en.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(name)}"
@@ -88,7 +98,11 @@ async def _photo_for(r, client: httpx.AsyncClient, name: str) -> str | None:
     return photo or None
 
 
+# ── Tier 1: Zafronix 2026 roster ───────────────────────────────────────────
+
+# Feed (ESPN) team names → the names Zafronix uses (FIFA English naming).
 _ZAFRONIX_NAME_ALIAS = {
+    "Bosnia-Herzegovina": "Bosnia & Herzegovina",
     "USA": "United States",
     "United States of America": "United States",
     "Korea Republic": "South Korea",
@@ -110,16 +124,13 @@ def _zafronix_name(team_name: str) -> str:
     return _ZAFRONIX_NAME_ALIAS.get(team_name, team_name)
 
 
-def _norm_team(name: str) -> str:
-    """Normalize team names for cross-source comparison."""
-    n = _ZAFRONIX_NAME_ALIAS.get(name, name)
-    return "".join(ch for ch in n.lower() if ch.isalnum())
-
-
 async def _fetch_zafronix_roster(
     client: httpx.AsyncClient, team_name: str
 ) -> tuple[list[dict] | None, str]:
-    """Fetch one Zafronix roster and return a failure reason if needed."""
+    """Zafronix roster for one team, or (None, reason) on failure.
+
+    Tries the FIFA-canonical alias first, then the raw name.
+    """
     candidates = []
     aliased = _zafronix_name(team_name)
     candidates.append(aliased)
@@ -149,7 +160,7 @@ async def _fetch_zafronix_roster(
             elif resp.status_code in (401, 403):
                 last_reason = f"{resp.status_code} — ZAFRONIX_API_KEY is missing, invalid, or expired"
                 log.warning(f"Zafronix roster: {last_reason}")
-                return None, last_reason
+                return None, last_reason  # auth won't improve by trying the other name
             else:
                 last_reason = f"HTTP {resp.status_code} for '{name}'"
                 log.info(f"Zafronix roster: {last_reason}")
@@ -161,7 +172,11 @@ async def _fetch_zafronix_roster(
 
 
 def _select_starting_xi(roster: list[dict]) -> tuple[list[dict], str]:
-    """Pick a plausible starting XI from a squad and infer a formation."""
+    """Plausible starting XI from a full squad, plus its formation.
+
+    Grouped DF, MF, FW first (the frontend assigns pitch slots by index);
+    starter, captain and jersey break ties within a group.
+    """
 
     def sort_key(p: dict):
         return (
@@ -170,6 +185,14 @@ def _select_starting_xi(roster: list[dict]) -> tuple[list[dict], str]:
             p.get("jersey") or 99,
         )
 
+    # Standard shapes to try, in order of preference — (def, mid, fwd) counts
+    # only, since Zafronix tags players as DF/MF/FW with no DM/AM
+    # granularity to split further. Must match keys in
+    # _formation_from_counts' `known` dict exactly, so the chosen formation
+    # string's assumed per-line counts always equal the xi's real counts.
+    # Picking the target shape from what's actually AVAILABLE (rather than
+    # deriving a formation from an arbitrary top-11 cut) is what guarantees
+    # every slot gets a player of the right position type.
     _TARGET_SHAPES = [
         (4, 3, 3),
         (4, 4, 2),
@@ -183,12 +206,14 @@ def _select_starting_xi(roster: list[dict]) -> tuple[list[dict], str]:
     mids = sorted([p for p in roster if p.get("position") == "MF"], key=sort_key)
     fwds = sorted([p for p in roster if p.get("position") == "FW"], key=sort_key)
 
+    # Pick the first shape the available squad can actually fill.
     n_def, n_mid, n_fwd = 4, 3, 3
     for d, m, f in _TARGET_SHAPES:
         if len(defs) >= d and len(mids) >= m and len(fwds) >= f:
             n_def, n_mid, n_fwd = d, m, f
             break
     else:
+        # Squad is short in some line — take what's there.
         n_def = min(len(defs), 5) or 4
         n_mid = min(len(mids), 5) or 3
         n_fwd = min(len(fwds), 3) or 3
@@ -196,11 +221,14 @@ def _select_starting_xi(roster: list[dict]) -> tuple[list[dict], str]:
     xi: list[dict] = []
     if keepers:
         xi.append(keepers[0])
-
+    # Order matters: DF block, then MF block, then FW block — this is what
+    # keeps array index aligned with H_POS's GK→DEF→MID→FWD slot ordering.
     xi.extend(defs[:n_def])
     xi.extend(mids[:n_mid])
     xi.extend(fwds[:n_fwd])
 
+    # If the squad was short somewhere, pad from whatever's left over so we
+    # still return 11 total rather than an incomplete XI.
     if len(xi) < 11:
         leftover = [p for p in (defs + mids + fwds) if p not in xi]
         xi.extend(leftover[: 11 - len(xi)])
@@ -208,6 +236,7 @@ def _select_starting_xi(roster: list[dict]) -> tuple[list[dict], str]:
     n_def = sum(1 for p in xi if p.get("position") == "DF")
     n_mid = sum(1 for p in xi if p.get("position") == "MF")
     n_fwd = sum(1 for p in xi if p.get("position") == "FW")
+    # If counts don't reach 10 outfield (missing position data), pad mids.
     formation = _formation_from_counts(n_def or 4, n_mid or 3, n_fwd or 3)
     return xi, formation
 
@@ -252,7 +281,7 @@ async def _fetch_from_zafronix(
 ) -> tuple[dict | None, str]:
     if not ZAFRONIX_KEY:
         return None, "ZAFRONIX_API_KEY is not set in this process's environment"
-    cache_key = f"zafronix:lineup:{home_name}:{away_name}"
+    cache_key = f"zafronix:lineup:v2:{home_name}:{away_name}"
     cached = await r.get(cache_key)
     if cached:
         return json.loads(cached), "ok (cached)"
@@ -270,9 +299,17 @@ async def _fetch_from_zafronix(
         log.info(f"Zafronix lineup unavailable: {reason}")
         return None, reason
 
-    result = {"home": home_entry, "away": away_entry, "source": "zafronix"}
+    result = {
+        "home": home_entry,
+        "away": away_entry,
+        "source": "zafronix_squad",
+        "projected": True,
+    }
     await r.setex(cache_key, ROSTER_CACHE_TTL, json.dumps(result))
     return result, "ok"
+
+
+# ── Tier 2: API-Sports live lineups ────────────────────────────────────────
 
 
 def _parse_player(raw: dict) -> dict:
@@ -324,87 +361,7 @@ async def _fetch_from_api_sports(fixture_id: str) -> dict | None:
     return result if len(result) == 2 else None
 
 
-_SB_FORMATION_MAP = {
-    433: "4-3-3",
-    442: "4-4-2",
-    4231: "4-2-3-1",
-    352: "3-5-2",
-    532: "5-3-2",
-    4141: "4-1-4-1",
-    343: "3-4-3",
-    3421: "3-4-2-1",
-    4213: "4-2-3-1",
-    41212: "4-1-4-1",
-    4411: "4-4-2",
-    4321: "4-3-3",
-}
-
-
-def _sb_formation_to_string(code: int | None) -> str:
-    if code and code in _SB_FORMATION_MAP:
-        return _SB_FORMATION_MAP[code]
-    first = int(str(code)[0]) if code else 4
-    return {3: "3-4-3", 4: "4-3-3", 5: "5-3-2"}.get(first, "4-3-3")
-
-
-async def _fetch_statsbomb_proxy_lineup(r, match_id: int) -> dict | None:
-    cache_key = f"sb:lineup:{match_id}"
-    cached = await r.get(cache_key)
-    if cached:
-        return json.loads(cached)
-
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(f"{SB_BASE}/events/{match_id}.json", timeout=20)
-            resp.raise_for_status()
-            events = resp.json()
-    except Exception as exc:
-        log.warning(f"StatsBomb proxy lineup fetch failed for mid={match_id}: {exc}")
-        return None
-
-    xi_events = [e for e in events if e.get("type", {}).get("name") == "Starting XI"]
-    if len(xi_events) < 2:
-        return None
-
-    result: dict[str, dict] = {}
-    async with httpx.AsyncClient(
-        headers={"User-Agent": "wc2026-lineups/1.0"}
-    ) as photo_client:
-        for ev in xi_events[:2]:
-            team_name = ev.get("team", {}).get("name", "")
-            tactics = ev.get("tactics", {})
-            lineup_sorted = sorted(
-                tactics.get("lineup", []),
-                key=lambda p: (p.get("position", {}).get("id") or 99),
-            )
-            names = [(p.get("player", {}).get("name") or "") for p in lineup_sorted]
-            photos = await asyncio.gather(
-                *[_photo_for(r, photo_client, n) for n in names],
-                return_exceptions=True,
-            )
-            starting = []
-            for p, photo in zip(lineup_sorted, photos):
-                player = p.get("player", {})
-                starting.append(
-                    {
-                        "number": p.get("jersey_number") or 0,
-                        "name": player.get("name") or "",
-                        "position": p.get("position", {}).get("name") or "",
-                        "grid": "",
-                        "photo": photo if isinstance(photo, str) else None,
-                    }
-                )
-            result[team_name] = {
-                "team": team_name,
-                "formation": _sb_formation_to_string(tactics.get("formation")),
-                "startingXI": starting,
-                "coach": None,
-            }
-
-    if len(result) < 2:
-        return None
-    await r.setex(cache_key, 6 * 3600, json.dumps(result))
-    return result
+# ── Route ──────────────────────────────────────────────────────────────────
 
 
 @router.get("/{fixture_id}/lineups")
@@ -414,77 +371,31 @@ async def lineups(fixture_id: str, request: Request):
     raw = await r.get(f"match:{fixture_id}:state")
     if not raw:
         raise HTTPException(404, "Fixture not found")
-
     state = MatchState.model_validate_json(raw)
 
-    zx, zx_reason = await _fetch_from_zafronix(r, state.home_name, state.away_name)
-    if zx:
-        return zx
+    # Tier 1: confirmed XI from ESPN, written by the match producer.
+    confirmed = await r.get(f"match:{fixture_id}:lineups")
+    if confirmed:
+        return json.loads(confirmed)
 
+    # Tier 2: confirmed XI from API-Sports (paid key).
     if API_KEY:
         api_data = await _fetch_from_api_sports(str(state.fixture_id))
         if api_data:
             teams = list(api_data.values())
-            home_entry = next(
-                (t for t in teams if t["team"] == state.home_name), teams[0]
-            )
-            away_entry = next(
-                (t for t in teams if t["team"] == state.away_name), teams[1]
-            )
+            home_entry = next((t for t in teams if t["team"] == state.home_name), teams[0])
+            away_entry = next((t for t in teams if t["team"] == state.away_name), teams[1])
             return {"home": home_entry, "away": away_entry, "source": "api-sports"}
 
-    if state.stats_proxy_match_id:
-        sb_data = await _fetch_statsbomb_proxy_lineup(r, state.stats_proxy_match_id)
-        if sb_data:
-            sb_team_names = {_norm_team(t) for t in sb_data.keys()}
-            live_names = {_norm_team(state.home_name), _norm_team(state.away_name)}
-            if sb_team_names & live_names:
-                teams = list(sb_data.values())
+    # Tier 3: real 2026 squad with a PROJECTED XI — not a confirmed lineup.
+    zx, zx_reason = await _fetch_from_zafronix(r, state.home_name, state.away_name)
+    if zx:
+        return zx
 
-                def _match_entry(live_name: str):
-                    for entry in teams:
-                        if _norm_team(entry["team"]) == _norm_team(live_name):
-                            return entry
-                    return None
-
-                home_entry = _match_entry(state.home_name)
-                away_entry = _match_entry(state.away_name)
-                if home_entry and away_entry:
-                    return {
-                        "home": home_entry,
-                        "away": away_entry,
-                        "source": "statsbomb_proxy",
-                    }
-            else:
-                log.info(
-                    f"[{fixture_id}] StatsBomb proxy match teams {sb_team_names} "
-                    f"don't match live teams {live_names} — skipping to estimated "
-                    f"formation rather than showing wrong players"
-                )
-
-    tac_raw = await r.get(f"match:{fixture_id}:tactical")
-    home_ppda, away_ppda = 10.0, 12.0
-    if tac_raw:
-        try:
-            tac = json.loads(tac_raw)
-            home_ppda = tac.get("home", {}).get("match", {}).get("ppda", 10.0)
-            away_ppda = tac.get("away", {}).get("match", {}).get("ppda", 12.0)
-        except Exception:
-            pass
-
+    # Tier 4: nothing known — empty XI, no guessed formation.
     return {
-        "home": {
-            "team": state.home_name,
-            "formation": _estimate_formation(home_ppda, True),
-            "startingXI": [],
-            "coach": None,
-        },
-        "away": {
-            "team": state.away_name,
-            "formation": _estimate_formation(away_ppda, False),
-            "startingXI": [],
-            "coach": None,
-        },
-        "source": "estimated",
+        "home": {"team": state.home_name, "formation": "", "startingXI": [], "coach": None},
+        "away": {"team": state.away_name, "formation": "", "startingXI": [], "coach": None},
+        "source": "unavailable",
         "zafronix_debug": zx_reason,
     }

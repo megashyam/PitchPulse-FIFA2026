@@ -1,7 +1,9 @@
-"""Group-table route for the match page.
+"""
+Group standings endpoint.
 
-GET /matches/{fixture_id}/group-table
+    GET /matches/{fixture_id}/group-table
 
+One SUNION(matches:active, matches:completed) plus one MGET per request.
 """
 
 from __future__ import annotations
@@ -17,14 +19,13 @@ router = APIRouter()
 
 
 def _extract_group(round_str: str) -> str:
-    """Extract the group letter from a tournament round label."""
+    """Extract group letter from 'Group Stage - Group A' → 'A'"""
     m = re.search(r"Group\s+([A-L])", round_str or "", re.IGNORECASE)
     return m.group(1).upper() if m else ""
 
 
 @router.get("/{fixture_id}/group-table")
 async def group_table(fixture_id: str, request: Request):
-    """Return current group standings calculated from completed fixtures."""
     r = request.app.state.redis
 
     raw = await r.get(f"match:{fixture_id}:state")
@@ -58,13 +59,7 @@ async def group_table(fixture_id: str, request: Request):
         for name in (m.home_name, m.away_name):
             if name not in standings:
                 standings[name] = {
-                    "name": name,
-                    "p": 0,
-                    "w": 0,
-                    "d": 0,
-                    "l": 0,
-                    "gf": 0,
-                    "ga": 0,
+                    "name": name, "p": 0, "w": 0, "d": 0, "l": 0, "gf": 0, "ga": 0,
                 }
 
         if m.status_short not in COMPLETED_STATUSES:

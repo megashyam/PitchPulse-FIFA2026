@@ -1,7 +1,7 @@
-"""Match stream route for live fixture updates.
+"""
+Match state stream.
 
-GET /matches/{fixture_id}/stream — pub/sub-backed SSE that delivers match
-state updates without polling Redis on every client interval.
+    GET /matches/{fixture_id}/stream   SSE (pub/sub-backed)
 """
 
 from fastapi import APIRouter, Request
