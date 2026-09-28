@@ -1,9 +1,12 @@
-"""Narrative routes for spikes, trending topics, and arc synthesis.
+"""
+Narrative Hub endpoints.
 
-The API exposes both the raw spike feed and the broader tournament-wide
-trending view. Its SSE endpoint is pub/sub-backed so clients only re-read the
-Redis payload when the detector publishes an update, while the arc endpoint
-can synthesize missing narrative text on demand.
+    GET      /narrative/spikes             last N spikes from the Redis feed
+    GET      /narrative/spikes/{spike_id}  single spike by ID
+    GET      /narrative/trending           tournament-wide trending topics
+    GET      /narrative/stream             SSE (pub/sub-backed)
+    GET      /narrative/arc/{spike_id}     fetch or generate the arc for a spike
+    GET/POST /narrative/trigger            debug: force one detector tick (token-gated)
 """
 
 import asyncio
@@ -24,7 +27,7 @@ log = logging.getLogger(__name__)
 
 @router.get("/spikes")
 async def get_spikes(request: Request, limit: int = 20):
-    """Return the newest narrative spikes from Redis."""
+    """Return the last `limit` narrative spikes (newest first)."""
     r = request.app.state.redis
     raw_list = await r.lrange("narrative:spikes:feed", 0, min(limit - 1, 49))
     if not raw_list:
@@ -56,7 +59,7 @@ async def get_spike(spike_id: str, request: Request):
 
 @router.get("/trending")
 async def get_trending(request: Request, limit: int = 12):
-    """Return the tournament-wide trending narrative list."""
+    """All topics ranked by buzz, returned under `spikes` like the feed."""
     r = request.app.state.redis
     raw = await r.get("narrative:trending:latest")
     items = json.loads(raw) if raw else []
@@ -69,7 +72,7 @@ async def get_trending(request: Request, limit: int = 12):
 
 @router.get("/stream")
 async def narrative_stream(request: Request):
-    """Stream narrative updates over pub/sub-backed SSE."""
+    """SSE, pub/sub-backed; heartbeats come from pubsub_sse's fallback poll."""
     r = request.app.state.redis
 
     async def generator():
@@ -88,7 +91,7 @@ async def narrative_stream(request: Request):
 
 @router.get("/arc/{spike_id}")
 async def get_or_generate_arc(spike_id: str, request: Request):
-    """Return a spike arc, synthesizing it when the cache is empty."""
+    """Return the arc for a spike, generating it now if not already cached."""
     r = request.app.state.redis
     raw = await r.get(f"narrative:spike:{spike_id}")
     if not raw:
@@ -130,7 +133,7 @@ async def get_or_generate_arc(spike_id: str, request: Request):
     dependencies=[Depends(require_trigger_token)],
 )
 async def trigger_narrative(request: Request):
-    """Force one detector tick immediately."""
+    """Force one detector tick (token-gated)."""
     r = request.app.state.redis
     loop = asyncio.get_running_loop()
     detector = get_detector()
@@ -138,18 +141,20 @@ async def trigger_narrative(request: Request):
     spikes = await detector.tick(loop)
     if not spikes:
         tick = detector._tick_count
-        if tick < 30:
+        remaining = detector.warmup_remaining()
+        if remaining > 0:
             return {
                 "status": "warming_up",
                 "tick": tick,
                 "message": (
-                    f"IsolationForest needs {30 - tick} more ticks before scoring."
+                    f"Spike scorer needs {remaining} more ticks of live baseline "
+                    "before scoring."
                 ),
             }
         return {
             "status": "no_spikes",
             "tick": tick,
-            "message": "No anomalies detected this tick — all topics within baseline.",
+            "message": "No surges this tick — all topics within baseline.",
         }
 
     results = []

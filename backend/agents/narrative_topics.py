@@ -1,22 +1,13 @@
 """
-agents/narrative_topics.py
-============================
 Fixture-aware topic tracking for the Narrative Hub.
 
-Provides dynamic topic discovery by combining active and recently completed
-fixtures into a unified tracking set. Team names are used as detector topics,
-while metadata maps each topic back to fixture context for downstream narrative
-generation.
+One SUNION(matches:active, matches:completed) plus one MGET per tick
+produces both:
+    get_tracked_topics()  topic strings for the detector: live, upcoming
+                          and recently finished team names, plus "WC2026"
+    get_topic_meta()      topic → {fixture_id, status_short, is_home}
 
-Key capabilities:
-    - Single Redis SUNION + MGET pipeline for efficient fixture retrieval.
-    - Tracks live, upcoming, and recently completed matches.
-    - Retains completed fixtures for post-match narrative signals.
-    - Provides fixture metadata including status and home/away context.
-    - Generates compact match context strings for LLM grounding.
-
-Consumed by narrative detection and generation services to connect real-time
-match state with emerging narrative signals.
+Completed fixtures stay tracked through the retention window.
 """
 
 from __future__ import annotations
@@ -26,31 +17,14 @@ from typing import Dict, List
 
 from api.schemas.event_types import COMPLETED_STATUSES
 
-COMPLETED_RETENTION_HOURS = 48.0
+COMPLETED_RETENTION_HOURS = 48.0  # keep tracking a finished match's teams
+# this long after full-time — post-match reaction chatter is real signal
 
 
 async def get_topic_meta(redis_client) -> Dict[str, dict]:
-    """
-    Retrieve metadata for all currently tracked narrative topics.
+    """{topic: {"fixture_id", "status_short", "is_home"}} for tracked teams.
 
-    Combines active and recently completed fixtures from Redis, loads match
-    states in a single batch operation, filters expired completed matches, and
-    maps team names to their associated fixture context.
-
-    Args:
-        redis_client: Async Redis client used for fixture state retrieval.
-
-    Returns:
-        Dict[str, dict]: Mapping of team/topic names to fixture metadata:
-            {
-                "fixture_id": int,
-                "status_short": str,
-                "is_home": bool
-            }
-
-    Notes:
-        If a team appears in multiple fixtures, the most relevant fixture state
-        is retained based on update ordering and completion status.
+    A team in several fixtures maps to the most recently updated one.
     """
     from api.schemas.schema import MatchState
 
@@ -96,19 +70,7 @@ async def get_topic_meta(redis_client) -> Dict[str, dict]:
 
 
 async def get_tracked_topics(redis_client) -> List[str]:
-    """
-    Generate the current set of narrative detection topics.
-
-    Retrieves active fixture metadata and converts tracked teams into a flat
-    topic list for downstream anomaly detection. Always includes the global
-    tournament-level topic.
-
-    Args:
-        redis_client: Async Redis client used for fixture lookup.
-
-    Returns:
-        List[str]: Sorted list of tracked team names plus the WC2026 topic.
-    """
+    """Flat topic list for the detector — team names + global tournament topic."""
     meta = await get_topic_meta(redis_client)
     topics = set(meta.keys())
     topics.add("WC2026")
@@ -116,23 +78,7 @@ async def get_tracked_topics(redis_client) -> List[str]:
 
 
 def build_match_context(state) -> str:
-    """
-    Convert a match state object into an LLM-readable context summary.
-
-    Creates a compact natural-language representation containing teams,
-    match status, score information, and recent goal events. The generated
-    context is used to ground narrative generation agents with live fixture
-    information.
-
-    Args:
-        state: Validated match state containing teams, scores, status, and events.
-
-    Returns:
-        str: Human-readable match context suitable for LLM prompting.
-
-    Example:
-        "Argentina vs France. 67' — 2-1. Goals: 23' Messi (Argentina)."
-    """
+    """Short match context string that grounds arc synthesis."""
     parts = [f"{state.home_name} vs {state.away_name}"]
 
     if state.status_short in COMPLETED_STATUSES:

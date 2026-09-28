@@ -1,52 +1,9 @@
 """
-Real-time narrative intelligence worker.
+Narrative background worker.
 
-This background worker transforms statistical anomalies from live match data
-into higher-level narrative insights using a hybrid ML + LLM pipeline.
-
-The worker combines:
-    - anomaly detection for identifying unusual match/tournament patterns
-    - comment sample aggregation for contextual signals
-    - LLM-based narrative arc generation
-    - Redis-backed caching and pub/sub distribution
-
-Pipeline:
-
-    Live Data Sources
-          ↓
-    Narrative Spike Detector
-          ↓
-    Trending / Spike Detection
-          ↓
-    Narrative Arc Agent
-          ↓
-    Redis Narrative Cache
-          ↓
-    API / Streaming Consumers
-
-
-Responsibilities:
-    - Periodically execute narrative anomaly detection.
-    - Maintain tournament-wide trending snapshots.
-    - Generate human-readable narrative explanations.
-    - Persist spike histories and latest insights.
-    - Broadcast new narrative events through Redis pub/sub.
-
-Redis storage:
-    narrative:trending:latest
-        Current tournament-wide narrative ranking.
-
-    narrative:spike:{id}
-        Individual anomaly-driven narrative.
-
-    narrative:spikes:feed
-        Rolling historical narrative stream.
-
-    narrative:stream:latest
-        Most recent narrative event.
-
-Designed for continuous async operation with independent failure handling
-between detection, generation, and persistence stages.
+Surge detection every 60s, a tournament-wide trending snapshot and top-N
+arc synthesis. Scorer baselines persist in Redis, so a restart needs no
+fresh warm-up.
 """
 
 import asyncio
@@ -56,55 +13,66 @@ import logging
 import redis.asyncio as aioredis
 
 from agents import narrative_arc_agent
+from agents.llm_queue import Priority, llm_priority
 from agents.narrative_spike_detector import NarrativeSpike, get_detector
 from api.routes.narrative_comments import store_comment_samples
+from monitoring.metrics import WORKER_ERRORS, WORKER_TICK_DURATION, tick_done
 
 log = logging.getLogger(__name__)
 INTERVAL = 60.0
+# LLM arcs for the top N trending stories each tick; the on-demand arc
+# endpoint (api/routes/narrative.py) covers the rest.
 ARC_TOP_N = 6
+ARC_CACHE_TTL = 1_800  # an unchanged surge keeps its arc for 30 min
+STATE_KEY = "narrative:scorer:state"
+STATE_TTL = 3_600
+STATE_EVERY = 5  # ticks
 
 
 async def run(redis_client: aioredis.Redis) -> None:
-    """
-    Start the long-running narrative intelligence worker.
-
-    Executes the narrative detection pipeline at a fixed interval and maintains
-    the detector lifecycle for the lifetime of the application.
-
-    Each cycle:
-        1. Detects emerging narrative spikes.
-        2. Refreshes trending narratives.
-        3. Generates AI narrative explanations.
-        4. Updates Redis caches and notifications.
-
-    Individual failures are isolated so one failed generation or storage
-    operation does not terminate the worker.
-    """
-    log.info("Narrative worker started — IsolationForest spike detection every 60s")
+    log.info("Narrative worker started — surge detection every 60s")
     loop = asyncio.get_running_loop()
     detector = get_detector()
+    await load_state(redis_client, detector)
 
     while True:
         try:
-            await _tick(redis_client, loop, detector)
+            with WORKER_TICK_DURATION.labels("narrative").time():
+                await _tick(redis_client, loop, detector)
+            tick_done("narrative")
         except asyncio.CancelledError:
             log.info("Narrative worker cancelled")
-            return
+            raise
         except Exception as exc:
+            WORKER_ERRORS.labels("narrative").inc()
             log.error(f"Narrative worker error: {exc}", exc_info=True)
         await asyncio.sleep(INTERVAL)
 
 
+async def load_state(r: aioredis.Redis, detector) -> bool:
+    try:
+        raw = await r.get(STATE_KEY)
+        if not raw:
+            return False
+        detector.load_state(json.loads(raw))
+        log.info(
+            f"Narrative scorer state restored (warm-up left: "
+            f"{detector.warmup_remaining()} ticks)"
+        )
+        return True
+    except Exception as exc:
+        log.warning(f"Narrative scorer state restore failed: {exc}")
+        return False
+
+
+async def save_state(r: aioredis.Redis, detector) -> None:
+    try:
+        await r.setex(STATE_KEY, STATE_TTL, json.dumps(detector.export_state()))
+    except Exception as exc:
+        log.debug(f"Narrative scorer state save failed: {exc}")
+
+
 async def _store_comment_samples_for_all_topics(r: aioredis.Redis, detector) -> None:
-    """
-    Persist recent contextual samples collected by the narrative detector.
-
-    Stores representative source comments associated with tracked topics so
-    downstream APIs can provide evidence and context behind detected trends.
-
-    Failures for individual topics are ignored to prevent one unavailable
-    source from affecting the complete narrative pipeline.
-    """
     stored_count = 0
     for topic in detector.topics:
         try:
@@ -122,16 +90,12 @@ async def _store_comment_samples_for_all_topics(r: aioredis.Redis, detector) -> 
 
 
 async def _add_arcs_to_top_trending(
-    snapshot: list, loop: asyncio.AbstractEventLoop
+    r: aioredis.Redis, snapshot: list, loop: asyncio.AbstractEventLoop
 ) -> None:
-    """
-    Generate narrative explanations for the highest-priority trending topics.
+    """Arcs for the top trending rows.
 
-    Converts detector-generated trending rows into NarrativeSpike objects and
-    enriches them using the narrative arc agent.
-
-    Only the top-ranked topics are processed to control LLM inference cost
-    while keeping the UI focused on the most significant stories.
+    Rows with surging sources get an LLM arc at background priority, cached
+    by (topic, surging set); quiet rows get the template.
     """
     for row in snapshot[:ARC_TOP_N]:
         try:
@@ -144,40 +108,36 @@ async def _add_arcs_to_top_trending(
                 source_names=row["source_names"],
                 summary=row["summary"],
                 timestamp=row["timestamp"],
+                data_sources=row.get("data_sources"),
+                z_scores=row.get("z_scores"),
             )
-            row["arc"] = await narrative_arc_agent.synthesise(spike, loop)
+            surging = sorted(row["source_names"] or [])
+            if not surging:
+                row["arc"] = narrative_arc_agent.template_arc(spike)
+                continue
+            key = f"narrative:arc:cache:{row['topic']}:{','.join(surging)}"
+            cached = await r.get(key)
+            if cached:
+                row["arc"] = cached
+                continue
+            with llm_priority(Priority.BACKGROUND):
+                row["arc"] = await narrative_arc_agent.synthesise(spike, loop)
+            await r.setex(key, ARC_CACHE_TTL, row["arc"])
         except Exception as exc:
             topic_name = row.get("topic")
             log.debug(f"trending arc synthesis failed for {topic_name}: {exc}")
 
 
 async def _tick(r: aioredis.Redis, loop: asyncio.AbstractEventLoop, detector) -> None:
-    """
-    Execute one complete narrative intelligence refresh cycle.
-
-    Processing stages:
-
-        1. Run anomaly detection over tracked topics.
-        2. Persist supporting comment samples.
-        3. Refresh tournament trending rankings.
-        4. Generate narrative arcs for important trends.
-        5. Store detected spikes and notify subscribers.
-
-    The pipeline separates:
-        - detection (ML anomaly scoring)
-        - interpretation (LLM narrative generation)
-        - delivery (Redis cache and pub/sub)
-
-    This allows each layer to fail independently while maintaining partial
-    system availability.
-    """
     spikes = await detector.tick(loop)
+    if detector._tick_count % STATE_EVERY == 0:
+        await save_state(r, detector)
 
     await _store_comment_samples_for_all_topics(r, detector)
 
     try:
         snapshot = detector.trending(top_n=12)
-        await _add_arcs_to_top_trending(snapshot, loop)
+        await _add_arcs_to_top_trending(r, snapshot, loop)
         await r.setex("narrative:trending:latest", 3_600, json.dumps(snapshot))
     except Exception as exc:
         log.debug(f"trending snapshot failed: {exc}")

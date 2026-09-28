@@ -1,10 +1,11 @@
-"""Comment-sample helpers for narrative topics.
+"""
+Narrative comment sample endpoints.
 
-GET /narrative/{topic}/comments           cached comment samples
-GET /narrative/{topic}/comments/seed-demo development helper for demo data
+    GET /narrative/{topic}/comments            cached comment samples
+    GET /narrative/{topic}/comments/seed-demo  dev helper: seed demo data
 
-The storage path deduplicates samples before writing and updates the cached
-list atomically so readers never observe a partial write.
+store_comment_samples dedupes by permalink (or a text hash) and writes
+LPUSH + LTRIM + EXPIRE in one pipeline.
 """
 
 from __future__ import annotations
@@ -14,7 +15,9 @@ import json
 import logging
 import time
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
+
+from api.routes._security import require_trigger_token
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -56,43 +59,46 @@ async def get_comment_samples(topic: str, request: Request):
     return {"topic": topic, "count": len(samples), "samples": samples}
 
 
-@router.get("/{topic}/comments/seed-demo")
+@router.get(
+    "/{topic}/comments/seed-demo",
+    dependencies=[Depends(require_trigger_token)],
+)
 async def seed_demo_comments(topic: str, request: Request):
-    """Seed deterministic demo samples for local narrative testing."""
+    """Seed fixed demo samples flagged demo=True (dev only, token-gated)."""
     r = request.app.state.redis
     demo_samples = [
         {
             "text": f"{topic} looking sharp in the warmup, midfield press is intense today",
             "source": "mastodon",
-            "author": "@tacticsnerd@mastodon.social",
+            "author": "demo-1",
             "permalink": None,
             "demo": True,
         },
         {
             "text": f"anyone else think {topic} changes formation at half if this stays 0-0",
             "source": "mastodon",
-            "author": "@matchday_mike@mastodon.social",
+            "author": "demo-2",
             "permalink": None,
             "demo": True,
         },
         {
             "text": f"{topic} fans are LOUD right now, whole section on their feet",
             "source": "bluesky",
-            "author": "@pitchside.bsky",
+            "author": "demo-3",
             "permalink": None,
             "demo": True,
         },
         {
             "text": f"stat check: {topic} have 68% possession but only 2 shots on target so far",
             "source": "mastodon",
-            "author": "@xg_watcher@mastodon.social",
+            "author": "demo-4",
             "permalink": None,
             "demo": True,
         },
         {
             "text": f"{topic} keeper made a huge save there, momentum shift incoming",
             "source": "bluesky",
-            "author": "@wc2026live.bsky",
+            "author": "demo-5",
             "permalink": None,
             "demo": True,
         },

@@ -1,6 +1,13 @@
 """
-Engaging-voice arc synthesis for narrative spikes.
+Narrative arc synthesis for narrative spikes.
 
+Generates a short arc for each spike from the per-source signal, similar
+past arcs in Weaviate and the live match context.
+
+Design:
+    - The prompt discloses when any source value is synthetic (mock data).
+    - The template fallback describes only the observed signal.
+    - Embeddings run on ml.executors.EMBED_EXECUTOR.
 """
 
 from __future__ import annotations
@@ -11,7 +18,7 @@ import os
 from typing import List
 
 from agents.narrative_spike_detector import NarrativeSpike
-from agents.ollama_client import generate
+from agents.ollama_client import generate_with_source
 from agents.weaviate_client import get_weaviate_client, NARRATIVE_ARCS
 from ml.embedding_model import get_embed_model as _get_embed_model
 from ml.executors import EMBED_EXECUTOR
@@ -50,14 +57,14 @@ BANNED_PHRASES = [
 FEW_SHOT_EXAMPLES = """
 GOOD (leads with a number, gives a probable cause reasoned from which
 sources moved and which didn't — no match data needed, just signal shape):
-"86 posts a minute on Mastodon right now — triple the pre-tournament
+"86 posts an hour on Mastodon right now — triple the pre-tournament
 baseline, with almost no matching move on Bluesky or Wikipedia. That
 lopsided pattern is the signature of a single viral post or clip getting
 shared rapidly on one platform, not a broad multi-source reaction like a
 goal or a major news story would produce."
 
 GOOD (a comparison that draws a real inference from the signal pattern):
-"Wikipedia edits on the squad page jumped to 4.2/min with Mastodon and
+"Wikipedia edits on the squad page jumped to 12 an hour with Mastodon and
 Bluesky both still near baseline — that mismatch usually means a lineup
 or injury story breaking on a slower news cycle, since fan chatter would
 normally lead a Wikipedia spike, not lag behind it like this one does."
@@ -71,32 +78,25 @@ experienced a significant spike in social signals."
 
 
 def _build_prompt(spike: NarrativeSpike, rag_docs: List[str]) -> str:
-    """
-    Construct the LLM instruction prompt for generating a narrative arc.
-
-    Formats live signal metrics, source movement patterns, historical context,
-    and generation constraints into a structured prompt that guides the model
-    toward evidence-based narrative analysis.
-
-    Args:
-        spike (NarrativeSpike): Narrative spike containing detected signals,
-            severity, and source metadata.
-        rag_docs (List[str]): Retrieved historical narrative examples used as
-            contextual references.
-
-    Returns:
-        str: Fully formatted prompt for narrative generation.
-    """
     signal_lines = []
     s = spike.sources
-    if s.get("mastodon", 0) > 5:
-        signal_lines.append(f"Mastodon: {s['mastodon']:.0f} posts/min")
-    if s.get("bluesky", 0) > 3:
-        signal_lines.append(f"Bluesky: {s['bluesky']:.0f} mentions/min")
-    if s.get("trends", 0) > 30:
-        signal_lines.append(f"Google Trends: {s['trends']:.0f}/100")
-    if s.get("wikipedia", 0) > 0.5:
-        signal_lines.append(f"Wikipedia: {s['wikipedia']:.1f} edits/min")
+    z = spike.z_scores or {}
+
+    def _z(src: str) -> str:
+        return f" ({z[src]:.1f}σ vs 3h baseline)" if z.get(src) is not None else ""
+
+    if s.get("mastodon", 0) > 3:
+        signal_lines.append(f"Mastodon: {s['mastodon']:.0f} posts/hr{_z('mastodon')}")
+    if s.get("bluesky", 0) > 20:
+        signal_lines.append(f"Bluesky: {s['bluesky']:.0f} posts/hr{_z('bluesky')}")
+    if s.get("trends", 0) > 1.2:
+        signal_lines.append(
+            f"Google Trends: {s['trends']:.1f}× the last hour{_z('trends')}"
+        )
+    if s.get("wikipedia", 0) > 1:
+        signal_lines.append(
+            f"Wikipedia: {s['wikipedia']:.0f} edits/hr{_z('wikipedia')}"
+        )
     signal_str = "; ".join(signal_lines) if signal_lines else spike.summary
 
     precedent = ""
@@ -114,6 +114,7 @@ def _build_prompt(spike: NarrativeSpike, rag_docs: List[str]) -> str:
         f"Stayed near baseline: {', '.join(sorted(quiet)) or 'none — all four moved together'}."
     )
 
+    # Disclose mock-data provenance so synthetic numbers aren't narrated as real.
     mock_note = ""
     if spike.data_sources:
         mock_sources = [s for s, kind in spike.data_sources.items() if kind == "mock"]
@@ -127,7 +128,9 @@ def _build_prompt(spike: NarrativeSpike, rag_docs: List[str]) -> str:
     return (
         f"[INST] You are a sharp, cynical digital culture trend-spotter for a live sports intelligence desk. "
         f"Your job is to cut through the noise and tell the audience if a social spike is a real-world event or just a viral meme.\n\n"
-        f"SPIKE: topic '{spike.topic}', severity {spike.severity:.0%} above baseline.\n"
+        f"SPIKE: topic '{spike.topic}', severity index {spike.severity:.2f} "
+        f"(0 = at the alert threshold, 1 = far beyond it; robust z-scores vs a "
+        f"rolling 3-hour baseline).\n"
         f"Signal: {signal_str}.\n"
         f"Source pattern: {shape_note}"
         f"{mock_note}"
@@ -162,19 +165,6 @@ def _build_prompt(spike: NarrativeSpike, rag_docs: List[str]) -> str:
 
 
 def sanitize_arc(text: str, max_chars: int = 780) -> str:
-    """
-    Clean and normalize generated narrative text before returning it.
-
-    Removes common model preambles, trims unnecessary formatting, and truncates
-    long outputs while preserving sentence boundaries when possible.
-
-    Args:
-        text (str): Raw generated narrative text.
-        max_chars (int, optional): Maximum allowed output length in characters.
-
-    Returns:
-        str: Sanitized narrative arc text.
-    """
     text = text.strip().strip('"').strip()
     for prefix in ("Here's", "Here is", "Sure,", "Sure!", "Certainly,"):
         if text.startswith(prefix):
@@ -193,40 +183,13 @@ def sanitize_arc(text: str, max_chars: int = 780) -> str:
 
 
 def _violates_rules(text: str) -> bool:
-    """
-    Check whether generated text contains prohibited phrases.
-
-    Used as a safety guard to prevent the final narrative from including banned
-    template-like language or unsupported analytical claims.
-
-    Args:
-        text (str): Generated narrative text to validate.
-
-    Returns:
-        bool: True if banned phrasing is detected, otherwise False.
-    """
-    """True if generated text uses banned phrasing."""
+    """True if a generated arc uses banned phrasing (falls back to template)."""
     low = text.lower()
     return any(bp in low for bp in BANNED_PHRASES)
 
 
-def _template_arc(spike: NarrativeSpike) -> str:
-    """
-    Generate a deterministic fallback narrative from observed signal patterns.
-
-    Creates a rule-based narrative when LLM generation fails or produces output
-    that violates quality constraints. The fallback reasons from source movement
-    patterns without introducing unsupported statistics.
-
-    Args:
-        spike (NarrativeSpike): Narrative spike containing signal metrics and
-            source activity information.
-
-    Returns:
-        str: Generated fallback narrative arc.
-    """
-    """Template fallback based on observed per-source signal shape."""
-    sev_pct = round(spike.severity * 100)
+def template_arc(spike: NarrativeSpike) -> str:
+    """Template arc built from the per-source numbers (which moved, which didn't)."""
     s = spike.sources or {}
     driving = spike.source_names or []
     all_four = ["mastodon", "bluesky", "trends", "wikipedia"]
@@ -236,17 +199,19 @@ def _template_arc(spike: NarrativeSpike) -> str:
     if spike.data_sources and any(v == "mock" for v in spike.data_sources.values()):
         mock_note = " (signal is partly simulated — live source unavailable)"
 
+    # Lead with the loudest concrete number available.
     lead_parts = []
-    if s.get("mastodon", 0) > 10:
-        lead_parts.append(f"{s['mastodon']:.0f} Mastodon posts/min")
-    if s.get("bluesky", 0) > 8:
-        lead_parts.append(f"{s['bluesky']:.0f} Bluesky mentions/min")
-    if s.get("trends", 0) > 50:
-        lead_parts.append(f"a Trends index of {s['trends']:.0f}")
-    if s.get("wikipedia", 0) > 1:
-        lead_parts.append(f"{s['wikipedia']:.1f} Wikipedia edits/min")
-    lead = lead_parts[0] if lead_parts else f"{sev_pct}% above its rolling baseline"
+    if s.get("mastodon", 0) > 6:
+        lead_parts.append(f"{s['mastodon']:.0f} Mastodon posts/hr")
+    if s.get("bluesky", 0) > 50:
+        lead_parts.append(f"{s['bluesky']:.0f} Bluesky posts/hr")
+    if s.get("trends", 0) > 1.5:
+        lead_parts.append(f"Google Trends at {s['trends']:.1f}× the last hour")
+    if s.get("wikipedia", 0) > 3:
+        lead_parts.append(f"{s['wikipedia']:.0f} Wikipedia edits/hr")
+    lead = lead_parts[0] if lead_parts else "an elevated multi-source signal"
 
+    # Shape-based reasoning — same logic the LLM prompt is instructed to use.
     if len(driving) == 1:
         shape_sentence = (
             f"The move is concentrated entirely on {driving[0]}, with "
@@ -282,7 +247,8 @@ def _template_arc(spike: NarrativeSpike) -> str:
 
     return (
         f"{spike.topic} is running at {lead} right now{mock_note}, "
-        f"{sev_pct}% above its 72-hour baseline. {shape_sentence} {watch_for}"
+        f"severity index {spike.severity:.2f} against its rolling 3-hour baseline. "
+        f"{shape_sentence} {watch_for}"
     )
 
 
@@ -290,22 +256,6 @@ async def synthesise(
     spike: NarrativeSpike,
     loop: asyncio.AbstractEventLoop,
 ) -> str:
-    """
-    Generate a narrative arc for a detected narrative spike.
-
-    Retrieves related historical arcs using vector search, builds an LLM prompt,
-    generates and validates the narrative response, and falls back to a
-    rule-based template when generation fails. Optionally stores generated arcs
-    back into the vector database.
-
-    Args:
-        spike (NarrativeSpike): Narrative spike requiring narrative synthesis.
-        loop (asyncio.AbstractEventLoop): Event loop used for asynchronous
-            embedding execution.
-
-    Returns:
-        str: Final synthesized narrative arc.
-    """
     wv = get_weaviate_client()
     rag_docs: List[str] = []
 
@@ -317,7 +267,8 @@ async def synthesise(
                 EMBED_EXECUTOR,
                 lambda: model.encode(query, normalize_embeddings=True).tolist(),
             )
-            rag_docs = wv.hybrid_search(
+            rag_docs = await asyncio.to_thread(
+                wv.hybrid_search,
                 query_vector=vec,
                 query_text=query,
                 top_k=3,
@@ -329,13 +280,13 @@ async def synthesise(
     prompt = _build_prompt(spike, rag_docs)
 
     try:
-        arc_text = await generate(prompt, timeout=20.0)
+        arc_text, served_by = await generate_with_source(prompt, timeout=20.0)
     except Exception as e:
         log.warning(f"Arc generation failed: {e}")
-        arc_text = ""
+        arc_text, served_by = "", ""
 
     if not arc_text:
-        arc_text = _template_arc(spike)
+        arc_text = template_arc(spike)
         via = "template"
     else:
         arc_text = sanitize_arc(arc_text)
@@ -344,10 +295,10 @@ async def synthesise(
                 f"Arc for {spike.topic} rejected (banned phrasing / parroted "
                 f"precedent) — using template"
             )
-            arc_text = _template_arc(spike)
+            arc_text = template_arc(spike)
             via = "template(guard)"
         else:
-            via = "mistral"
+            via = served_by or "llm"
 
     log.info(
         f"Arc synthesised for {spike.topic} spike {spike.spike_id} "
@@ -367,7 +318,8 @@ async def synthesise(
                 EMBED_EXECUTOR,
                 lambda: model.encode(content, normalize_embeddings=True).tolist(),
             )
-            wv.insert_document(
+            await asyncio.to_thread(
+                wv.insert_document,
                 collection=NARRATIVE_ARCS,
                 properties={
                     "content": content,
