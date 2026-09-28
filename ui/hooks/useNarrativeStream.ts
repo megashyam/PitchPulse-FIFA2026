@@ -1,13 +1,11 @@
 "use client"
-
-/**
- * Stream the tournament-wide narrative hub.
- *
- * The endpoint is intentionally broader than anomaly detection: it surfaces
- * all trending topics and lets the backend rank them by live fixture
- * relevance first, then by spike strength. The hook only needs to poll and
- * refresh on SSE signals; it does not apply any client-side ranking rules.
- */
+// hooks/useNarrativeStream.ts
+// Feeds the tournament-wide "trending now" hub: fetches /narrative/trending
+// (ALL topics ranked by buzz, not only alerted surges), polls every
+// 20s, and re-fetches whenever the SSE stream signals a new anomaly.
+//
+// Spikes may carry optional `fixture_id` / `match_status` fields for the
+// live/kickoff badge.
 
 import { useEffect, useState, useCallback, useRef } from "react"
 
@@ -30,7 +28,7 @@ export interface NarrativeSpike {
     timestamp: number
     arc: string | null
     is_spike?: boolean
-
+    // Optional fixture fields for the live/kickoff badge
     fixture_id?: number | null
     match_status?: string | null
 }
@@ -62,7 +60,7 @@ export function useNarrativeStream(): UseNarrativeStreamResult {
                 setError(null)
             }
         } catch {
-
+            /* keep waiting; next poll retries */
         }
     }, [])
 
@@ -71,6 +69,7 @@ export function useNarrativeStream(): UseNarrativeStreamResult {
         fetchTrending()
         const poll = setInterval(fetchTrending, POLL_INTERVAL)
 
+        // SSE only nudges a refetch when a fresh anomaly lands.
         const es = new EventSource(`${API}/narrative/stream`)
         es.addEventListener("narrative_spike", () => {
             if (mounted.current) fetchTrending()

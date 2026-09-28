@@ -1,4 +1,5 @@
 "use client"
+// app/predict/page.tsx — fully interactive outcome predictor
 
 import { useMemo, useState } from "react"
 import { usePredictStream } from "@/hooks/usePredictStream"
@@ -24,20 +25,24 @@ export default function PredictPage() {
     const [expandedTeam, setExpandedTeam] = useState<string | null>(null)
     const [selectedTop8, setSelectedTop8] = useState<string | null>(null)
 
+    // Top 4 for KPI strip
     const top4 = useMemo(() =>
         hasData ? [...prediction!.teams].sort((a, b) => b.champion.p - a.champion.p).slice(0, 4) : []
         , [prediction])
 
+    // Teams in the active group sorted by champion prob
     const groupTeams = useMemo(() =>
         hasData
             ? prediction!.teams.filter(t => t.group === activeGroup).sort((a, b) => b.champion.p - a.champion.p)
             : []
         , [prediction, activeGroup])
 
+    // Full table sorted
     const sorted = useMemo(() =>
         hasData ? [...prediction!.teams].sort((a, b) => b[sortStage].p - a[sortStage].p) : []
         , [prediction, sortStage])
 
+    // Top 8 for chart
     const top8 = useMemo(() =>
         hasData ? [...prediction!.teams].sort((a, b) => b.champion.p - a.champion.p).slice(0, 8) : []
         , [prediction])
@@ -48,7 +53,7 @@ export default function PredictPage() {
     return (
         <div className="ip-page">
 
-
+            {/* ── Header ── */}
             <div className="ip-header">
                 <div className="ip-header-left">
                     <div className="ip-eyebrow">Monte Carlo · 48-team · numpy vectorized</div>
@@ -69,7 +74,7 @@ export default function PredictPage() {
                 </div>
             </div>
 
-
+            {/* ── Empty state ── */}
             {!hasData && !isRunning && (
                 <div className="nar-empty" style={{ minHeight: 320 }}>
                     <div className="nar-empty-icon">🎯</div>
@@ -89,7 +94,7 @@ export default function PredictPage() {
 
             {hasData && (<>
 
-
+                {/* ── KPI strip — top 4 teams ── */}
                 <div className="kpi-strip">
                     {top4.map((team, i) => {
                         const colors = ["var(--accent)", "var(--home)", "var(--c-ai)", "var(--amber)"]
@@ -106,7 +111,7 @@ export default function PredictPage() {
                                 </div>
                                 <div className="kpi-cell-name">{team.name}</div>
                                 <div className="kpi-cell-sub">Elo {team.elo.toFixed(0)} · Group {team.group}</div>
-                                { }
+                                {/* Hover expand — full tournament path */}
                                 <div className="kpi-cell-expand">
                                     {STAGES.map(s => (
                                         <div key={s} className="kpi-expand-row">
@@ -123,14 +128,14 @@ export default function PredictPage() {
                     })}
                 </div>
 
-
+                {/* ── Main grid ── */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: 0, borderBottom: "1px solid var(--border-bright)" }}>
 
-                    { }
+                    {/* Left: group selector + team bars */}
                     <div style={{ borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column" }}>
 
                         <div style={{ padding: "16px 18px 0", borderBottom: "1px solid var(--border)" }}>
-                            <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "uppercase", letterSpacing: ".12em", color: "var(--text-3)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                            <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-3)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
                                 <span style={{ width: 3, height: 10, background: "var(--accent)", borderRadius: 2, display: "inline-block" }} />
                                 Group Stage
                             </div>
@@ -143,7 +148,7 @@ export default function PredictPage() {
                             </div>
                         </div>
 
-                        <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "uppercase", letterSpacing: ".1em", color: "var(--text-3)", padding: "12px 18px 6px", borderBottom: "1px solid var(--border)" }}>
+                        <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-3)", padding: "12px 18px 6px", borderBottom: "1px solid var(--border)" }}>
                             Group {activeGroup} — advancement &amp; WC win
                         </div>
 
@@ -191,10 +196,12 @@ export default function PredictPage() {
 
                     </div>
 
+                    {/* Right: top 8 chart + match odds */}
                     <div style={{ display: "flex", flexDirection: "column" }}>
 
+                        {/* Top 8 chart */}
                         <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--border)" }}>
-                            <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "uppercase", letterSpacing: ".12em", color: "var(--text-3)", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-3)", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                                 <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                     <span style={{ width: 3, height: 10, background: "var(--c-ai)", borderRadius: 2, display: "inline-block" }} />
                                     Win distribution — top 8
@@ -228,7 +235,7 @@ export default function PredictPage() {
                                         <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 6 }}>
                                             {STAGES.map(s => (
                                                 <div key={s} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                                                    <span style={{ fontFamily: "var(--font-mono)", fontSize: ".52rem", textTransform: "uppercase", letterSpacing: ".08em", color: "var(--text-3)" }}>{STAGE_LABELS[s]}</span>
+                                                    <span style={{ fontFamily: "var(--font-mono)", fontSize: ".52rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-3)" }}>{STAGE_LABELS[s]}</span>
                                                     <div style={{ height: 3, background: "var(--bg-4)", borderRadius: 2, overflow: "hidden" }}>
                                                         <div style={{ height: "100%", width: `${(t[s].p * 100).toFixed(1)}%`, background: STAGE_COLORS[s], borderRadius: 2 }} />
                                                     </div>
@@ -241,9 +248,9 @@ export default function PredictPage() {
                             })()}
                         </div>
 
-                        { }
+                        {/* Per-match odds */}
                         <div style={{ flex: 1, padding: "14px 18px", overflow: "auto" }}>
-                            <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "uppercase", letterSpacing: ".12em", color: "var(--text-3)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                            <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-3)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
                                 <span style={{ width: 3, height: 10, background: "var(--away)", borderRadius: 2, display: "inline-block" }} />
                                 Market odds — per match
                             </div>
@@ -253,10 +260,10 @@ export default function PredictPage() {
                     </div>
                 </div>
 
-
+                {/* ── Tournament table ── */}
                 <div style={{ padding: "0 0 0" }}>
                     <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "uppercase", letterSpacing: ".12em", color: "var(--text-3)", display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-3)", display: "flex", alignItems: "center", gap: 6 }}>
                             <span style={{ width: 3, height: 10, background: "var(--amber)", borderRadius: 2, display: "inline-block" }} />
                             All 48 Teams — click rows to expand · click headers to sort
                         </div>
@@ -326,9 +333,9 @@ export default function PredictPage() {
                     </div>
                 </div>
 
-                { }
+                {/* Bracket impact */}
                 <div style={{ padding: "16px 18px", borderTop: "1px solid var(--border-bright)" }}>
-                    <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "uppercase", letterSpacing: ".12em", color: "var(--text-3)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-3)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ width: 3, height: 10, background: "var(--c-ai)", borderRadius: 2, display: "inline-block" }} />
                         Bracket impact — counterfactual analysis
                     </div>

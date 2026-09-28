@@ -1,4 +1,5 @@
 "use client"
+// hooks/useMatchBriefing.ts — adds refetch() for polling after auto-trigger
 
 import { useEffect, useState, useCallback } from "react"
 

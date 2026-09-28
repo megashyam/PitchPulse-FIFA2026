@@ -1,9 +1,9 @@
 // types/predict.ts — updated with group finishing position fields
 
 export interface StageProbability {
-    p: number
-    ci_lo: number
-    ci_hi: number
+    p: number   // probability 0..1
+    ci_lo: number   // 95% CI lower
+    ci_hi: number   // 95% CI upper
 }
 
 export interface TeamPrediction {
@@ -12,17 +12,15 @@ export interface TeamPrediction {
     elo: number
     fifa_rank: number
 
-
-    group_exit: StageProbability
-    group_first: StageProbability
-    group_second: StageProbability
-    group_third: StageProbability
-
-    group_fourth: StageProbability
-
+    // Group stage finishing position
+    group_exit: StageProbability  // eliminated in group
+    group_first: StageProbability  // finishes 1st
+    group_second: StageProbability  // finishes 2nd
+    group_third: StageProbability  // finishes 3rd (eligible for best-thirds)
+    group_fourth: StageProbability  // finishes 4th (always eliminated)
 
     // Knockout stages
-    r32: StageProbability
+    r32: StageProbability  // advances from group (= 1st + 2nd + best_third)
     r16: StageProbability
     qf: StageProbability
     sf: StageProbability

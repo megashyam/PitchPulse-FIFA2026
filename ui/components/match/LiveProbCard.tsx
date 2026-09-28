@@ -1,16 +1,8 @@
 "use client"
 // components/match/LiveProbCard.tsx
-// Live win probability. Now backed by GET /matches/{id}/live-prob — the
-// same in-play model (ml/in_play.py) the counterfactual agent conditions
-// on — polled every 30s. Falls back to the local calcProbs() heuristic only
-// if that fetch fails, so the card never goes blank on a transient error.
-//
-// Fix (audit finding): this component previously computed its OWN
-// probability from score + momentum + elapsed time — a fourth, independent
-// probability model alongside the backend's Elo/Betfair prior, in-play
-// model, and counterfactual conditioning, with no guarantee any of them
-// agreed. calcProbs() is kept only as an offline/error fallback so the UI
-// degrades gracefully instead of going blank.
+// Live win probability from GET /matches/{id}/live-prob (the in-play model
+// in ml/in_play.py), polled every 30s. Falls back to the local calcProbs()
+// heuristic only if that fetch fails.
 
 import { useEffect, useState } from "react"
 import { useMomentumStream } from "@/hooks/useMomentumStream"
@@ -141,7 +133,7 @@ export function LiveProbCard({ state, fixtureId }: Props) {
 
             <div style={{ padding: "3px 14px 5px" }}>
 
-
+                {/* Team abbreviations + percentages, one line */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 4, marginBottom: 3, alignItems: "baseline" }}>
                     <span style={{ fontSize: ".68rem", fontWeight: 700, color: "var(--home)" }}>
                         {hn} <span style={{ fontSize: ".76rem" }}>{homeW}%</span>
@@ -152,7 +144,7 @@ export function LiveProbCard({ state, fixtureId }: Props) {
                     </span>
                 </div>
 
-
+                {/* Tricolor bar */}
                 <div style={{ height: 4, borderRadius: 2, overflow: "hidden", display: "flex", gap: 1 }}>
                     <div style={{ width: `${homeW}%`, background: "var(--home)" }} />
                     <div style={{ width: `${drawW}%`, background: "var(--text-3)" }} />

@@ -1,16 +1,20 @@
 "use client"
+// components/match/TacticalCard.tsx — bigger pitch, 2-column stat grid
 
 import type { MatchState } from "@/types/match"
 import { useTactical, type TeamFingerprint } from "@/hooks/useTactical"
 
-function FingerprintNarrative({ homeName, awayName, fp }: { homeName: string; awayName: string; fp: TeamFingerprint }) {
+function FingerprintNarrative({ fp }: { fp: TeamFingerprint }) {
     const m = fp.match
     return (
         <div className="tactical-narrative">
             <div className="tactical-narrative-head">
-                <span className="tactical-narrative-title">
-                    {homeName} vs {awayName} · FIFA WC {m.season}
+                <span className="tactical-narrative-matchup">
+                    <span style={{ color: "var(--home)" }}>{m.team}</span>
+                    <span className="tactical-narrative-vs"> vs </span>
+                    <span style={{ color: "var(--away)" }}>{m.opponent}</span>
                 </span>
+                <span className="tactical-narrative-tournament">{m.competition} {m.season}</span>
             </div>
             <p className="tactical-narrative-quote">"{m.content}"</p>
             <div className="tactical-narrative-zones">
@@ -34,25 +38,36 @@ function FingerprintNarrative({ homeName, awayName, fp }: { homeName: string; aw
 
             <style jsx>{`
                 .tactical-narrative {
-                    padding: 12px 18px 14px;
+                    padding: 16px;
                     margin: 8px;
-                    background: var(--glass-bg-inner, rgba(255, 255, 255, .04));
-                    border: 1px solid var(--glass-border-inner, rgba(255, 255, 255, .08));
+                    background: var(--glass-bg-inner);
+                    border: 1px solid var(--glass-border-inner);
                     border-radius: var(--r-md);
-                    backdrop-filter: blur(12px);
-                    -webkit-backdrop-filter: blur(12px);
+                    backdrop-filter: var(--glass-blur);
+                    -webkit-backdrop-filter: var(--glass-blur);
                 }
                 .tactical-narrative-head {
                     display: flex;
-                    align-items: center;
+                    align-items: baseline;
+                    justify-content: space-between;
                     gap: 8px;
-                    font-family: var(--font-mono);
-                    font-size: .68rem;
                     margin-bottom: 6px;
                 }
-                .tactical-narrative-title {
+                .tactical-narrative-matchup {
+                    font-family: var(--font-mono);
+                    font-size: .68rem;
                     font-weight: 700;
-                    color: var(--text-1);
+                }
+                .tactical-narrative-vs {
+                    color: var(--text-3);
+                    font-weight: 400;
+                }
+                .tactical-narrative-tournament {
+                    font-family: var(--font-mono);
+                    font-size: .56rem;
+                    color: var(--text-2);
+                    white-space: nowrap;
+                    flex-shrink: 0;
                 }
                 .tactical-narrative-quote {
                     font-size: .78rem;
@@ -74,10 +89,10 @@ function FingerprintNarrative({ homeName, awayName, fp }: { homeName: string; aw
                 }
                 .tactical-narrative-zone-label {
                     font-family: var(--font-mono);
-                    font-size: .52rem;
-                    text-transform: uppercase;
-                    letter-spacing: .06em;
-                    color: var(--text-3);
+                    font-size: .6rem;
+                    text-transform: none;
+                    letter-spacing: normal;
+                    color: var(--text-2);
                 }
                 .tactical-narrative-zone-val {
                     font-family: var(--font-mono);
@@ -101,25 +116,25 @@ export function TacticalCard({ state, fixtureId }: { state: MatchState; fixtureI
     const awayAbbr = state.away_name.slice(0, 3).toUpperCase()
     const fp = tactical?.home ?? null
     const fpAway = tactical?.away ?? null
-    const ppdaDisplay = fp ? fp.match.ppda.toFixed(1)
-        : h.shots_total > 0 ? (a.passes_total / h.shots_total).toFixed(1) : "—"
-
-    const hasFingerprint = !!fp && fp.match.match_pct != null
-    const hasAwayFingerprint = !!fpAway && fpAway.match.match_pct != null
+    // Historical PPDA only — live stats carry no per-zone pressing data.
+    const ppdaDisplay = fp ? fp.match.ppda.toFixed(1) : "—"
+    const hasFingerprint = !!fp && !!fp.match.team
+    const hasAwayFingerprint = !!fpAway && !!fpAway.match.team
 
     return (
         <div>
-
+            {/* Two columns: pitch + raw stats on the left, fingerprint match
+                and both teams' narratives on the right. */}
             <div className="tactical-2col">
                 <div className="tactical-col-left">
 
-
+                    {/* Pitch — bigger, real football green */}
                     <div className="tactical-pitch-v2">
                         <div className="tactical-pitch-circle" />
                         <div className="tactical-pitch-box-home" />
                         <div className="tactical-pitch-box-away" />
 
-
+                        {/* Home zone */}
                         <div
                             className="tactical-zone-overlay home"
                             style={{
@@ -132,7 +147,7 @@ export function TacticalCard({ state, fixtureId }: { state: MatchState; fixtureI
                             <span className="tactical-zone-label">{homeAbbr}</span>
                         </div>
 
-
+                        {/* Away zone */}
                         <div
                             className="tactical-zone-overlay away"
                             style={{
@@ -202,7 +217,7 @@ export function TacticalCard({ state, fixtureId }: { state: MatchState; fixtureI
                             <div className="tactical-fp-label">Closest tactical profile</div>
                             {!fp && (
                                 <div style={{ fontSize: ".7rem", color: "var(--text-3)", marginTop: 3 }}>
-                                    Run tactical indexer to enable cosine matching
+                                    Run the tactical indexer to enable profile matching
                                 </div>
                             )}
                         </div>
@@ -214,7 +229,9 @@ export function TacticalCard({ state, fixtureId }: { state: MatchState; fixtureI
                                         {fp!.match.competition} {fp!.match.season}
                                     </div>
                                 </div>
-                                <div className="tactical-fp-pct">{fp!.match.match_pct}%</div>
+                                <div className="tactical-fp-pct" title="Possession gap to the historical profile, percentage points">
+                                    Δ{fp!.match.possession_gap_pp}pp
+                                </div>
                             </div>
                         ) : (
                             <div style={{ fontFamily: "var(--font-mono)", fontSize: ".68rem", color: "var(--text-3)" }}>
@@ -233,10 +250,10 @@ export function TacticalCard({ state, fixtureId }: { state: MatchState; fixtureI
                         LLM-generated), plus the per-zone PPDA values the
                         backend already returns but the card never showed. */}
                     {hasFingerprint && (
-                        <FingerprintNarrative homeName={state.home_name} awayName={state.away_name} fp={fp!} />
+                        <FingerprintNarrative fp={fp!} />
                     )}
                     {hasAwayFingerprint && (
-                        <FingerprintNarrative homeName={state.home_name} awayName={state.away_name} fp={fpAway!} />
+                        <FingerprintNarrative fp={fpAway!} />
                     )}
                 </div>
             </div>
@@ -271,7 +288,7 @@ export function TacticalCard({ state, fixtureId }: { state: MatchState; fixtureI
                     padding: 4px 0 !important;
                 }
                 .tactical-stats-grid-compact :global(.tactical-stat-cell-label) {
-                    font-size: .58rem !important;
+                    font-size: .68rem !important;
                     margin-bottom: 1px !important;
                 }
                 .tactical-stats-grid-compact :global(.tactical-stat-cell-value) {

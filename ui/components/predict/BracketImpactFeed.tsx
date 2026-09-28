@@ -1,12 +1,7 @@
 "use client"
-
-/**
- * Counterfactual bracket impact feed for the prediction page.
- *
- * This view reuses the same historical counterfactual feed as the match page
- * but presents it in a tournament-context layout, keeping only events that
- * are still relevant to the current match clock.
- */
+// components/predict/BracketImpactFeed.tsx
+// Same stale result guard as CounterfactualPanel.
+// Fetches current match elapsed to filter out results from previous cycles.
 
 import { useEffect, useState } from "react"
 
@@ -69,6 +64,7 @@ function useBracketImpact() {
 export function BracketImpactFeed() {
     const { entries, matchName, matchElapsed, loading } = useBracketImpact()
 
+    // Filter out stale results from previous replay cycles
     const freshEntries = entries.filter(e => e.minute <= matchElapsed + 5)
 
     return (
@@ -78,7 +74,7 @@ export function BracketImpactFeed() {
                     <span className="src src-novel">Novel · counterfactual narrator</span>
                     {matchName && <span className="pred-bracket-match">{matchName}</span>}
                 </div>
-                <span className="pred-bracket-meta">MC divergence score → Mistral 7B</span>
+                <span className="pred-bracket-meta">MC divergence score → LLM</span>
             </div>
 
             <div className="pred-bracket-section">Bracket impact — key events</div>
@@ -106,7 +102,7 @@ export function BracketImpactFeed() {
                     {freshEntries[0]?.narrative && (
                         <div className="pred-bracket-narrative-wrap">
                             <span className="pred-bracket-narrative-meta">
-                                Mistral 7B · Ollama · post-event narrative
+                                post-event narrative
                             </span>
                             <p className="pred-bracket-narrative">"{freshEntries[0].narrative}"</p>
                         </div>

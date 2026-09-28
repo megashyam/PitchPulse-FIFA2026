@@ -1,5 +1,6 @@
 "use client"
-
+// components/match/EventsFeed.tsx
+// Compact single-line event rows.
 
 import type { MatchState } from "@/types/match"
 
@@ -30,38 +31,38 @@ export function EventsFeed({ state }: Props) {
                 </div>
             ) : (
                 <div style={{ maxHeight: 160, overflowY: "auto" }}>
-                    {events.map((ev, i) => {
-                        const isHome = ev.team_name === state.home_name
-                        const icon = EV_ICONS[ev.type] ?? "•"
-                        const label = EV_LABELS[ev.type] ?? ev.type
-                        const showName = ev.player_name && !HIDDEN_DETAILS.has(ev.player_name.toLowerCase())
-                        const text = showName ? ev.player_name! : label
+                {events.map((ev, i) => {
+                    const isHome = ev.team_name === state.home_name
+                    const icon = EV_ICONS[ev.type] ?? "•"
+                    const label = EV_LABELS[ev.type] ?? ev.type
+                    const showName = ev.player_name && !HIDDEN_DETAILS.has(ev.player_name.toLowerCase())
+                    const text = showName ? ev.player_name! : label
 
-                        return (
-                            <div key={i} style={{
-                                display: "flex", alignItems: "center", gap: 5,
-                                padding: "2px 14px", borderTop: "1px solid var(--border)",
-                                fontSize: ".7rem", lineHeight: 1.1,
-                                justifyContent: isHome ? "flex-start" : "flex-end",
-                            }}>
-                                {isHome ? (
-                                    <>
-                                        <span style={{ fontFamily: "var(--font-mono)", fontSize: ".68rem", color: "var(--amber)", fontWeight: 600, width: 26 }}>{ev.elapsed}'</span>
-                                        <span style={{ fontSize: ".84rem" }}>{icon}</span>
-                                        <span style={{ fontWeight: 600, color: "var(--text-1)" }}>{text}</span>
-                                        <span style={{ color: "var(--text-3)", fontSize: ".66rem" }}>{ev.team_name}</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <span style={{ color: "var(--text-3)", fontSize: ".66rem" }}>{ev.team_name}</span>
-                                        <span style={{ fontWeight: 600, color: "var(--text-1)" }}>{text}</span>
-                                        <span style={{ fontSize: ".84rem" }}>{icon}</span>
-                                        <span style={{ fontFamily: "var(--font-mono)", fontSize: ".68rem", color: "var(--amber)", fontWeight: 600, width: 26, textAlign: "right" }}>{ev.elapsed}'</span>
-                                    </>
-                                )}
-                            </div>
-                        )
-                    })}
+                    return (
+                        <div key={i} style={{
+                            display: "flex", alignItems: "center", gap: 5,
+                            padding: "2px 14px", borderTop: "1px solid var(--border)",
+                            fontSize: ".7rem", lineHeight: 1.1,
+                            justifyContent: isHome ? "flex-start" : "flex-end",
+                        }}>
+                            {isHome ? (
+                                <>
+                                    <span style={{ fontFamily: "var(--font-mono)", fontSize: ".68rem", color: "var(--amber)", fontWeight: 600, width: 26 }}>{ev.elapsed}'</span>
+                                    <span style={{ fontSize: ".84rem" }}>{icon}</span>
+                                    <span style={{ fontWeight: 600, color: "var(--text-1)" }}>{text}</span>
+                                    <span style={{ color: "var(--text-3)", fontSize: ".66rem" }}>{ev.team_name}</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span style={{ color: "var(--text-3)", fontSize: ".66rem" }}>{ev.team_name}</span>
+                                    <span style={{ fontWeight: 600, color: "var(--text-1)" }}>{text}</span>
+                                    <span style={{ fontSize: ".84rem" }}>{icon}</span>
+                                    <span style={{ fontFamily: "var(--font-mono)", fontSize: ".68rem", color: "var(--amber)", fontWeight: 600, width: 26, textAlign: "right" }}>{ev.elapsed}'</span>
+                                </>
+                            )}
+                        </div>
+                    )
+                })}
                 </div>
             )}
         </div>

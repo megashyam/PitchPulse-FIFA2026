@@ -1,4 +1,5 @@
 "use client"
+// components/match/MatchAITabs.tsx — no grid, each component full width
 
 import { useState, useEffect } from "react"
 import type { MatchState } from "@/types/match"
@@ -45,8 +46,10 @@ export function MatchAITabs({ state, fixtureId }: Props) {
 
                 {active === "tactical" && (
                     <>
+                        {/* Tactical fingerprint — full width */}
                         <TacticalCard state={state} fixtureId={fixtureId} />
 
+                        {/* Divider + label */}
                         <div style={{
                             borderTop: "1px solid var(--border-bright)",
                             padding: "10px 14px 8px",
@@ -59,13 +62,14 @@ export function MatchAITabs({ state, fixtureId }: Props) {
                             }} />
                             <span style={{
                                 fontFamily: "var(--font-mono)", fontSize: ".6rem",
-                                textTransform: "uppercase", letterSpacing: ".1em",
+                                textTransform: "none", letterSpacing: "normal",
                                 color: "var(--text-3)"
                             }}>
                                 Formations
                             </span>
                         </div>
 
+                        {/* Lineup — full width, untouched */}
                         <LineupCard
                             fixtureId={fixtureId}
                             homeTeam={state.home_name}

@@ -1,5 +1,6 @@
 "use client"
-
+// app/narrative/page.tsx
+// Spike cards show a LIVE/UPCOMING badge when a spike carries fixture fields.
 
 import { useEffect, useState } from "react"
 import { useNarrativeStream } from "@/hooks/useNarrativeStream"
@@ -10,10 +11,10 @@ import { triggerHeaders } from "@/lib/api"
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
 const SRC: Record<string, { color: string; bg: string; icon: string; label: string; max: number; unit: string }> = {
-    mastodon: { color: "#6364FF", bg: "rgba(99,100,255,.12)", icon: "🐘", label: "Mastodon", max: 50, unit: "posts/min" },
-    bluesky: { color: "#4f86f7", bg: "rgba(79,134,247,.12)", icon: "🦋", label: "Bluesky", max: 40, unit: "mentions/min" },
-    trends: { color: "#f59e0b", bg: "rgba(245,158,11,.12)", icon: "📈", label: "Trends", max: 100, unit: "index 0–100" },
-    wikipedia: { color: "#10d9a0", bg: "rgba(16,217,160,.12)", icon: "📖", label: "Wikipedia", max: 10, unit: "edits/min" },
+    mastodon: { color: "#6364FF", bg: "rgba(99,100,255,.12)", icon: "🐘", label: "Mastodon", max: 60, unit: "posts/hr" },
+    bluesky: { color: "#4f86f7", bg: "rgba(79,134,247,.12)", icon: "🦋", label: "Bluesky", max: 1000, unit: "posts/hr" },
+    trends: { color: "#f59e0b", bg: "rgba(245,158,11,.12)", icon: "📈", label: "Trends", max: 5, unit: "× last hr" },
+    wikipedia: { color: "#10d9a0", bg: "rgba(16,217,160,.12)", icon: "📖", label: "Wikipedia", max: 20, unit: "edits/hr" },
 }
 const SOURCES = ["mastodon", "bluesky", "trends", "wikipedia"] as const
 const DEFAULT_CFG = SRC.mastodon
@@ -53,6 +54,10 @@ export default function NarrativePage() {
     const [triggering, setTriggering] = useState(false)
     const [trigMsg, setTrigMsg] = useState<string | null>(null)
 
+    // On-demand arc fetch: the backend generates arcs only for the top
+    // trending topics (ARC_TOP_N in api/workers/narrative_worker.py).
+    // Selecting a spike without an arc fetches one by topic and shows a
+    // loading state meanwhile.
     const [arcCache, setArcCache] = useState<Record<string, string>>({})
     const [arcLoadingTopic, setArcLoadingTopic] = useState<string | null>(null)
 
@@ -71,10 +76,11 @@ export default function NarrativePage() {
                 if (cancelled || !data?.arc) return
                 setArcCache(prev => ({ ...prev, [data.topic]: data.arc }))
             })
-            .catch(() => { })
+            .catch(() => { /* leave the loader off; user can re-select to retry */ })
             .finally(() => { if (!cancelled) setArcLoadingTopic(null) })
 
         return () => { cancelled = true }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selected?.topic, resolvedArc])
 
     async function handleForce() {
@@ -89,10 +95,10 @@ export default function NarrativePage() {
     return (
         <div className="ip-page">
 
-
+            {/* ── Header ── */}
             <div className="ip-header">
                 <div className="ip-header-left">
-                    <div className="ip-eyebrow">IsolationForest · contamination=0.05 · 60s cadence · sorted by live fixture</div>
+                    <div className="ip-eyebrow">Robust z-score · 2-source corroboration · 60s cadence · sorted by live fixture</div>
                     <div className="ip-title">Narrative Hub</div>
                     <div className="ip-subtitle">
                         Multi-source signal spike detection — Mastodon · Bluesky · Trends · Wikipedia
@@ -113,12 +119,15 @@ export default function NarrativePage() {
                 </div>
             </div>
 
-
+            {/* ══════════════════════════════════════════════════
+                Narrative Arc — first thing shown, above the
+                source-strip KPI cards.
+                ══════════════════════════════════════════════════ */}
             {selected && (
                 <div className="narrative-arc-top">
-                    <div style={{ fontFamily: "var(--font-mono)", fontSize: ".6rem", textTransform: "uppercase", letterSpacing: ".12em", color: "var(--c-ai)", display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                    <div style={{ fontFamily: "var(--font-mono)", fontSize: ".6rem", textTransform: "none", letterSpacing: "normal", color: "var(--c-ai)", display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                         <span style={{ width: 3, height: 10, background: "var(--c-ai)", borderRadius: 2, display: "inline-block" }} />
-                        Mistral 7B · Arc Synthesis · Weaviate RAG
+                        LLM arc synthesis · Weaviate RAG
                     </div>
 
                     <div className="spike-arc-panel">
@@ -130,7 +139,7 @@ export default function NarrativePage() {
                                 return badge ? (
                                     <span style={{
                                         marginLeft: "auto", fontFamily: "var(--font-mono)", fontSize: ".56rem",
-                                        letterSpacing: ".08em", color: badge.color, background: badge.bg,
+                                        letterSpacing: "normal", color: badge.color, background: badge.bg,
                                         padding: "2px 8px", borderRadius: 10,
                                     }}>
                                         {badge.label}
@@ -144,7 +153,7 @@ export default function NarrativePage() {
                             <div className="spike-arc-loading">
                                 <span className="arc-spinner" aria-hidden="true" />
                                 <div>
-                                    <div className="arc-loading-title">Mistral 7B is analysing this spike…</div>
+                                    <div className="arc-loading-title">Analysing this spike…</div>
                                     <div className="arc-loading-sub">Pulling historical precedent from Weaviate, then generating a take — usually 5-15 seconds</div>
                                 </div>
                                 <style jsx>{`
@@ -182,9 +191,9 @@ export default function NarrativePage() {
                         )}
                     </div>
 
-
+                    {/* Driving sources */}
                     <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
-                        <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "uppercase", letterSpacing: ".1em", color: "var(--text-3)" }}>
+                        <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-3)" }}>
                             Driving sources
                         </div>
                         {(selected.source_names ?? []).map(src => {
@@ -205,9 +214,9 @@ export default function NarrativePage() {
                         })}
                     </div>
 
-
+                    {/* Detection info */}
                     <div style={{ marginTop: 14, padding: "12px", background: "var(--bg-3)", borderRadius: "var(--r-md)", border: "1px solid var(--border)" }}>
-                        <div style={{ fontFamily: "var(--font-mono)", fontSize: ".56rem", textTransform: "uppercase", letterSpacing: ".1em", color: "var(--text-3)", marginBottom: 8 }}>
+                        <div style={{ fontFamily: "var(--font-mono)", fontSize: ".56rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-3)", marginBottom: 8 }}>
                             Detection info
                         </div>
                         {[
@@ -225,7 +234,7 @@ export default function NarrativePage() {
                 </div>
             )}
 
-
+            {/* ── Source KPI strip — compressed, sits below the arc ── */}
             <div className="source-strip source-strip-compact">
                 {SOURCES.map(src => {
                     const cfg = cfgFor(src)
@@ -254,7 +263,7 @@ export default function NarrativePage() {
                 })}
             </div>
 
-
+            {/* ── Empty / warming state ── */}
             {(isWarming || (isWaiting && spikes.length === 0)) && (
                 <div className="nar-empty" style={{ minHeight: 260 }}>
                     <div className="nar-empty-icon">📡</div>
@@ -263,7 +272,7 @@ export default function NarrativePage() {
                     </div>
                     <div className="nar-empty-sub">
                         {isWarming
-                            ? "IsolationForest needs ~30 ticks to establish a rolling baseline. Click Force tick to accelerate warm-up."
+                            ? "The scorer needs ~60 ticks of live data per source to build a baseline. Mock values are shown but never scored."
                             : "The detector runs every 60 seconds across Mastodon, Bluesky, Trends, and Wikipedia. Use Force tick to run immediately."}
                     </div>
                     <button onClick={handleForce} disabled={triggering} className="nar-force-btn">
@@ -274,7 +283,7 @@ export default function NarrativePage() {
 
             {spikes.length > 0 && (<>
 
-
+                {/* ── Dense adaptive spike grid ── */}
                 <div className="spike-grid-section">
                     <div className="spike-grid-header">
                         <div className="spike-grid-title">
@@ -310,7 +319,7 @@ export default function NarrativePage() {
                                             {badge && (
                                                 <span style={{
                                                     marginLeft: 6, fontFamily: "var(--font-mono)", fontSize: ".5rem",
-                                                    letterSpacing: ".06em", color: badge.color, background: badge.bg,
+                                                    letterSpacing: "normal", color: badge.color, background: badge.bg,
                                                     padding: "1px 6px", borderRadius: 8, verticalAlign: "middle",
                                                 }}>
                                                     {badge.label}
@@ -344,13 +353,13 @@ export default function NarrativePage() {
                     </div>
                 </div>
 
-
+                {/* ── Live comment bubbles for the selected topic ── */}
                 {selected && (
                     <div style={{ padding: "0 0 4px" }}>
                         <div style={{
                             padding: "14px 18px 0", fontFamily: "var(--font-mono)",
-                            fontSize: ".6rem", textTransform: "uppercase",
-                            letterSpacing: ".1em", color: "var(--text-3)"
+                            fontSize: ".6rem", textTransform: "none",
+                            letterSpacing: "normal", color: "var(--text-3)"
                         }}>
                             Live comments — {selected.topic}
                         </div>
@@ -358,7 +367,7 @@ export default function NarrativePage() {
                     </div>
                 )}
 
-
+                {/* ── Signal detail — left column only (arc is at top) ── */}
                 {selected && (
                     <div style={{ padding: "16px 18px", borderTop: "1px solid var(--border-bright)" }}>
                         <div className="spike-detail-topic-row">
@@ -388,9 +397,9 @@ export default function NarrativePage() {
                     </div>
                 )}
 
-
+                {/* Methodology */}
                 <div className="predict-method" style={{ margin: "16px 18px 0" }}>
-                    <strong>Methodology —</strong> IsolationForest(contamination=0.05, n_estimators=100) on a 72-hour rolling window (4320 ticks × 4 features). Score threshold −0.10. Results sorted so topics tied to a currently-live fixture rank first, upcoming-kickoff topics next, then severity within each tier. Spikes trigger RAG over NarrativeArcs → Mistral 7B synthesis → arc stored back into Weaviate. 5-min cooldown per topic.
+                    <strong>Methodology —</strong> Per source, a one-sided robust z-score (median/MAD) of log rate against its own 3-hour live baseline. A topic alerts when ≥2 live sources are ≥3σ above baseline, or one is ≥6σ; drops never alert and mock values are never scored. Results sorted so topics tied to a currently-live fixture rank first, upcoming-kickoff topics next, then severity within each tier. Spikes trigger RAG over NarrativeArcs → LLM synthesis (local Ollama, Groq fallback) → arc stored back into Weaviate. One alert per surge episode per topic.
                 </div>
 
             </>)}

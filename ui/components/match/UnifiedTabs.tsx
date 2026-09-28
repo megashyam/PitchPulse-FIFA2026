@@ -1,10 +1,11 @@
 "use client"
-
+// components/match/UnifiedTabs.tsx
+// Single tab strip (Tactical, What If?, Briefing, Live, Predictor,
+// Narrative); each panel renders full-width in the main content column.
 
 import { useState, useEffect } from "react"
 import type { MatchState } from "@/types/match"
 import { TacticalCard } from "@/components/match/TacticalCard"
-import { LineupCard } from "@/components/match/LineupCard"
 import { CounterfactualPanel } from "@/components/match/CounterfactualPanel"
 import { PreMatchBriefingCard } from "@/components/match/PreMatchBriefingCard"
 import { IntelFeed } from "@/components/match/IntelFeed"
@@ -54,18 +55,7 @@ export function UnifiedTabs({ state, fixtureId }: Props) {
             <div className="mp-tabs-body">
 
                 {active === "tactical" && (
-                    <>
-                        <TacticalCard state={state} fixtureId={fixtureId} />
-                        <div className="mp-section-label">
-                            <span className="mp-section-label-bar" />
-                            <span>Formations</span>
-                        </div>
-                        <LineupCard
-                            fixtureId={fixtureId}
-                            homeTeam={state.home_name}
-                            awayTeam={state.away_name}
-                        />
-                    </>
+                    <TacticalCard state={state} fixtureId={fixtureId} />
                 )}
 
                 {active === "counterfactual" && (
@@ -78,7 +68,7 @@ export function UnifiedTabs({ state, fixtureId }: Props) {
 
                 {active === "live" && (
                     <div className="mp-tabs-stack">
-
+                        {/* Win probability + xG live in the left stats column. */}
                         <IntelFeed fixtureId={fixtureId} statusShort={state.status_short} />
                         <TeamFormCard
                             fixtureId={fixtureId}

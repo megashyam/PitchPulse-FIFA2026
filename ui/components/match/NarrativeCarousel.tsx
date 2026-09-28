@@ -1,13 +1,8 @@
 "use client"
-
-/**
- * Narrative carousel for the match page.
- *
- * The top panel shows the selected spike and its synthesized arc, while the
- * grid below provides a compact ranked view of all trending stories. Local
- * state only tracks presentation concerns such as the selected spike and the
- * active source filter.
- */
+// components/match/NarrativeCarousel.tsx
+// Detail panel first, 2-column spike grid below it.
+// Clicking any spike (in the grid or elsewhere) opens SpikeCommentModal
+// with floating, non-overlapping real comment bubbles for that topic.
 
 import { useState } from "react"
 import { useNarrativeStream } from "@/hooks/useNarrativeStream"
@@ -21,10 +16,10 @@ const SRC_LABELS: Record<string, string> = {
     mastodon: "Mastodon", bluesky: "Bluesky", trends: "Trends", wikipedia: "Wikipedia",
 }
 const SRC_UNITS: Record<string, string> = {
-    mastodon: "posts/min", bluesky: "mentions/min", trends: "index 0-100", wikipedia: "edits/min",
+    mastodon: "posts/hr", bluesky: "posts/hr", trends: "× last hr", wikipedia: "edits/hr",
 }
 const SRC_MAX: Record<string, number> = {
-    mastodon: 50, bluesky: 40, trends: 100, wikipedia: 10,
+    mastodon: 60, bluesky: 1000, trends: 5, wikipedia: 20,
 }
 const SRC_COLOR: Record<string, string> = {
     mastodon: "#6364FF", bluesky: "#4f86f7", trends: "#f59e0b", wikipedia: "#10d9a0",
@@ -53,6 +48,10 @@ function seededPoints(seed: string, n = 8): number[] {
     return pts
 }
 
+// Deterministic pseudo-random walk, NOT real historical tick data — there's
+// no per-minute time series backing this signal, only the current severity/
+// source snapshot. <title> makes that discoverable on hover instead of the
+// sparkline silently reading as a real trend line next to genuine numbers.
 function Sparkline({ seed, color }: { seed: string; color: string }) {
     const pts = seededPoints(seed)
     const w = 100, h = 26
@@ -61,6 +60,7 @@ function Sparkline({ seed, color }: { seed: string; color: string }) {
     const areaPath = `${path} L ${w} ${h} L 0 ${h} Z`
     return (
         <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", height: h, display: "block" }}>
+            <title>Simulated trend for display only — not historical data</title>
             <path d={areaPath} fill={color} opacity={0.12} />
             <path d={path} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
         </svg>
@@ -79,6 +79,9 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
     const [commentsOpen, setCommentsOpen] = useState(false)
     const [selSource, setSelSource] = useState<string | null>(null)
 
+    // Tournament-wide "trending now": the most-discussed stories across all
+    // teams, sorted by how far above baseline each spike sits. The current
+    // match's teams are flagged with a marker.
     const matchTeams = new Set(
         [canonTeam(homeTeam), canonTeam(awayTeam)].filter(Boolean)
     )
@@ -87,6 +90,7 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
 
     const selected = trending.find(s => s.spike_id === selectedId) ?? trending[0] ?? null
 
+    // Default the source detail to the top driving source (never "stuck on mastodon").
     const drivingDefault = selected
         ? (selected.source_names?.[0]
             ?? SOURCES.reduce((a, b) =>
@@ -125,18 +129,20 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
     return (
         <div>
 
+            {/* ── Detail panel — the selected/most-recent spike, stacked FIRST ── */}
             {selected && (
                 <div style={{ padding: "16px 14px", borderBottom: "1px solid var(--border-bright)" }}>
 
+                    {/* Narrative Arc, above everything else in this panel */}
                     <div style={{ marginBottom: 16 }}>
-                        <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "uppercase", letterSpacing: ".1em", color: "var(--c-ai)", display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                        <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "none", letterSpacing: "normal", color: "var(--c-ai)", display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
                             <span style={{ width: 3, height: 10, background: "var(--c-ai)", borderRadius: 2, flexShrink: 0 }} />
-                            Mistral 7B · Arc Synthesis · Weaviate RAG
+                            LLM arc synthesis · Weaviate RAG
                         </div>
-                        <div style={{ background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: "var(--r-md)", padding: "12px 14px" }}>
+                        <div style={{ background: "var(--glass-bg-inner)", border: "1px solid var(--glass-border-inner)", borderRadius: "var(--r-md)", padding: "16px" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
                                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--c-ai)", flexShrink: 0 }} />
-                                <span style={{ fontFamily: "var(--font-mono)", fontSize: ".56rem", textTransform: "uppercase", letterSpacing: ".08em", color: "var(--text-3)" }}>
+                                <span style={{ fontFamily: "var(--font-mono)", fontSize: ".56rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-2)" }}>
                                     Narrative Arc
                                 </span>
                             </div>
@@ -157,7 +163,7 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
                             {isTeamTopic(selected.topic)
                                 ? <Flag team={selected.topic} size="md" />
                                 : <span style={{ fontSize: "1.6rem" }}>🌍</span>}
-                            <span style={{ fontFamily: "var(--font-display)", fontSize: "1.5rem", letterSpacing: ".02em", color: "var(--text-1)" }}>
+                            <span style={{ fontFamily: "var(--font-display)", fontSize: "1.5rem", letterSpacing: "normal", color: "var(--text-1)" }}>
                                 {selected.topic.toUpperCase()}
                             </span>
                             {matchTeams.has(canonTeam(selected.topic)) && (
@@ -168,7 +174,7 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
                             <div style={{ fontFamily: "var(--font-display)", fontSize: "1.6rem", color: severityColor(selected.severity), lineHeight: 1 }}>
                                 {Math.round(selected.severity * 100)}%
                             </div>
-                            <div style={{ fontFamily: "var(--font-mono)", fontSize: ".56rem", color: "var(--text-3)", textTransform: "uppercase" }}>
+                            <div style={{ fontFamily: "var(--font-mono)", fontSize: ".56rem", color: "var(--text-3)", textTransform: "none" }}>
                                 above baseline
                             </div>
                         </div>
@@ -176,6 +182,7 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
 
                     <p style={{ fontSize: ".76rem", color: "var(--text-2)", marginBottom: 10 }}>{selected.summary}</p>
 
+                    {/* Compact single-row source stats; driving sources get a ▲ marker. */}
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 10 }}>
                         {SOURCES.map(src => {
                             const val = selected.sources[src] ?? 0
@@ -184,8 +191,8 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
                             const color = SRC_COLOR[src]
                             return (
                                 <button key={src} onClick={() => setSelSource(src)} style={{
-                                    background: active ? `${color}22` : driving ? `${color}12` : "var(--bg-3)",
-                                    border: `1px solid ${active ? color : driving ? color + "40" : "var(--border)"}`,
+                                    background: active ? `${color}22` : driving ? `${color}12` : "var(--glass-bg-inner)",
+                                    border: `1px solid ${active ? color : driving ? color + "40" : "var(--glass-border-inner)"}`,
                                     borderRadius: 6, padding: "5px 6px", textAlign: "center", position: "relative", cursor: "pointer",
                                 }}>
                                     {driving && <span style={{ position: "absolute", top: 2, right: 3, fontSize: ".5rem", color }}>▲</span>}
@@ -198,12 +205,19 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
                         })}
                     </div>
 
+                    {/* Per-source detail — updates when a source button above is clicked.
+                        The number is real (severity/source data from the backend); the
+                        sparkline beside it is a seeded pseudo-random walk, not real
+                        historical tick data — labelled so it doesn't read as one. */}
                     <div style={{ marginBottom: 10 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "var(--font-mono)", fontSize: ".56rem", color: "var(--text-3)", marginBottom: 4 }}>
                             <span>{SRC_LABELS[activeSource]}</span>
                             <span>{((selected.sources as Record<string, number>)[activeSource] ?? 0).toFixed(1)} {SRC_UNITS[activeSource]}</span>
                         </div>
                         <Sparkline seed={`${selected.spike_id}:${activeSource}`} color={SRC_COLOR[activeSource]} />
+                        <div style={{ fontFamily: "var(--font-mono)", fontSize: ".52rem", color: "var(--text-3)", opacity: .7, marginTop: 2 }}>
+                            simulated trend, not historical data
+                        </div>
                     </div>
 
                     <button
@@ -217,6 +231,7 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
                         💬 {commentsOpen ? "Hide live comments" : "View live comments"}
                     </button>
 
+                    {/* Inline sliding carousel, directly beneath this button. */}
                     {commentsOpen && <CommentBubbles topic={selected.topic} />}
 
                     <div style={{ fontFamily: "var(--font-mono)", fontSize: ".56rem", color: "var(--text-3)", marginTop: 8 }}>
@@ -225,9 +240,10 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
                 </div>
             )}
 
+            {/* ── 2-column grid of all spikes ── */}
             <div style={{ padding: "12px 14px 14px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "uppercase", letterSpacing: ".08em", color: "var(--text-3)" }}>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-3)" }}>
                         Trending now · {spikeCount} stor{spikeCount !== 1 ? "ies" : "y"}
                     </span>
                 </div>
@@ -242,8 +258,8 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
                                 onClick={() => setSelectedId(spike.spike_id)}
                                 onDoubleClick={() => { setSelectedId(spike.spike_id); setCommentsOpen(true) }}
                                 style={{
-                                    background: "var(--bg-2)", border: `1px solid ${isSel ? "var(--accent)" : "var(--border)"}`,
-                                    borderRadius: "var(--r-md)", padding: "9px 10px", cursor: "pointer",
+                                    background: "var(--glass-bg-inner)", border: `1px solid ${isSel ? "var(--accent)" : "var(--glass-border-inner)"}`,
+                                    borderRadius: "var(--r-md)", padding: "12px", cursor: "pointer",
                                     transition: "all .15s",
                                 }}
                             >
@@ -266,7 +282,7 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
                                     <span style={{ fontSize: ".7rem" }}>
                                         {(spike.source_names ?? []).map(s => SRC_ICONS[s] ?? "").join(" ")}
                                     </span>
-                                    <span style={{ fontFamily: "var(--font-mono)", fontSize: ".54rem", color: "var(--text-3)" }}>
+                                    <span style={{ fontFamily: "var(--font-mono)", fontSize: ".54rem", color: "var(--text-2)" }}>
                                         {new Date(spike.timestamp * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                     </span>
                                 </div>

@@ -1,5 +1,6 @@
 "use client"
-
+// components/match/TeamFormCard.tsx
+// Last 5 results for both teams — shown below the lineup
 
 import { useEffect, useState } from "react"
 import { Flag } from "@/components/Flag"
@@ -73,23 +74,29 @@ export function TeamFormCard({ fixtureId, homeTeam, awayTeam }: Props) {
     if (!data.home.form.length && !data.away.form.length) return null
 
     return (
-        <div style={{ borderTop: "1px solid var(--border-bright)" }}>
+        <div style={{
+            background: "var(--glass-bg-inner)", border: "1px solid var(--glass-border-inner)",
+            borderRadius: "var(--r-md)", overflow: "hidden"
+        }}>
+            {/* Header */}
             <div style={{
-                padding: "10px 14px 8px", borderBottom: "1px solid var(--border)",
+                padding: "16px", borderBottom: "1px solid var(--glass-border-inner)",
                 display: "flex", alignItems: "center", gap: 6
             }}>
                 <div style={{ width: 3, height: 10, background: "var(--amber)", borderRadius: 2 }} />
                 <span style={{
                     fontFamily: "var(--font-mono)", fontSize: ".6rem",
-                    textTransform: "uppercase", letterSpacing: ".1em", color: "var(--text-3)"
+                    textTransform: "none", letterSpacing: "normal", color: "var(--text-3)"
                 }}>
                     Recent Form
                 </span>
             </div>
 
+            {/* Two columns */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
 
-                <div style={{ padding: "10px 12px", borderRight: "1px solid var(--border)" }}>
+                {/* Home team */}
+                <div style={{ padding: "16px", borderRight: "1px solid var(--glass-border-inner)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
                         <Flag team={homeTeam} size="sm" />
                         <span style={{ fontSize: ".76rem", fontWeight: 700, color: "var(--home)" }}>
@@ -107,7 +114,8 @@ export function TeamFormCard({ fixtureId, homeTeam, awayTeam }: Props) {
                     )}
                 </div>
 
-                <div style={{ padding: "10px 12px" }}>
+                {/* Away team */}
+                <div style={{ padding: "16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
                         <Flag team={awayTeam} size="sm" />
                         <span style={{ fontSize: ".76rem", fontWeight: 700, color: "var(--away)" }}>

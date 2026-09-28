@@ -1,13 +1,26 @@
-
+/**
+ * usePredictStream
+ *
+ * Fetches tournament prediction data and polls /predict/status while
+ * a simulation is running. Auto-refreshes when a "prediction_update"
+ * event is received on the existing SSE stream.
+ *
+ * A 202 from GET /predict/tournament (the backend started a sim because
+ * none exists yet) sets isLoading and starts polling, like triggerSim().
+ *
+ * Usage:
+ *   const { prediction, status, isLoading, error, triggerSim } = usePredictStream()
+ */
 
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TournamentPrediction, SimStatus } from "@/types/predict";
+import { triggerHeaders } from "@/lib/api";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-
+// How often to poll status while sim is running (ms)
 const POLL_INTERVAL_MS = 2_000;
 
 interface UsePredictStreamReturn {
@@ -27,8 +40,9 @@ export function usePredictStream(): UsePredictStreamReturn {
 
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const mountRef = useRef(true);
-
-    const fetchStatusRef = useRef<() => Promise<void>>(async () => { });
+    // Refs let fetchPrediction and fetchStatus reference each other's
+    // latest closures without a circular useCallback dependency chain.
+    const fetchStatusRef = useRef<() => Promise<void>>(async () => {});
 
     const stopPolling = useCallback(() => {
         if (pollRef.current) {
@@ -42,12 +56,14 @@ export function usePredictStream(): UsePredictStreamReturn {
         pollRef.current = setInterval(() => { fetchStatusRef.current(); }, POLL_INTERVAL_MS);
     }, []);
 
-
+    // ------------------------------------------------------------------
+    // Fetch latest prediction
+    // ------------------------------------------------------------------
     const fetchPrediction = useCallback(async () => {
         try {
             const res = await fetch(`${API}/predict/tournament`);
             if (res.status === 202) {
-
+                // Backend started a sim: show loading and start polling.
                 if (mountRef.current) setIsLoading(true);
                 startPolling();
                 return;
@@ -63,7 +79,9 @@ export function usePredictStream(): UsePredictStreamReturn {
         }
     }, [startPolling]);
 
-
+    // ------------------------------------------------------------------
+    // Poll status while running
+    // ------------------------------------------------------------------
     const fetchStatus = useCallback(async () => {
         try {
             const res = await fetch(`${API}/predict/status`);
@@ -82,7 +100,7 @@ export function usePredictStream(): UsePredictStreamReturn {
                 setError(s.error ?? "Simulation failed");
             }
         } catch {
-
+            // ignore transient errors during polling
         }
     }, [fetchPrediction, stopPolling]);
 
@@ -90,13 +108,16 @@ export function usePredictStream(): UsePredictStreamReturn {
         fetchStatusRef.current = fetchStatus;
     }, [fetchStatus]);
 
-
+    // ------------------------------------------------------------------
+    // Trigger a new simulation
+    // ------------------------------------------------------------------
     const triggerSim = useCallback(async (nSims = 50_000) => {
         setIsLoading(true);
         setError(null);
         try {
             const res = await fetch(`${API}/predict/simulate?n_sims=${nSims}`, {
                 method: "POST",
+                headers: triggerHeaders(),
             });
             if (res.status === 409) {
                 // Already running — just start polling
@@ -111,13 +132,17 @@ export function usePredictStream(): UsePredictStreamReturn {
         }
     }, [startPolling]);
 
-
+    // ------------------------------------------------------------------
+    // Initial load + SSE prediction_update listener
+    // ------------------------------------------------------------------
     useEffect(() => {
         mountRef.current = true;
 
+        // Load whatever's in Redis; on a 202, fetchPrediction starts polling.
         fetchPrediction();
         fetchStatus();
 
+        // Auto-refresh when prediction_worker (or a manual trigger) lands a new sim.
         const es = new EventSource(`${API}/predict/stream`);
         es.addEventListener("prediction_update", () => {
             if (mountRef.current) fetchPrediction();

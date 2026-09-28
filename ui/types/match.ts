@@ -1,4 +1,4 @@
-
+// types/match.ts
 // Mirrors Python MatchState / TeamStats / MatchEvent from schemas/schema.py
 
 export interface TeamStats {
@@ -26,6 +26,7 @@ export interface MatchEvent {
   player_name: string | null
   type: string
   detail: string | null
+  source?: "espn" | "synthesised"
 }
 
 export interface MatchState {
@@ -38,7 +39,8 @@ export interface MatchState {
   status_short: string
   status_long: string
   elapsed: number | null
-  kickoff_time: string | null   // ← added
+  elapsed_extra?: number | null  // stoppage minutes ("90'+4'")
+  kickoff_time: string | null
   home_id: number
   home_name: string
   home_logo: string
@@ -50,5 +52,8 @@ export interface MatchState {
   away_score: number
   away_stats: TeamStats
   events: MatchEvent[]
+  stats_source?: "espn" | "unavailable"
+  home_pens?: number | null
+  away_pens?: number | null
   updated_at: string
 }

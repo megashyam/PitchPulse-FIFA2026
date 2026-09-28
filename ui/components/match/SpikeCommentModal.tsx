@@ -1,11 +1,10 @@
 "use client"
-
-/**
- * Modal for showing sampled comments for a narrative spike.
- *
- * Bubble positions are assigned on a jittered grid rather than pure random
- * placement so the samples remain readable and do not overlap.
- */
+// components/match/SpikeCommentModal.tsx
+// Modal popup showing real comment samples for a spike's topic as
+// floating bubbles. Positions use a jittered GRID (not pure random)
+// so bubbles are guaranteed non-overlapping — each bubble gets its
+// own cell in an N×M grid sized to the comment count, then drifts
+// within a small radius inside that cell only.
 
 import { useEffect, useState } from "react"
 
@@ -15,6 +14,7 @@ interface CommentSample {
     text: string
     source: "mastodon" | "bluesky"
     author: string
+    demo?: boolean
     permalink?: string | null
     timestamp: number
 }
@@ -53,6 +53,9 @@ export function SpikeCommentModal({ spike, onClose }: Props) {
         return () => window.removeEventListener("keydown", onKey)
     }, [onClose])
 
+    // Grid-cell placement — guarantees no two bubbles ever occupy the
+    // same region. cols/rows chosen to roughly fit the field's aspect
+    // ratio for up to 10 bubbles.
     const n = Math.min(samples.length, 10)
     const cols = n <= 4 ? 2 : n <= 6 ? 3 : 4
     const rows = Math.ceil(n / cols)
@@ -78,6 +81,7 @@ export function SpikeCommentModal({ spike, onClose }: Props) {
                     overflow: "hidden", display: "flex", flexDirection: "column",
                 }}
             >
+                {/* Header */}
                 <div style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",
                     padding: "14px 16px", borderBottom: "1px solid var(--border)",
@@ -97,6 +101,7 @@ export function SpikeCommentModal({ spike, onClose }: Props) {
                     }}>×</button>
                 </div>
 
+                {/* Bubble field */}
                 <div style={{
                     position: "relative", height: 380, background: "var(--bg-3)",
                     overflow: "hidden",
@@ -126,6 +131,9 @@ export function SpikeCommentModal({ spike, onClose }: Props) {
                         const col = i % cols
                         const row = Math.floor(i / cols)
 
+                        // Jitter WITHIN this bubble's own cell only — margin keeps
+                        // bubbles away from cell edges so adjacent cells' bubbles
+                        // can never touch even at max jitter.
                         const jitterX = (seededRand(s.text + i, 17) - 0.5) * (cellW * 0.3)
                         const jitterY = (seededRand(s.text + i, 31) - 0.5) * (cellH * 0.3)
                         const left = col * cellW + cellW / 2 + jitterX
@@ -151,7 +159,7 @@ export function SpikeCommentModal({ spike, onClose }: Props) {
                                 <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
                                     <span style={{ color: cfg.color }}>{cfg.icon}</span>
                                     <span style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", color: "var(--text-3)" }}>
-                                        {s.author}
+                                        {s.author}{s.demo ? " · demo" : ""}
                                     </span>
                                 </div>
                                 <p style={{ fontSize: ".7rem", color: "var(--text-1)", lineHeight: 1.4, margin: 0 }}>

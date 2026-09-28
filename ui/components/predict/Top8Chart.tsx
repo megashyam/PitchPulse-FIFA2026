@@ -1,13 +1,5 @@
 "use client"
-
-/**
- * Compact top-eight tournament chart.
- *
- * This view focuses on the championship probability distribution only, which
- * makes it easy to compare the strongest contenders without exposing the full
- * table. The visual is intentionally narrow so it can sit beside the more
- * detailed per-team breakdowns.
- */
+// components/predict/Top8Chart.tsx
 
 import { useMemo } from "react"
 import type { TeamPrediction } from "@/types/predict"
@@ -29,6 +21,7 @@ export function Top8Chart({ teams }: { teams: TeamPrediction[] }) {
             </div>
             <div className="pred-card-title">Win probability distribution — top 8</div>
 
+            {/* Vertical bar chart */}
             <div className="pred-top8-chart">
                 {top8.map((team, idx) => {
                     const p = team.champion.p

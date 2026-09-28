@@ -1,6 +1,5 @@
 "use client"
-
-
+// app/page.tsx — grid of match cards, loaded with one GET /matches/summary call
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
@@ -20,6 +19,7 @@ function parseDate(f: Fixture): Date {
   try { return new Date(f.kickoff_time || f.updated_at) } catch { return new Date() }
 }
 
+// US Eastern, DST-aware.
 const TZ = "America/New_York"
 const dayKey = (d: Date) =>
   new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(d)
@@ -49,6 +49,7 @@ export default function HomePage() {
   useEffect(() => {
     async function load() {
       try {
+        // Single bulk call for every fixture.
         const r = await fetch(`${API}/matches/summary`)
         const { fixtures: raw } = await r.json()
         const details: (Fixture | null)[] = (raw || []).map(toFixture)
@@ -66,6 +67,7 @@ export default function HomePage() {
     return true
   })
 
+  // group by date
   const groups = new Map<string, { label: string; items: Fixture[] }>()
   const sorted = [...filtered].sort((a, b) => parseDate(b).getTime() - parseDate(a).getTime())
   for (const f of sorted) {
@@ -80,7 +82,7 @@ export default function HomePage() {
   return (
     <div className="v4-home">
 
-      { }
+      {/* Hero */}
       <div className="v4-home-hero">
         <div className="v4-hero-eyebrow">FIFA World Cup 2026 · USA · Canada · Mexico</div>
         <div className="v4-hero-title">Match Center</div>
@@ -90,7 +92,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      { }
+      {/* Filter tabs */}
       <div className="v4-home-tabs">
         <button className={`v4-home-tab${filter === "all" ? " active" : ""}`} onClick={() => setFilter("all")}>All Matches</button>
         <button className={`v4-home-tab${filter === "live" ? " active" : ""}`} onClick={() => setFilter("live")}>
@@ -125,11 +127,6 @@ export default function HomePage() {
 }
 
 function MatchCard({ f }: { f: Fixture }) {
-  /**
-   * Match card keeps the summary view compact: pre-match fixtures show
-   * kickoff time, live fixtures show elapsed time, and finished fixtures
-   * emphasize the score and winner state.
-   */
   const isLive = LIVE.has(f.status_short)
   const isFT = ["FT", "AET", "PEN"].includes(f.status_short)
   const isNS = f.status_short === "NS"

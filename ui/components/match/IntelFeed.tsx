@@ -1,15 +1,12 @@
 "use client"
-
-/**
- * Live intelligence feed for match-level narrative updates.
- *
- * The component is driven by the hook's phase model so it can distinguish
- * between live loading, live streaming, and genuinely idle matches without
- * leaving the user stuck on a permanent spinner.
- */
+// components/match/IntelFeed.tsx — match intelligence activity feed
+//
+// Driven by the hook's `phase`: a spinner only while waiting on live
+// analysis, and a distinct message for matches that aren't live.
 
 import { useIntelStream } from "@/hooks/useIntelStream"
 import type { IntelEntry } from "@/hooks/useIntelStream"
+import { viaLabel } from "@/lib/via"
 import { useState, useEffect } from "react"
 
 const TYPE_META: Record<string, { icon: string; label: string }> = {
@@ -110,7 +107,7 @@ function IntelCard({ entry }: { entry: IntelEntry }) {
                 <p className="intel-entry-text">{entry.narrative}</p>
                 <div className="intel-entry-footer">
                     <span className="intel-entry-via">
-                        {entry.via === "mistral" ? "Mistral 7B" : entry.via === "groq" ? "Groq 70B" : "template"}
+                        {viaLabel(entry.via)}
                         {entry.rag_docs_used > 0 && ` · ${entry.rag_docs_used} sources`}
                     </span>
                     <span className="intel-entry-timestamp">{ts}</span>

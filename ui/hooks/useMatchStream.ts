@@ -1,12 +1,10 @@
 "use client"
-
-/**
- * Subscribe to a fixture's server-sent event stream.
- *
- * The hook keeps the live match view simple: each update replaces the local
- * snapshot with the newest MatchState, while a separate waiting event lets the
- * UI show that the backend is still preparing the first state.
- */
+// hooks/useMatchStream.ts
+//
+// Opens an SSE connection to GET /matches/{fixtureId}/stream
+// On each "match_update" event, replaces local state with the new MatchState.
+// On "waiting" event, sets isWaiting=true so the UI can show a loading state.
+// Reconnects automatically — EventSource does this natively.
 
 import { useEffect, useState } from "react"
 import type { MatchState } from "@/types/match"
@@ -26,7 +24,6 @@ export function useMatchStream(fixtureId: string): UseMatchStreamResult {
 
   useEffect(() => {
     if (!fixtureId) return
-
 
     const url = `${API}/matches/${fixtureId}/stream`
     const es = new EventSource(url)
@@ -51,9 +48,12 @@ export function useMatchStream(fixtureId: string): UseMatchStreamResult {
         const data = JSON.parse(e.data)
         setError(data.message)
       } catch {
+        // SSE connection error — EventSource will retry automatically
       }
     })
 
+    // Native EventSource error (connection drop) — don't set error state,
+    // let EventSource handle the reconnect silently
     es.onerror = () => { }
 
     return () => es.close()

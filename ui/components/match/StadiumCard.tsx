@@ -1,6 +1,6 @@
 "use client"
-
-
+// components/match/StadiumCard.tsx
+// WC 2026 venue info + live weather from Open-Meteo (free, no key needed)
 
 import { useEffect, useState } from "react"
 
@@ -14,6 +14,7 @@ interface StadiumInfo {
     lon: number
 }
 
+// Complete WC 2026 stadium database
 const STADIUMS: Record<string, StadiumInfo> = {
     "MetLife Stadium": { fullName: "MetLife Stadium", city: "East Rutherford, NJ", country: "USA", capacity: 82500, surface: "Grass", lat: 40.8135, lon: -74.0745 },
     "AT&T Stadium": { fullName: "AT&T Stadium", city: "Arlington, TX", country: "USA", capacity: 80000, surface: "FieldTurf", lat: 32.7473, lon: -97.0945 },
@@ -35,7 +36,9 @@ const STADIUMS: Record<string, StadiumInfo> = {
 
 function findStadium(venue: string): StadiumInfo | null {
     if (!venue) return null
+    // Exact match
     if (STADIUMS[venue]) return STADIUMS[venue]
+    // Partial match
     const lower = venue.toLowerCase()
     for (const [key, info] of Object.entries(STADIUMS)) {
         if (lower.includes(key.toLowerCase()) || key.toLowerCase().includes(lower))
@@ -90,8 +93,8 @@ export function StadiumCard({ venue, round }: Props) {
         if (!venue) return null
         return (
             <div style={{
-                background: "var(--bg-2)", border: "1px solid var(--border)",
-                borderRadius: "var(--r-lg)", padding: "12px 14px"
+                background: "var(--glass-bg-inner)", border: "1px solid var(--glass-border-inner)",
+                borderRadius: "var(--r-md)", padding: "16px"
             }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                     <span>🏟</span>
@@ -106,12 +109,13 @@ export function StadiumCard({ venue, round }: Props) {
 
     return (
         <div style={{
-            background: "var(--bg-2)", border: "1px solid var(--border)",
-            borderTop: "2px solid var(--c-data)", borderRadius: "var(--r-lg)",
+            background: "var(--glass-bg-inner)", border: "1px solid var(--glass-border-inner)",
+            borderRadius: "var(--r-md)",
             overflow: "hidden"
         }}>
 
-            <div style={{ padding: "12px 14px 10px", borderBottom: "1px solid var(--border)" }}>
+            {/* Header */}
+            <div style={{ padding: "16px", borderBottom: "1px solid var(--glass-border-inner)" }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                     <div>
                         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
@@ -127,7 +131,8 @@ export function StadiumCard({ venue, round }: Props) {
                 </div>
             </div>
 
-            <div style={{ padding: "10px 14px" }}>
+            {/* Details */}
+            <div style={{ padding: "16px" }}>
 
                 <div style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",

@@ -35,7 +35,7 @@ export function GroupTable({ fixtureId, highlightTeams }: Props) {
                 <span className="fm-gt-title">Group {data.group}</span>
             </div>
 
-
+            {/* Column headers */}
             <div className="fm-gt-cols">
                 <div className="fm-gt-col-label">#</div>
                 <div className="fm-gt-col-label left">Team</div>

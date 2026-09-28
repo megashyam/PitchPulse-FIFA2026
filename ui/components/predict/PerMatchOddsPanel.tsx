@@ -1,13 +1,5 @@
 "use client"
-
-/**
- * Per-match market odds panel.
- *
- * This panel aggregates fixture-scoped odds across the current tournament
- * schedule so the simulation input is visible alongside the broader Monte
- * Carlo model. Live market data and Elo fallbacks are presented with the
- * same layout so the source can change without changing the UI contract.
- */
+// components/predict/PerMatchOddsPanel.tsx
 
 import { useEffect, useState } from "react"
 
@@ -62,6 +54,7 @@ export function PerMatchOddsPanel() {
     return (
         <div className="pred-card">
             <div className="pred-card-top">
+                {/* Source badge */}
                 <span className="src src-api">The Odds API · market odds</span>
                 <span className="pred-card-label">consumed directly</span>
             </div>

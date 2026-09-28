@@ -1,12 +1,5 @@
 "use client"
-
-/**
- * Right-column tab switcher for the match page.
- *
- * The live, predictor, and narrative tabs each present a different backend
- * surface, so the wrapper keeps them separate instead of trying to merge the
- * panels into a single scrolling column.
- */
+// components/match/RightColumnTabs.tsx
 
 import { useState, useEffect } from "react"
 import { IntelFeed } from "@/components/match/IntelFeed"

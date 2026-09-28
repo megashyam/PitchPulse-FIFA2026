@@ -1,12 +1,10 @@
 "use client"
-
-/**
- * Auto-scrolling row of narrative comment samples.
- *
- * The row loops seamlessly by duplicating the sample list once and animating
- * the track across a masked viewport. That keeps the comments readable while
- * still giving the card a live, ambient feel.
- */
+// components/narrative/CommentBubbles.tsx
+//
+// Netflix-style auto-scrolling row of live comment cards. The whole row
+// marquees horizontally on its own, pausing on hover/touch so the user can
+// read. Cards are duplicated once so the scroll loops seamlessly.
+// Data: GET /narrative/{topic}/comments, polled every 15s.
 
 import { useEffect, useState } from "react"
 
@@ -18,6 +16,7 @@ interface CommentSample {
     author: string
     permalink?: string | null
     timestamp: number
+    demo?: boolean
 }
 
 const SRC_STYLE: Record<string, { color: string; icon: string; label: string }> = {
@@ -103,6 +102,8 @@ export function CommentBubbles({ topic }: Props) {
         )
     }
 
+    // Duplicate the list so the marquee can loop seamlessly (translateX
+    // -50% lands exactly at the start of the second copy).
     const loopItems = [...samples, ...samples]
     const durationS = Math.max(18, samples.length * 5)
 
@@ -119,6 +120,7 @@ export function CommentBubbles({ topic }: Props) {
                             <div className="comment-row-head">
                                 <span style={{ color: cfg.color }}>{cfg.icon}</span>
                                 <span className="comment-row-author">{s.author || "anon"}</span>
+                                {s.demo && <span className="comment-row-src" style={{ color: "var(--text-3)" }}>demo</span>}
                                 <span className="comment-row-src" style={{ color: cfg.color }}>{cfg.label}</span>
                             </div>
                             <p className="comment-row-text">{s.text}</p>
@@ -128,6 +130,9 @@ export function CommentBubbles({ topic }: Props) {
             </div>
 
             <style jsx>{`
+                /* .comment-row-track is absolutely positioned inside this
+                   fixed-height wrapper so the marquee can't widen any flex or
+                   grid ancestor. */
                 .comment-row-wrap {
                     position: relative;
                     width: 100%;
@@ -161,10 +166,10 @@ export function CommentBubbles({ topic }: Props) {
                     flex: 0 0 auto;
                     width: 190px;
                     height: 100%;
-                    background: var(--bg-3);
-                    border: 1px solid var(--border);
+                    background: var(--glass-bg-inner);
+                    border: 1px solid var(--glass-border-inner);
                     border-radius: var(--r-md, 10px);
-                    padding: 9px 11px;
+                    padding: 12px;
                 }
                 .comment-row-head {
                     display: flex;
@@ -184,8 +189,8 @@ export function CommentBubbles({ topic }: Props) {
                 .comment-row-src {
                     font-family: var(--font-mono);
                     font-size: .5rem;
-                    text-transform: uppercase;
-                    letter-spacing: .06em;
+                    text-transform: none;
+                    letter-spacing: normal;
                 }
                 .comment-row-text {
                     font-size: .7rem;

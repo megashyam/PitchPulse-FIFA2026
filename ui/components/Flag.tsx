@@ -1,12 +1,5 @@
 "use client"
-
-/**
- * Country flag image with a text fallback.
- *
- * The flag URL helper handles the country-to-code mapping, while the fallback
- * keeps the layout stable on platforms or teams where a proper image is not
- * available.
- */
+// components/Flag.tsx — image flag with letter fallback
 import { flagUrl } from "@/lib/flag"
 
 interface Props { team: string; size?: "sm" | "md" | "lg" | "xl" }

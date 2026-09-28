@@ -1,13 +1,7 @@
 "use client"
-
-/**
- * Per-match prediction panel.
- *
- * The panel shows the backend's win/draw/loss probabilities with confidence
- * bands plus the downstream tournament implications for each side. It sits
- * under the momentum card because the in-play model is the more immediate
- * signal while this view explains the broader match outcome.
- */
+// components/match/MatchPredictionPanel.tsx
+// Per-match W/D/L prediction with CI bands + tournament implications.
+// Sits below MomentumBar on the match dashboard.
 
 import { useMatchPrediction } from "@/hooks/useMatchPrediction"
 import type { MatchOdds, TeamTournament } from "@/hooks/useMatchPrediction"
@@ -30,6 +24,7 @@ export function MatchPredictionPanel({ fixtureId }: Props) {
 
             </div>
 
+            {/* ── W/D/L stacked bar ── */}
             <div className="pred-bar">
                 <div
                     className="pred-seg home"
@@ -51,6 +46,7 @@ export function MatchPredictionPanel({ fixtureId }: Props) {
                 </div>
             </div>
 
+            {/* ── Probability rows with CI ── */}
             <div className="pred-rows">
                 <ProbRow
                     label={`${home_name} win`}
@@ -69,6 +65,7 @@ export function MatchPredictionPanel({ fixtureId }: Props) {
                 />
             </div>
 
+            {/* ── Tournament implications ── */}
             {(prediction.home_tournament || prediction.away_tournament) && (
                 <div className="pred-tourney">
                     <div className="pred-tourney-header">Tournament path implications</div>
@@ -86,6 +83,8 @@ export function MatchPredictionPanel({ fixtureId }: Props) {
     )
 }
 
+// ── Probability bar with CI band ──────────────────────────────────────────
+
 function ProbRow({ label, odds, color }: { label: string; odds: MatchOdds; color: string }) {
     const pct = (odds.p * 100).toFixed(1)
     const ciLo = (odds.ci_lo * 100).toFixed(1)
@@ -93,21 +92,27 @@ function ProbRow({ label, odds, color }: { label: string; odds: MatchOdds; color
     const fillW = `${(odds.p * 100).toFixed(2)}%`
     const ciLeft = `${(odds.ci_lo * 100).toFixed(2)}%`
     const ciW = `${((odds.ci_hi - odds.ci_lo) * 100).toFixed(2)}%`
+    // A model prior is a point estimate — only draw a band when one exists.
+    const hasCI = odds.ci_hi - odds.ci_lo > 1e-6
 
     return (
         <div className="pred-prob-row">
             <span className="pred-prob-label">{label}</span>
             <div className="pred-prob-track">
-                <div className="pred-ci-band" style={{ left: ciLeft, width: ciW }} />
+                {/* CI band */}
+                {hasCI && <div className="pred-ci-band" style={{ left: ciLeft, width: ciW }} />}
+                {/* Fill */}
                 <div className="pred-prob-fill" style={{ width: fillW, background: color }} />
             </div>
             <span className="pred-prob-val" style={{ color }}>
                 {pct}%
-                <span className="pred-ci-label">{ciLo}–{ciHi}</span>
+                {hasCI && <span className="pred-ci-label">{ciLo}–{ciHi}</span>}
             </span>
         </div>
     )
 }
+
+// ── Tournament path card ──────────────────────────────────────────────────
 
 const STAGES = ["r32", "r16", "qf", "sf", "final", "champion"] as const
 const LABELS: Record<string, string> = {

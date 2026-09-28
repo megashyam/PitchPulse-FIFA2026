@@ -1,5 +1,6 @@
 "use client"
-
+// components/match/StatsPanel.tsx
+// FM-style bilateral rows: every stat gets a proportional home/away bar.
 
 import type { TeamStats } from "@/types/match"
 
@@ -45,7 +46,7 @@ export function StatsPanel({ home, away }: Props) {
             <StatRow label="Shots" home={home.shots_total} away={away.shots_total} />
             <StatRow label="On Target" home={home.shots_on_goal} away={away.shots_on_goal} />
             <StatRow
-                label="xG"
+                label="Model xG"
                 home={home.expected_goals} away={away.expected_goals}
                 format={v => (v ?? 0).toFixed(2)}
             />

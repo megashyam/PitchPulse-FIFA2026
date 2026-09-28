@@ -1,16 +1,12 @@
 "use client"
-
-/**
- * Referee profile card.
- *
- * The dynamic part of the card compares the referee's baseline card rate to
- * the cards actually shown in the current match. The more speculative referee
- * metrics are left as static placeholders because they depend on a separate
- * cross-schema join that is not yet wired into this view.
- */
+// components/match/RefereeCard.tsx
+//
+// Actual cards are counted from the match's yellow/red events on every update.
+// Avg cards/match and press tolerance are static, labelled sample values.
 
 import type { MatchState } from "@/types/match"
 
+// Card event types from schema.py
 const CARD_TYPES = new Set(["yellow", "red", "yellow_red"])
 
 interface Props { state: MatchState }
@@ -18,8 +14,10 @@ interface Props { state: MatchState }
 export function RefereeCard({ state }: Props) {
     if (!state.referee || state.referee.trim() === "") return null
 
+    // Count actual cards from the match events
     const actualCards = state.events.filter(ev => CARD_TYPES.has(ev.type)).length
 
+    // Expected baseline (static)
     const expectedCards = 3.8
 
     const refName = state.referee.trim()
@@ -32,14 +30,15 @@ export function RefereeCard({ state }: Props) {
             </span>
 
             <div className="ref-name">{refName}</div>
-            <div className="ref-sub">89 matches · data from StatsBomb</div>
+            <div className="ref-sub">Illustrative baseline · not this referee's actual history</div>
 
+            {/* Static sample values, the same for every referee. */}
             <div className="ref-row">
-                <span className="ref-row-label">Avg cards / match</span>
+                <span className="ref-row-label">Avg cards / match (sample)</span>
                 <span className="ref-row-val">3.2</span>
             </div>
             <div className="ref-row">
-                <span className="ref-row-label">Press tolerance</span>
+                <span className="ref-row-label">Press tolerance (sample)</span>
                 <span className="ref-row-val">
                     <span style={{ color: "var(--c-goal)" }}>High</span>
                     <span style={{ color: "var(--text-3)", fontSize: ".6rem" }}>·</span>
@@ -47,6 +46,7 @@ export function RefereeCard({ state }: Props) {
                 </span>
             </div>
 
+            {/* Dynamic — updates on every SSE event via state.events count */}
             <div className="ref-row">
                 <span className="ref-row-label">Expected → actual</span>
                 <span className="ref-row-val">

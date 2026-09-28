@@ -1,17 +1,10 @@
 "use client"
-
-/**
- * Sortable tournament probability table.
- *
- * The table keeps the bracket model readable by allowing the user to sort by
- * any stage while preserving a single canonical row shape for each team.
- * Confidence intervals are optionally rendered on the active sort column so
- * the UI can surface uncertainty without cluttering every probability cell.
- */
+// components/predict/TournamentTable.tsx
 
 import React, { useState, useMemo } from "react"
 import { TeamPrediction, Stage, STAGES, STAGE_LABELS } from "@/types/predict"
 
+// Color per stage for the active sort column's fill bar
 const STAGE_FILL: Record<Stage, string> = {
     r32: "#3b82f6",
     r16: "#3b82f6",
@@ -31,16 +24,19 @@ export function TournamentTable({ teams, highlightStage = "champion" }: Props) {
     const [groupFilter, setGroupFilter] = useState("All")
     const [showCI, setShowCI] = useState(false)
 
+    // Sorted by selected stage descending
     const sorted = useMemo(
         () => [...teams].sort((a, b) => b[sortStage].p - a[sortStage].p),
         [teams, sortStage]
     )
 
+    // Unique group letters for filter pills
     const groups = useMemo(() => {
         const gs = [...new Set(teams.map(t => t.group))].sort()
         return ["All", ...gs]
     }, [teams])
 
+    // Apply group filter
     const visible = useMemo(
         () => groupFilter === "All" ? sorted : sorted.filter(t => t.group === groupFilter),
         [sorted, groupFilter]
@@ -49,6 +45,7 @@ export function TournamentTable({ teams, highlightStage = "champion" }: Props) {
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
 
+            {/* Controls row */}
             <div className="predict-filters">
                 <div className="filter-pills">
                     {groups.map(g => (
@@ -71,6 +68,7 @@ export function TournamentTable({ teams, highlightStage = "champion" }: Props) {
                 </label>
             </div>
 
+            {/* Table */}
             <div className="tournament-wrap">
                 <table className="tournament-table">
                     <thead>
@@ -111,6 +109,8 @@ export function TournamentTable({ teams, highlightStage = "champion" }: Props) {
         </div>
     )
 }
+
+// ── Individual row ────────────────────────────────────────────────────────
 
 interface RowProps {
     rank: number

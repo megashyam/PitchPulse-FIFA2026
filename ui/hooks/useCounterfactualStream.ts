@@ -1,13 +1,11 @@
 "use client"
-
-/**
- * Stream counterfactual match results and the in-flight simulation state.
- *
- * The hook merges an initial REST history fetch with SSE updates so the UI
- * can show the current counterfactual feed immediately and keep it live for
- * active fixtures. Finished matches stop subscribing because the history is
- * immutable once the result feed has been materialized.
- */
+// hooks/useCounterfactualStream.ts
+// REST /feed for history plus SSE for new results, deduped by
+// (minute, type, team) signature. Completed matches (FT/AET/PEN) skip SSE.
+//
+// `calculating` is set by the "counterfactual_calculating" SSE event when a
+// simulation starts, and cleared when a matching result lands or after a
+// safety timeout.
 
 import { useEffect, useRef, useState } from "react"
 
@@ -30,6 +28,7 @@ export interface CfResult {
     path_shift_pct: number
     top_changes: CfChange[]
     narrative: string
+    via?: string
     n_sims: number
     elapsed_s: number
     updated_at: string
@@ -53,8 +52,6 @@ function sigOf(r: { minute: number; event_type: string; event_team: string }): s
 }
 
 function dedupe(list: CfResult[]): CfResult[] {
-    // The same event can arrive from the initial feed and from SSE, so use a
-    // stable event signature instead of object identity.
     const seen = new Set<string>()
     const out: CfResult[] = []
     for (const r of list) {
@@ -82,6 +79,7 @@ export function useCounterfactualStream(
         if (!fixtureId) return
         let mounted = true
 
+        // Initial REST fetch — this is the full history for the match so far
         fetch(`${API}/matches/${fixtureId}/counterfactual/feed`)
             .then(r => (r.ok ? r.json() : null))
             .then((data: { entries: CfResult[] } | null) => {
@@ -91,8 +89,11 @@ export function useCounterfactualStream(
             })
             .catch(() => { })
 
+        // Completed matches: no live updates left to stream — REST fetch above
+        // is the complete and final history. Skip SSE entirely.
         if (isCompleted) return () => { mounted = false }
 
+        // Live/upcoming matches: subscribe for real-time updates
         const es = new EventSource(`${API}/matches/${fixtureId}/counterfactual/stream`)
 
         es.addEventListener("counterfactual_calculating", (e: MessageEvent) => {
@@ -119,6 +120,7 @@ export function useCounterfactualStream(
                 setWaiting(false)
                 setError(null)
 
+                // Clear the loader once the matching (or any newer) result lands.
                 setCalculating(prev => {
                     if (!prev) return prev
                     if (sigOf(prev) === sigOf(result) || result.minute >= prev.minute) {

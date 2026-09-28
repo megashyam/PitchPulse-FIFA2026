@@ -1,12 +1,8 @@
 "use client"
 // components/match/PreMatchBriefingCard.tsx
-// v2 — polls /briefing/trigger periodically (every 60s) instead of
-// firing once on mount. Since the backend only actually generates a
-// NEW briefing when match status has changed (see briefing_routes.py
-// v3), this is safe to poll continuously — it's a no-op most of the
-// time and naturally produces a fresh entry at kickoff, half-time,
-// and full-time without needing a separate backend worker loop.
-// Renders the full feed (newest first) instead of a single static block.
+// Polls /briefing/trigger every 60s; the backend generates a new briefing
+// only when match status changes, so most polls are no-ops. Renders the
+// full feed, newest first.
 
 import { useEffect, useState, useRef } from "react"
 import { triggerHeaders } from "@/lib/api"
@@ -93,23 +89,25 @@ export function PreMatchBriefingCard({ fixtureId }: Props) {
     )
 
     return (
-        <div style={{ display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 10 }}>
             {entries.map((entry, i) => {
                 const genTime = new Date(entry.generated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                 return (
                     <div key={`${entry.match_status}-${entry.generated_at}`} style={{
-                        padding: "12px 14px",
-                        borderBottom: i < entries.length - 1 ? "1px solid var(--border)" : "none",
+                        padding: 16,
+                        background: "var(--glass-bg-inner)",
+                        border: "1px solid var(--glass-border-inner)",
+                        borderRadius: "var(--r-md)",
                     }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                             <span style={{
-                                fontFamily: "var(--font-mono)", fontSize: ".56rem", textTransform: "uppercase",
-                                letterSpacing: ".08em", color: "var(--accent)", background: "var(--accent-dim)",
+                                fontFamily: "var(--font-mono)", fontSize: ".56rem", textTransform: "none",
+                                letterSpacing: "normal", color: "var(--accent)", background: "var(--accent-dim)",
                                 padding: "2px 8px", borderRadius: 10,
                             }}>
                                 {entry.match_status}
                             </span>
-                            <span style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", color: "var(--text-3)" }}>
+                            <span style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", color: "var(--text-2)" }}>
                                 {genTime} · {entry.model}
                             </span>
                         </div>

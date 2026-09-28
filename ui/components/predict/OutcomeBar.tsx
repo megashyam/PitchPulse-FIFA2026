@@ -1,14 +1,11 @@
 "use client"
-
-/**
- * Shared probability bars for tournament prediction views.
- *
- * StageBar renders a single probability with an optional confidence band,
- * while MatchOutcomeBar renders a compact home/draw/away split for fixture
- * level views.
- */
+// components/predict/OutcomeBar.tsx
+// StageBar     — single probability bar, used in TournamentTable
+// MatchOutcomeBar — stacked W/D/L bar for the per-match view
 
 import React from "react"
+
+// ── StageBar ───────────────────────────────────────────────────────────────
 
 interface StageBarProps {
     p: number        // probability 0..1
@@ -49,6 +46,8 @@ export function StageBar({ p, ci_lo, ci_hi, fill = "var(--border-light)", showCI
         </div>
     )
 }
+
+// ── MatchOutcomeBar ─────────────────────────────────────────────────────────
 
 interface MatchOutcomeBarProps {
     homeTeam: string

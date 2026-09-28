@@ -1,13 +1,7 @@
 "use client"
-
-/**
- * Bracket probability chart for the tournament view.
- *
- * The top chart highlights the strongest champion candidates, while the
- * lower section shows the selected team's full bracket path. A fixture-scoped
- * odds card is included because the per-match market data is a separate input
- * to the simulation rather than a property of the global tournament table.
- */
+// components/match/BracketProbChart.tsx
+// Top 8 win distribution (hover reveals probabilities) plus market odds for
+// this fixture from GET /matches/{fixture_id}/prediction.
 
 import { useEffect, useMemo, useState } from "react"
 import { usePredictStream } from "@/hooks/usePredictStream"
@@ -34,7 +28,7 @@ interface MatchOdds {
         draw: { p: number; ci_lo: number; ci_hi: number }
         away_win: { p: number; ci_lo: number; ci_hi: number }
     }
-    source: "betfair" | "elo"
+    source: "market_odds" | "elo"
 }
 
 interface Props { defaultTeams?: string[]; fixtureId: string }
@@ -49,6 +43,7 @@ export function BracketProbChart({ defaultTeams = [], fixtureId }: Props) {
     const isRunning = status?.status === "running" || isLoading
     const hasData = !!prediction
 
+    // Top 8 teams by champion probability — this IS the Win Distribution chart
     const top8 = useMemo(() =>
         hasData ? [...prediction!.teams].sort((a, b) => b.champion.p - a.champion.p).slice(0, 8) : []
         , [prediction])
@@ -61,6 +56,7 @@ export function BracketProbChart({ defaultTeams = [], fixtureId }: Props) {
         setSelected(preferred ?? top8[0]?.name ?? null)
     }, [hasData, top8])
 
+    // Fetch odds for THIS match only
     useEffect(() => {
         if (!fixtureId) return
         fetch(`${API}/matches/${fixtureId}/prediction`)
@@ -99,14 +95,15 @@ export function BracketProbChart({ defaultTeams = [], fixtureId }: Props) {
     return (
         <div>
 
+            {/* ── Win distribution — top 8, hover reveals bracket path ── */}
             <div style={{ padding: "12px 14px 4px" }}>
                 <div style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",
                     marginBottom: 10,
                 }}>
                     <span style={{
-                        fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "uppercase",
-                        letterSpacing: ".1em", color: "var(--text-3)",
+                        fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "none",
+                        letterSpacing: "normal", color: "var(--text-3)",
                     }}>
                         Win Distribution — Top 8
                     </span>
@@ -135,6 +132,7 @@ export function BracketProbChart({ defaultTeams = [], fixtureId }: Props) {
                                     gap: 4, cursor: "pointer", position: "relative",
                                 }}
                             >
+                                {/* Hover tooltip — champion % */}
                                 {isHov && (
                                     <div style={{
                                         position: "absolute", bottom: barH + 22, left: "50%", transform: "translateX(-50%)",
@@ -164,6 +162,7 @@ export function BracketProbChart({ defaultTeams = [], fixtureId }: Props) {
                 </div>
             </div>
 
+            {/* Selected/hovered team's full bracket path */}
             {activeTeam && (
                 <div style={{ padding: "14px 14px 10px", borderTop: "1px solid var(--border)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10 }}>
@@ -177,7 +176,7 @@ export function BracketProbChart({ defaultTeams = [], fixtureId }: Props) {
                                 display: "grid", gridTemplateColumns: "62px 1fr 40px",
                                 alignItems: "center", gap: 10, marginBottom: 8,
                             }}>
-                                <span style={{ fontFamily: "var(--font-mono)", fontSize: ".64rem", color: "var(--text-3)" }}>
+                                <span style={{ fontFamily: "var(--font-mono)", fontSize: ".72rem", color: "var(--text-2)" }}>
                                     {COMPACT_LABELS[stage]}
                                 </span>
                                 <div style={{ height: 6, background: "var(--bg-4)", borderRadius: 3, overflow: "hidden" }}>
@@ -195,10 +194,11 @@ export function BracketProbChart({ defaultTeams = [], fixtureId }: Props) {
                 </div>
             )}
 
+            {/* ── Per-match market odds — THIS fixture only ── */}
             <div style={{ padding: "12px 14px 14px", borderTop: "1px solid var(--border-bright)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
                     <span style={{ width: 3, height: 10, background: "var(--away)", borderRadius: 2, flexShrink: 0 }} />
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "uppercase", letterSpacing: ".1em", color: "var(--text-3)" }}>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-3)" }}>
                         Market Odds — Per Match
                     </span>
                 </div>
@@ -214,21 +214,21 @@ export function BracketProbChart({ defaultTeams = [], fixtureId }: Props) {
                         <div style={{
                             display: "inline-flex", alignItems: "center", gap: 6,
                             padding: "3px 9px", borderRadius: 12, marginBottom: 8,
-                            background: matchOdds.source === "betfair" ? "rgba(240,84,84,.1)" : "var(--bg-3)",
-                            border: `1px solid ${matchOdds.source === "betfair" ? "rgba(240,84,84,.3)" : "var(--border)"}`,
+                            background: matchOdds.source === "market_odds" ? "rgba(240,84,84,.1)" : "var(--glass-bg-inner)",
+                            border: `1px solid ${matchOdds.source === "market_odds" ? "rgba(240,84,84,.3)" : "var(--glass-border-inner)"}`,
                         }}>
                             <span style={{
                                 fontFamily: "var(--font-mono)", fontSize: ".6rem", fontWeight: 700,
-                                color: matchOdds.source === "betfair" ? "#f05454" : "var(--text-3)",
+                                color: matchOdds.source === "market_odds" ? "#f05454" : "var(--text-3)",
                             }}>
-                                {matchOdds.source === "betfair" ? "THE ODDS API · MARKET ODDS" : "ELO PRIOR"}
+                                {matchOdds.source === "market_odds" ? "THE ODDS API · MARKET ODDS" : "ELO PRIOR"}
                             </span>
                         </div>
                         <div style={{ fontSize: ".7rem", color: "var(--text-3)", marginBottom: 10 }}>
                             Per-match win probabilities (input to MC sim)
                         </div>
 
-                        <div style={{ background: "var(--bg-2)", border: "1px solid var(--border)", borderRadius: "var(--r-md)", padding: 12 }}>
+                        <div style={{ background: "var(--glass-bg-inner)", border: "1px solid var(--glass-border-inner)", borderRadius: "var(--r-md)", padding: 16 }}>
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                                 <span style={{ fontSize: ".8rem", fontWeight: 700 }}>
                                     <span style={{ color: "var(--home)" }}>{matchOdds.home_name}</span>

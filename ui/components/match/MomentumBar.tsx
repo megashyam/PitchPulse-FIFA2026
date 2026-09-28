@@ -1,12 +1,5 @@
 "use client"
-
-/**
- * Live momentum summary for a fixture.
- *
- * The bar highlights the current balance of control and the three-cell grid
- * surfaces the slower-moving possession and pressure signals that feed the
- * live model.
- */
+// components/match/MomentumBar.tsx — hero percentage numbers + 3-cell grid
 
 import { useMomentumStream } from "@/hooks/useMomentumStream"
 import type { MomentumSnapshot } from "@/hooks/useMomentumStream"
@@ -23,8 +16,6 @@ function Display({ m }: { m: MomentumSnapshot }) {
     const awayPct = 100 - homePct
     const homeGoalPct = (m.home.goal_prob_5min * 100).toFixed(1)
     const awayGoalPct = (m.away.goal_prob_5min * 100).toFixed(1)
-    const homeBumped = Math.abs(m.home.bump) > 0.03
-    const awayBumped = Math.abs(m.away.bump) > 0.03
 
     const [open, setOpen] = useState(true)
     useEffect(() => { const s = localStorage.getItem("card:momentum"); if (s) setOpen(s === "open") }, [])
@@ -33,6 +24,7 @@ function Display({ m }: { m: MomentumSnapshot }) {
     return (
         <div className="momentum-wrap">
 
+            {/* Header */}
             <div className="momentum-header" style={{ cursor: "pointer" }} onClick={toggle}>
                 <div>
                     <div className="momentum-title">Momentum</div>
@@ -52,10 +44,10 @@ function Display({ m }: { m: MomentumSnapshot }) {
             {open && (
                 <div style={{ animation: "card-expand .18s ease" }}>
 
+                    {/* Hero numbers */}
                     <div className="momentum-hero">
                         <div>
-                            <div className={`momentum-hero-pct home${homeBumped ? " bumped" : ""}`}
-                                style={homeBumped ? { color: "var(--amber)" } : {}}>
+                            <div className="momentum-hero-pct home">
                                 {homePct}%
                             </div>
                             <div className="momentum-hero-sub home">{homeGoalPct}% chance/5 min</div>
@@ -71,40 +63,40 @@ function Display({ m }: { m: MomentumSnapshot }) {
                         </div>
 
                         <div style={{ textAlign: "right" }}>
-                            <div className={`momentum-hero-pct away${awayBumped ? " bumped" : ""}`}
-                                style={awayBumped ? { color: "var(--amber)" } : {}}>
+                            <div className="momentum-hero-pct away">
                                 {awayPct}%
                             </div>
                             <div className="momentum-hero-sub away">{awayGoalPct}% chance/5 min</div>
                         </div>
                     </div>
 
+                    {/* 3-cell breakdown */}
                     <div className="momentum-grid">
 
                         <div className="momentum-grid-cell">
-                            <span className="momentum-grid-label">Possession</span>
+                            <span className="momentum-grid-label">Shots (15')</span>
                             <div className="momentum-grid-values">
-                                <span className="momentum-grid-val home">{m.home.ewma_possession.toFixed(0)}%</span>
+                                <span className="momentum-grid-val home">{m.home.shots_15min}</span>
                                 <span className="momentum-grid-divider">/</span>
-                                <span className="momentum-grid-val away">{m.away.ewma_possession.toFixed(0)}%</span>
+                                <span className="momentum-grid-val away">{m.away.shots_15min}</span>
                             </div>
                         </div>
 
                         <div className="momentum-grid-cell">
-                            <span className="momentum-grid-label">Shot Press.</span>
+                            <span className="momentum-grid-label">xG (15')</span>
                             <div className="momentum-grid-values">
-                                <span className="momentum-grid-val home">{m.home.ewma_pressure.toFixed(2)}</span>
+                                <span className="momentum-grid-val home">{m.home.xg_15min.toFixed(2)}</span>
                                 <span className="momentum-grid-divider">/</span>
-                                <span className="momentum-grid-val away">{m.away.ewma_pressure.toFixed(2)}</span>
+                                <span className="momentum-grid-val away">{m.away.xg_15min.toFixed(2)}</span>
                             </div>
                         </div>
 
                         <div className="momentum-grid-cell">
-                            <span className="momentum-grid-label">Pass Acc.</span>
+                            <span className="momentum-grid-label">xG (match)</span>
                             <div className="momentum-grid-values">
-                                <span className="momentum-grid-val home">{m.home.ewma_pass_acc.toFixed(0)}%</span>
+                                <span className="momentum-grid-val home">{m.home.xg_total.toFixed(2)}</span>
                                 <span className="momentum-grid-divider">/</span>
-                                <span className="momentum-grid-val away">{m.away.ewma_pass_acc.toFixed(0)}%</span>
+                                <span className="momentum-grid-val away">{m.away.xg_total.toFixed(2)}</span>
                             </div>
                         </div>
 

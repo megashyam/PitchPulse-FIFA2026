@@ -12,8 +12,7 @@ const STATUS_LABEL: Record<string, string> = {
     P: "PENALTIES", FT: "FULL TIME", AET: "AET", PEN: "PENALTIES",
 }
 const LIVE = new Set(["1H", "2H", "ET", "P"])
-// US Eastern — correctly follows DST (audit H6 fix; was a fixed "Etc/GMT+5"
-// offset, which is only correct during EST/winter months).
+// US Eastern, DST-aware.
 const TZ = "America/New_York"
 
 // Page background: whichever side is ahead on the scoreboard gets the
@@ -95,7 +94,7 @@ export function ScoreHeader({ state, updatedAt }: { state: any; updatedAt?: stri
             )}
             <div className="score-header-v3-inner">
 
-
+                {/* Home */}
                 <div className="score-team-v3 home">
                     <div className="score-team-crest-row">
                         <Flag team={state.home_name} size="lg" />
@@ -104,7 +103,7 @@ export function ScoreHeader({ state, updatedAt }: { state: any; updatedAt?: stri
                     {state.venue && <span className="score-team-sub">{state.venue}</span>}
                 </div>
 
-
+                {/* Score */}
                 <div className="score-center-v3">
                     <div className="score-digits-v3">
                         <span className="score-digit-v3">{state.home_score}</span>
@@ -120,7 +119,7 @@ export function ScoreHeader({ state, updatedAt }: { state: any; updatedAt?: stri
                     </div>
                 </div>
 
-
+                {/* Away */}
                 <div className="score-team-v3 away">
                     <div className="score-team-crest-row">
                         <span className="score-team-name-v3">{state.away_name}</span>
@@ -131,7 +130,7 @@ export function ScoreHeader({ state, updatedAt }: { state: any; updatedAt?: stri
 
             </div>
 
-
+            {/* Progress bar */}
             <div className="score-header-v3-timeline">
                 <div className="score-header-v3-timeline-fill" style={{ width: `${progress.toFixed(1)}%` }} />
             </div>

@@ -1,6 +1,7 @@
 "use client"
-
-
+// hooks/useMatchPrediction.ts
+// Fetches per-match W/D/L prediction + tournament implications.
+// Simple REST fetch — no SSE needed (this data changes slowly).
 
 import { useEffect, useState } from "react"
 
@@ -35,7 +36,7 @@ export interface MatchPrediction {
         draw: MatchOdds
         away_win: MatchOdds
     }
-    source: string    // "betfair" | "elo"
+    source: string    // "market_odds" | "elo"
     home_tournament: TeamTournament | null
     away_tournament: TeamTournament | null
 }

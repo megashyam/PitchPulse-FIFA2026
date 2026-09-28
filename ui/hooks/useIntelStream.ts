@@ -1,14 +1,11 @@
 "use client"
-
-/**
- * Stream live match intelligence narratives and keep the empty-state logic honest.
- *
- * The backend may legitimately have no intel for a non-live or scoreless
- * fixture, so the hook treats a successful empty fetch as a real idle state
- * rather than a failure. Live fixtures keep both polling and SSE enabled;
- * completed fixtures only use the initial fetch because their intel history
- * stops changing.
- */
+// hooks/useIntelStream.ts
+// SSE subscription + 30s REST poll for live match intel narratives.
+//
+// Takes the match `statusShort` and:
+//   - resolves isWaiting=false after the first fetch completes;
+//   - exposes phase: "loading" | "streaming" | "idle" for the component;
+//   - opens SSE only for live matches.
 
 import { useEffect, useRef, useState, useCallback } from "react"
 
@@ -63,8 +60,8 @@ export function useIntelStream(
     const [firstLoadDone, setFirstLoadDone] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const mountedRef = useRef(true)
-    // Keep the completed-match poll cap off the React dependency list so a
-    // new fetch does not tear down the SSE/poll setup on every update.
+    // Entry count for the completed-match poll check, kept out of the
+    // subscription effect's dependencies.
     const entriesCountRef = useRef(0)
 
     const isLive = statusShort ? LIVE.has(statusShort) : false
@@ -74,8 +71,10 @@ export function useIntelStream(
         if (!fixtureId) return
         try {
             const r = await fetch(`${API}/matches/${fixtureId}/intel`)
+            console.log("[intel v2] fetch status", r.status, "for", fixtureId)
             if (r.ok) {
                 const data: { entries?: IntelEntry[] } = await r.json()
+                console.log("[intel v2] got entries:", data?.entries?.length ?? "none")
                 if (!mountedRef.current) return
                 const list = Array.isArray(data?.entries) ? data.entries : []
                 const deduped = sortedDeduped(list)
@@ -83,8 +82,9 @@ export function useIntelStream(
                 entriesCountRef.current = deduped.length
                 setError(null)
             }
+            // 404 (no data) is a normal state, not an error — just fall through.
         } catch (e) {
-            // Network issues are transient here; the next poll or SSE event retries.
+            console.log("[intel v2] fetch error", e)
         } finally {
             if (mountedRef.current) setFirstLoadDone(true)
         }
@@ -96,8 +96,13 @@ export function useIntelStream(
         setFirstLoadDone(false)
         entriesCountRef.current = 0
 
+        // Always do one fetch — a completed match may have stored history.
         fetchFeed()
 
+        // LIVE matches: poll + SSE indefinitely.
+        // COMPLETED matches: poll every 30s for the first few tries (the FT
+        // wrap-up lands within ~30s of full time), then every 2 min.
+        // NS matches: one fetch, no polling.
         if (!isLive && !isCompleted) {
             return () => { mountedRef.current = false }
         }
@@ -115,6 +120,8 @@ export function useIntelStream(
                 }
                 ftPolls += 1
                 if (ftPolls === FT_FAST_POLLS) {
+                    // Switch to the slower indefinite cadence instead of
+                    // stopping — re-create the interval at the new period.
                     clearInterval(poll)
                     poll = setInterval(tick, FT_SLOW_INTERVAL_MS)
                 }
@@ -122,6 +129,7 @@ export function useIntelStream(
             fetchFeed()
         }
 
+        // SSE only makes sense for live matches.
         let es: EventSource | null = null
         if (isLive) {
             es = new EventSource(`${API}/matches/${fixtureId}/intel/stream`)
@@ -136,15 +144,17 @@ export function useIntelStream(
             clearInterval(poll)
             if (es) es.close()
         }
-        // Only resubscribe when the fixture identity or live/completed state changes.
+        // entries.length is deliberately not a dependency: re-subscribe only
+        // when the fixture or its live/completed status changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fixtureId, isLive, isCompleted, fetchFeed])
 
     let phase: IntelPhase
-    if (entries.length > 0) phase = "streaming"
+    if (entries.length > 0) phase = "streaming"        // have data → always show it
     else if (!firstLoadDone) phase = "loading"
-    else if (isLive) phase = "idle_nodata"
-    else if (isCompleted) phase = "idle_nodata"
-    else phase = "idle_notlive"
+    else if (isLive) phase = "idle_nodata"             // live but nothing narratable yet
+    else if (isCompleted) phase = "idle_nodata"        // finished, no stored intel
+    else phase = "idle_notlive"                        // NS / pre-match
 
     return {
         entries,

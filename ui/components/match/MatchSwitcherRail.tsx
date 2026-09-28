@@ -2,11 +2,8 @@
 // components/match/MatchSwitcherRail.tsx
 // Left icon rail for jumping between matches without going back to the
 // list — live matches first, then every finished match (most recent
-// first). Previously restricted "finished" to only today's kickoffs,
-// which left the rail nearly empty this late in the tournament (almost
-// everything finished on earlier days). The list scrolls internally
-// (.mp-rail-list has its own max-height), so there's no need to cap or
-// day-restrict what's shown.
+// first). The list scrolls internally (.mp-rail-list has its own
+// max-height).
 
 import { useEffect, useState } from "react"
 import Link from "next/link"

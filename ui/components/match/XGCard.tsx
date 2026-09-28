@@ -1,4 +1,5 @@
 "use client"
+// components/match/XGCard.tsx — 3-cell hero numbers
 
 import type { MatchState } from "@/types/match"
 
@@ -9,7 +10,9 @@ export function XGCard({ state }: { state: MatchState }) {
 
     return (
         <div>
-            <div className="stats-section-header">Expected Goals (xG)</div>
+            <div className="stats-section-header" title="Our shot model over this match's real shots (location, body part, assist type) — not an official feed number">
+                Expected Goals (model xG)
+            </div>
             <div style={{
                 display: "grid", gridTemplateColumns: "1fr auto 1fr",
                 alignItems: "center", padding: "3px 14px 5px", gap: 4,

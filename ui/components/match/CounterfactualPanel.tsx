@@ -1,18 +1,14 @@
 "use client"
-
-/**
- * Counterfactual analysis panel for live and completed matches.
- *
- * Completed fixtures reuse the persisted history only, while live fixtures
- * keep a small loading card visible during the brief window between the
- * backend starting a simulation and the result stream arriving. That keeps
- * the UI honest about work in progress instead of leaving the previous card
- * in place with no explanation.
- */
+// components/match/CounterfactualPanel.tsx
+//
+// Completed matches skip SSE and show the history fetched once via REST.
+// A loading card is prepended while the backend simulates a new event
+// (`calculating`) and disappears when the result streams in.
 
 import { useCounterfactualStream } from "@/hooks/useCounterfactualStream"
 import { useMatchStream } from "@/hooks/useMatchStream"
 import type { CfResult, CfCalculating } from "@/hooks/useCounterfactualStream"
+import { viaLabel } from "@/lib/via"
 
 interface Props { fixtureId: string }
 
@@ -22,6 +18,8 @@ const EVENT_LABELS: Record<string, string> = {
     penalty_goal: "penalty",
     red: "red card",
     yellow_red: "second yellow",
+    yellow: "yellow card",
+    substitution: "substitution",
 }
 
 export function CounterfactualPanel({ fixtureId }: Props) {
@@ -30,10 +28,15 @@ export function CounterfactualPanel({ fixtureId }: Props) {
     const currentElapsed = state?.elapsed ?? 0
     const isCompleted = ["FT", "AET", "PEN"].includes(state?.status_short ?? "")
 
+    // For live matches, filter out results from a stale future (replay guard).
+    // For completed matches, show the full history — every minute is valid.
     const freshResults = isCompleted
         ? results
         : results.filter(r => r.minute <= currentElapsed + 5)
 
+    // Don't show the loader if a matching result already arrived in this
+    // render (guards a narrow race between the SSE result event and the
+    // calculating-clear logic in the hook).
     const showLoader = !!calculating && !freshResults.some(
         r => r.minute === calculating.minute
             && r.event_type === calculating.event_type
@@ -45,13 +48,14 @@ export function CounterfactualPanel({ fixtureId }: Props) {
     return (
         <div style={{ display: "flex", flexDirection: "column" }}>
 
+            {/* Description */}
             <div style={{ padding: "18px 20px 14px", borderBottom: "1px solid var(--border)" }}>
                 <div style={{ fontSize: ".8rem", fontWeight: 600, color: "var(--text-1)", marginBottom: 4 }}>
                     Counterfactual Analysis
                 </div>
                 <div style={{ fontSize: ".72rem", color: "var(--text-3)", lineHeight: 1.45 }}>
                     {isCompleted
-                        ? "Full match history — every goal and red card analysed during this match."
+                        ? "Full match history — every goal, card, and substitution analysed during this match."
                         : "Monte Carlo simulation shows how match trajectories shift after each key event. 50,000 runs computed in ~8 seconds."}
                 </div>
             </div>
@@ -66,17 +70,17 @@ export function CounterfactualPanel({ fixtureId }: Props) {
                     </div>
                     <div style={{ fontSize: ".72rem", color: "var(--text-3)", lineHeight: 1.5 }}>
                         {isCompleted
-                            ? "This match had no goals or red cards that triggered bracket analysis."
-                            : "Appears after the first goal or red card, showing how the tournament bracket shifts."}
+                            ? "This match had no goals, cards, or substitutions to analyse."
+                            : "Appears after the first goal, card, or substitution, showing how the tournament bracket shifts."}
                     </div>
                 </div>
             ) : (
-                <>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 10 }}>
                     {showLoader && calculating && <CfLoadingCard calculating={calculating} />}
                     {freshResults.map((r, i) => (
                         <CfEventCard key={`${r.minute}-${r.event_type}-${r.event_team}-${i}`} result={r} />
                     ))}
-                </>
+                </div>
             )}
 
         </div>
@@ -108,6 +112,8 @@ function CfLoadingCard({ calculating }: { calculating: CfCalculating }) {
                 </div>
             </div>
 
+            {/* Scoped keyframes — kept local to this component so no global
+                stylesheet edit is needed for this one loading state. */}
             <style jsx>{`
                 .cf-loading-spinner {
                     display: inline-block;
@@ -138,10 +144,11 @@ function CfEventCard({ result }: { result: CfResult }) {
     const evLabel = EVENT_LABELS[result.event_type] ?? result.event_type
     const shiftPct = (result.path_shift_pct * 100).toFixed(0)
     const top = result.top_changes[0]
-    const simK = (result.n_sims / 1000).toFixed(0)
     const isHigh = result.path_shift_pct >= 0.5
 
-    let summary = `${shiftPct}% of ${simK}k simulation paths shifted.`
+    let summary = result.n_sims > 0
+        ? `${shiftPct}% of championship probability moved between teams.`
+        : "No change to score or players on the pitch — bracket unchanged."
     if (top) {
         summary += ` ${top.team} ${top.delta > 0 ? "▲" : "▼"} from ${(top.before * 100).toFixed(0)}% → ${(top.after * 100).toFixed(0)}% WC win probability.`
     }
@@ -169,7 +176,10 @@ function CfEventCard({ result }: { result: CfResult }) {
 
                 {result.narrative && (
                     <div className="cf-narrative-block">
-                        <span className="cf-narrative-meta">Mistral 7B · {result.n_sims.toLocaleString()} runs · {result.elapsed_s}s</span>
+                        <span className="cf-narrative-meta">
+                            {viaLabel(result.via)}
+                            {result.n_sims > 0 ? ` · ${result.n_sims.toLocaleString()} runs · ${result.elapsed_s}s` : " · no simulation needed"}
+                        </span>
                         <p className="cf-narrative-text">"{result.narrative}"</p>
                     </div>
                 )}

@@ -1,14 +1,12 @@
 "use client"
-
-/**
- * Load the tactical fingerprint match for a fixture.
- *
- * Tactical fingerprints are slow-moving, cached server-side, and stored in
- * Weaviate, so a straightforward REST fetch is enough here. The hook
- * normalizes the "not started" and "missing fingerprint" cases to null so
- * the card can render its fallback state without branching on transport
- * details.
- */
+// hooks/useTactical.ts
+// Fetches the tactical fingerprint match for a fixture from the
+// /matches/{id}/tactical endpoint (backed by the Weaviate TacticalProfiles
+// collection). Simple REST — this data changes slowly within a match
+// (cached 10 min server-side), so no SSE needed.
+//
+// Returns null when no fingerprint exists yet (404) or the match hasn't
+// started (200 {"status": "not_started"}).
 
 import { useEffect, useState } from "react"
 
@@ -19,7 +17,7 @@ export interface FingerprintMatch {
     opponent: string
     competition: string
     season: string
-    match_pct: number | null
+    possession_gap_pp: number | null
     ppda: number
     ppda_mid_third: number
     ppda_att_third: number
@@ -37,7 +35,7 @@ export interface TeamFingerprint {
         team: string
         season: string
         ppda: number
-        match_pct: number | null
+        possession_gap_pp: number | null
     }[]
 }
 
@@ -77,6 +75,8 @@ export function useTactical(fixtureId: string) {
                 if (mounted) setLoading(false)
             })
 
+        // Refresh every 60s; a worker refresh or kickoff can change it before
+        // the 10-min server cache expires.
         const t = setInterval(() => {
             fetch(`${API}/matches/${fixtureId}/tactical`)
                 .then(r => (r.ok ? r.json() : null))

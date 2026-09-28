@@ -1,13 +1,5 @@
 "use client"
-
-/**
- * Group-stage probability panel.
- *
- * The panel groups teams by their tournament group, sorts them by the
- * probability of winning the group, and lets the user inspect one group at a
- * time. The data is intentionally flattened into a simple ranked list because
- * the underlying model already encodes the tournament logic.
- */
+// components/predict/GroupPanel.tsx
 
 import { useEffect, useMemo, useState } from "react"
 import type { TeamPrediction } from "@/types/predict"
@@ -15,6 +7,7 @@ import type { TeamPrediction } from "@/types/predict"
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
 export function GroupPanel({ teams }: { teams: TeamPrediction[] }) {
+    // Build group map sorted by 1st-place probability
     const groupMap = useMemo(() => {
         const map = new Map<string, TeamPrediction[]>()
         for (const t of teams) {
@@ -31,6 +24,7 @@ export function GroupPanel({ teams }: { teams: TeamPrediction[] }) {
 
     const groupKeys = useMemo(() => [...groupMap.keys()].sort(), [groupMap])
 
+    // Auto-detect active match group
     const [active, setActive] = useState("")
     useEffect(() => {
         if (!teams.length) return
@@ -52,6 +46,7 @@ export function GroupPanel({ teams }: { teams: TeamPrediction[] }) {
 
     const groupTeams = groupMap.get(active) ?? []
 
+    // Build flat rows: 1st × all teams, 2nd × all teams, WC win × all teams
     const rows = useMemo(() => {
         const out: { label: string; p: number; kind: "first" | "second" | "wc" }[] = []
         groupTeams.forEach(t => out.push({ label: `${t.name} 1st`, p: t.group_first?.p ?? 0, kind: "first" }))
@@ -77,6 +72,7 @@ export function GroupPanel({ teams }: { teams: TeamPrediction[] }) {
                 <span className="pred-card-label">50k runs · numpy · CPU ~8s</span>
             </div>
 
+            {/* Group selector pills */}
             <div className="pred-group-pills">
                 {groupKeys.map(g => (
                     <button

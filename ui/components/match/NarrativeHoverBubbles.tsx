@@ -1,12 +1,9 @@
 "use client"
-
-/**
- * Fixed comment bubbles for hovered narrative spikes.
- *
- * The bubbles stay anchored beside the card while the text inside each one
- * cycles independently, which makes the interaction feel like comment
- * shuffling instead of moving geometry.
- */
+// components/match/NarrativeHoverBubbles.tsx
+// 5 fixed circular bubbles positioned beside a hovered spike card.
+// The BUBBLES don't move — only the comment text inside each cycles
+// through the fetched samples on a staggered interval, so it reads as
+// "shuffling comments" rather than "floating shapes."
 
 import { useEffect, useState, useRef } from "react"
 
@@ -23,6 +20,9 @@ interface CommentSample {
 
 const SRC_ICONS: Record<string, string> = { mastodon: "🐘", bluesky: "🦋" }
 
+// 5 fixed positions arranged in an arc beside the card — evenly spaced
+// so none can ever overlap. Angles cover a ~200° arc to the right of
+// the anchor point (flips left if not enough screen room, handled by caller).
 const ANGLES_DEG = [-70, -35, 0, 35, 70]
 const RADIUS = 78
 
@@ -44,6 +44,7 @@ export function NarrativeHoverBubbles({ topic, anchorRect, flipLeft }: Props) {
             .catch(() => { })
     }, [topic])
 
+    // Staggered independent cycling per bubble slot
     useEffect(() => {
         if (samples.length === 0) return
         timers.current.forEach(clearInterval)
