@@ -1,12 +1,3 @@
-"""
-Pydantic models for tournament prediction API responses.
-
-Separates:
-- stage-level probabilities
-- team tournament outcomes
-- simulation lifecycle responses
-"""
-
 from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
@@ -14,27 +5,25 @@ from pydantic import BaseModel, Field
 
 
 class StageProbability(BaseModel):
-    """Probability and confidence interval for a single tournament stage."""
-
     p: float = 0.0
     ci_lo: float = 0.0
     ci_hi: float = 0.0
 
 
 class TeamPrediction(BaseModel):
-    """Per-team tournament probabilities returned to the UI."""
-
     name: str
     group: str
     elo: float
     fifa_rank: int
 
+    # ── Group stage finishing position ────────────────────────────────────
     group_exit: StageProbability = Field(default_factory=StageProbability)
     group_first: StageProbability = Field(default_factory=StageProbability)
     group_second: StageProbability = Field(default_factory=StageProbability)
     group_third: StageProbability = Field(default_factory=StageProbability)
     group_fourth: StageProbability = Field(default_factory=StageProbability)
 
+    # ── Knockout stages ───────────────────────────────────────────────────
     r32: StageProbability = Field(default_factory=StageProbability)
     r16: StageProbability = Field(default_factory=StageProbability)
     qf: StageProbability = Field(default_factory=StageProbability)
@@ -44,8 +33,6 @@ class TeamPrediction(BaseModel):
 
     @classmethod
     def from_result(cls, r) -> "TeamPrediction":
-        """Convert the simulator result model into the API response shape."""
-
         def sp(stage: str) -> StageProbability:
             p = r.probs.get(stage, 0.0)
             lo, hi = r.ci_95.get(stage, (0.0, 0.0))
@@ -71,8 +58,6 @@ class TeamPrediction(BaseModel):
 
 
 class TournamentPrediction(BaseModel):
-    """Top-level tournament prediction payload."""
-
     sim_id: str
     n_sims: int
     elapsed_s: float
@@ -82,8 +67,6 @@ class TournamentPrediction(BaseModel):
 
 
 class SimStatus(BaseModel):
-    """Current lifecycle state for an in-flight tournament simulation."""
-
     status: str
     sim_id: Optional[str] = None
     started_at: Optional[datetime] = None
@@ -91,8 +74,6 @@ class SimStatus(BaseModel):
 
 
 class SimTriggerResponse(BaseModel):
-    """Response returned when a new simulation is queued."""
-
     accepted: bool
     message: str
     sim_id: str

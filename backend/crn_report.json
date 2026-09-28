@@ -1,0 +1,36 @@
+{
+  "team": "Argentina",
+  "elo_boost": 30.0,
+  "n_sims_per_leg": 10000,
+  "repeats": 20,
+  "delta_champion_prob": {
+    "crn_shared_seed": {
+      "mean": 0.03904500000000001,
+      "std": 0.0018268393758793218,
+      "min": 0.0363,
+      "max": 0.043800000000000006
+    },
+    "independent_seeds": {
+      "mean": 0.039895,
+      "std": 0.005758881013384091,
+      "min": 0.0267,
+      "max": 0.04829999999999998
+    }
+  },
+  "path_shift": {
+    "crn_shared_seed": {
+      "mean": 0.03916000000000001,
+      "std": 0.0018265296401415974,
+      "min": 0.03640000000000001,
+      "max": 0.04380000000000002
+    },
+    "independent_seeds": {
+      "mean": 0.04928500000000001,
+      "std": 0.005335607793524161,
+      "min": 0.0396,
+      "max": 0.0603
+    }
+  },
+  "variance_reduction_factor": 9.9,
+  "equivalent_extra_sims": "independent seeding needs ~10x more simulations for the same delta precision"
+}

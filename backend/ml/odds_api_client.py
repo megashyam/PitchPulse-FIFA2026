@@ -1,41 +1,15 @@
 """
-Odds API integration layer for live market-based tournament priors.
+Market W/D/L client for The Odds API.
 
-This module provides asynchronous access to external football betting markets
-and exposes normalized decimal odds consumed by downstream probability models.
+TTL-cached with stale-if-error reuse. Each bookmaker's line is de-vigged
+on its own (Shin, ml.prior_builder.shin_devig) and the fair probabilities
+are averaged across books, then returned as zero-margin decimal odds (1/p).
+Team names go through ml.team_names.canonical.
 
-The client preserves the existing Betfair-style interface while adding:
-    - API-based odds retrieval
-    - TTL caching
-    - request coalescing
-    - transient failure recovery
-    - free-tier usage protection
-
-
-Pipeline:
-
-    External Odds Provider
-            ↓
-    Odds Normalization
-            ↓
-    Cached Market Snapshot
-            ↓
-    Probability Calibration
-            ↓
-    Tournament Simulation
-
-
-Core responsibilities:
-    - Retrieve live head-to-head market odds.
-    - Aggregate bookmaker prices into consensus estimates.
-    - Maintain cached odds snapshots.
-    - Prevent excessive API requests.
-    - Provide fallback behavior during provider failures.
-
-
-Raw decimal odds are intentionally preserved at this layer so downstream
-components can apply probability transformations such as de-vigging and
-market calibration consistently.
+Env:
+    ODDS_API_KEY     enable live odds (empty → {} → Elo priors everywhere)
+    ODDS_CACHE_TTL   seconds to cache the odds map (default 5400, ~16
+                     requests/day, inside the 500/month free tier)
 """
 
 from __future__ import annotations
@@ -47,47 +21,25 @@ import time
 from typing import Dict, Optional, Tuple
 
 import httpx
+import numpy as np
+
+from ml.team_names import canonical
 
 log = logging.getLogger(__name__)
 
 ODDS_API_KEY = os.getenv("ODDS_API_KEY", "")
 ODDS_API_BASE = "https://api.the-odds-api.com/v4"
-SPORT_KEY = "soccer_fifa_world_cup"
-CACHE_TTL = float(os.getenv("ODDS_CACHE_TTL", "900"))
+SPORT_KEY = "soccer_fifa_world_cup"  # update to the correct key when WC2026 goes live
+CACHE_TTL = float(os.getenv("ODDS_CACHE_TTL", "5400"))
 
 # (home_name, away_name) -> (decimal_home, decimal_draw, decimal_away)
 OddsMap = Dict[Tuple[str, str], Tuple[float, float, float]]
 
 
 async def _fetch_odds() -> Optional[OddsMap]:
-    """
-    Fetch and normalize live football market odds from the external provider.
+    """H2H odds per match: {(home, away): (odds_home, odds_draw, odds_away)}.
 
-    Retrieves head-to-head markets across available bookmakers and aggregates
-    multiple prices into a single consensus decimal odds estimate per fixture.
-
-    The function distinguishes between:
-        - empty markets: valid response with no available odds
-        - failed requests: unavailable provider response
-
-    This distinction allows the cache layer to decide whether stale data
-    should be retained.
-
-    Returns:
-        OddsMap containing:
-
-            {
-                (home_team, away_team):
-                    (
-                        home_decimal_odds,
-                        draw_decimal_odds,
-                        away_decimal_odds
-                    )
-            }
-
-        Returns:
-            - Empty dictionary when odds are unavailable or API key is missing.
-            - None when the provider request fails.
+    None on transport/HTTP failure (distinct from an empty market list).
     """
     if not ODDS_API_KEY:
         log.debug("No ODDS_API_KEY set — Elo priors will be used for all matches")
@@ -118,33 +70,30 @@ async def _fetch_odds() -> Optional[OddsMap]:
         log.warning(f"Odds API error: {exc}")
         return None
 
+    from ml.prior_builder import shin_devig  # local: prior_builder imports config
+
     odds_map: OddsMap = {}
     for event in events:
-        home = (event.get("home_team") or "").strip()
-        away = (event.get("away_team") or "").strip()
-        if not home or not away:
+        raw_home = (event.get("home_team") or "").strip()
+        raw_away = (event.get("away_team") or "").strip()
+        if not raw_home or not raw_away:
             continue
 
-        home_prices, draw_prices, away_prices = [], [], []
+        fair = []
         for book in event.get("bookmakers", []):
             for market in book.get("markets", []):
                 if market.get("key") != "h2h":
                     continue
                 by_name = {o["name"]: o["price"] for o in market.get("outcomes", [])}
-                hp, dp, ap = by_name.get(home), by_name.get("Draw"), by_name.get(away)
-                if hp and dp and ap and min(hp, dp, ap) > 1.0:  # decimal odds > 1.0
-                    home_prices.append(hp)
-                    draw_prices.append(dp)
-                    away_prices.append(ap)
+                hp, dp, ap = by_name.get(raw_home), by_name.get("Draw"), by_name.get(raw_away)
+                if hp and dp and ap and min(hp, dp, ap) > 1.0:
+                    fair.append(shin_devig((hp, dp, ap))[0])
 
-        if not home_prices:
+        if not fair:
             continue
-
-        # Keep raw decimal odds here; de-vigging happens downstream.
-        odds_map[(home, away)] = (
-            round(sum(home_prices) / len(home_prices), 4),
-            round(sum(draw_prices) / len(draw_prices), 4),
-            round(sum(away_prices) / len(away_prices), 4),
+        p = np.mean(fair, axis=0)
+        odds_map[(canonical(raw_home), canonical(raw_away))] = tuple(
+            round(float(1.0 / x), 4) for x in p
         )
 
     log.info(f"Odds API: loaded {len(odds_map)} match odds")
@@ -152,20 +101,7 @@ async def _fetch_odds() -> Optional[OddsMap]:
 
 
 class _OddsApiClient:
-    """
-    Asynchronous TTL-cached client for external market odds.
-
-    Provides a stable interface for downstream systems while abstracting
-    provider-specific API communication and cache management.
-
-    Design features:
-        - In-memory TTL caching reduces API usage.
-        - Async locking prevents duplicate concurrent refresh requests.
-        - Previous successful snapshots remain available during outages.
-
-    The client intentionally returns normalized raw odds rather than
-    probabilities so downstream calibration layers remain independent.
-    """
+    """TTL-cached client for The Odds API."""
 
     def __init__(self) -> None:
         self._cache: Optional[OddsMap] = None
@@ -173,34 +109,11 @@ class _OddsApiClient:
         self._lock = asyncio.Lock()
 
     async def get_all_odds(self) -> OddsMap:
-        """
-        Retrieve the latest available odds snapshot.
-
-        Uses a TTL-based cache strategy:
-
-            1. Serve existing cache when still valid.
-            2. Acquire refresh lock after expiration.
-            3. Fetch updated market data.
-            4. Replace cache only on successful retrieval.
-            5. Serve stale data during transient provider failures.
-
-
-        This approach minimizes API usage while maintaining availability for
-        downstream prediction pipelines.
-
-        Returns:
-            Dictionary mapping fixtures to normalized decimal odds:
-
-                {
-                    (home_team, away_team):
-                        (home_odds, draw_odds, away_odds)
-                }
-        """
         now = time.monotonic()
         if self._cache is not None and now - self._cached_at < CACHE_TTL:
             return self._cache
 
-        async with self._lock:
+        async with self._lock:  # coalesce concurrent refreshes to one request
             now = time.monotonic()
             if self._cache is not None and now - self._cached_at < CACHE_TTL:
                 return self._cache
@@ -210,10 +123,12 @@ class _OddsApiClient:
                 self._cache = fresh
                 self._cached_at = now
             elif self._cache is not None:
+                # stale-if-error: keep serving the last good snapshot rather
+                # than flipping the whole prior table to Elo mid-match
                 log.warning("Odds API fetch failed — serving stale cached odds")
             else:
                 self._cache = {}
-                self._cached_at = now
+                self._cached_at = now  # back off; don't hammer a failing API
         return self._cache or {}
 
 
@@ -221,5 +136,5 @@ _singleton = _OddsApiClient()
 
 
 def get_oddsapi_client() -> _OddsApiClient:
-    """Drop-in replacement for the original get_betfair_client()."""
+    """Singleton Odds API client."""
     return _singleton

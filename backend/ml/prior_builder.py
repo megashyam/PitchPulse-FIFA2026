@@ -1,98 +1,51 @@
-"""
-Probability prior generation layer for tournament simulation.
-
-This module converts team strength signals and market information into
-calibrated win/draw/loss probability distributions used by the tournament
-simulation engine.
-
-The system combines:
-
-    Team Strength Ratings
-            +
-    Market-Based Odds
-            ↓
-    Calibrated Match Probabilities
-            ↓
-    Group Stage & Knockout Simulation
-
-
-Core responsibilities:
-    - Convert Elo ratings into match outcome probabilities.
-    - Transform bookmaker odds into fair probabilities.
-    - Apply probability calibration and numerical safeguards.
-    - Generate complete tournament prior tables.
-    - Construct knockout advancement probability matrices.
-
-
-Betting market inputs are used as fixture-specific priors when available,
-while Elo remains the fallback signal for unseen matchups. All outputs are
-normalized into valid probability distributions suitable for large-scale
-Monte Carlo simulation.
-"""
-
 import numpy as np
 from typing import Dict, Optional, Tuple
 
-from ml.wc_2026_config import WC2026_TEAMS
+from ml.in_play import ko_advance_batch
+from ml.wc_2026_config import TEAM_BY_NAME, WC2026_TEAMS
 
+# Match probability type: (p_win, p_draw, p_loss) from team_a perspective
 MatchProb = Tuple[float, float, float]
 
+# Minimum probability floor — prevents 0.0 from causing log(0) issues
+# and extreme bracket distortions in the sim.
 MIN_PROB = 0.01
+
+# Home advantage in Elo points (eloratings.net); only host nations playing in
+# their own country get it at this tournament.
+HOME_ADV = 100.0
+DEFAULT_WDL: "MatchProb" = (0.40, 0.25, 0.35)
+
+
+# ---------------------------------------------------------------------------
+# Elo model
+# ---------------------------------------------------------------------------
 
 
 def elo_expected(rating_a: float, rating_b: float) -> float:
-    """
-    Calculate the expected Elo score for team A.
-
-    Uses the standard Elo formulation to estimate the probability that team A
-    achieves a positive result relative to team B.
-
-    Args:
-        rating_a:
-            Elo rating of team A.
-
-        rating_b:
-            Elo rating of team B.
-
-    Returns:
-        Expected score probability for team A in the range [0, 1].
-    """
+    """Standard Elo expected score for A against B (1=win, 0.5=draw, 0=loss)."""
     return 1.0 / (1.0 + 10.0 ** ((rating_b - rating_a) / 400.0))
 
 
 def elo_to_wdl(rating_a: float, rating_b: float) -> MatchProb:
     """
-    Convert Elo ratings into calibrated win/draw/loss probabilities.
+    Convert Elo ratings into W/D/L probabilities.
 
-    Elo provides the competitive strength component while a dynamic draw
-    model adjusts draw probability based on rating similarity. The remaining
-    probability mass is distributed between win and loss outcomes.
-
-    Args:
-        rating_a:
-            Elo rating of team A.
-
-        rating_b:
-            Elo rating of team B.
-
-    Returns:
-        Tuple containing:
-
-            (
-                probability_team_a_win,
-                probability_draw,
-                probability_team_b_win
-            )
-
-        Values are normalized and guaranteed to form a valid probability
-        distribution.
+    Method: calibrated to international football draw rates (~23-27%).
+    - Base draw rate: 25%
+    - Draw rate scales up when teams are closely matched (Elo diff < 100)
+      and scales down for lopsided fixtures.
+    - Remaining probability split into W/L proportional to Elo expectation.
     """
     e_a = elo_expected(rating_a, rating_b)
 
+    # Draw probability: highest when fixture is even, falls off for big gaps
     elo_diff = abs(rating_a - rating_b)
+    # Exponential decay: 30% draw at even, ~18% at 300 Elo gap
     p_draw = 0.25 * np.exp(-elo_diff / 450.0) + 0.05
-    p_draw = float(np.clip(p_draw, 0.10, 0.30))
+    p_draw = float(np.clip(p_draw, 0.03, 0.30))
 
+    # Split remaining probability proportional to Elo expectation
     remaining = 1.0 - p_draw
     p_win = remaining * e_a
     p_loss = remaining * (1.0 - e_a)
@@ -100,97 +53,90 @@ def elo_to_wdl(rating_a: float, rating_b: float) -> MatchProb:
     return _normalise(p_win, p_draw, p_loss)
 
 
+# ---------------------------------------------------------------------------
+# Bookmaker odds → fair probability
+# ---------------------------------------------------------------------------
+
+
+def _shin_probs(pi: np.ndarray, z: float) -> np.ndarray:
+    """Shin (1993) true probabilities for insider fraction ``z``."""
+    big_pi = pi.sum()
+    return (np.sqrt(z**2 + 4.0 * (1.0 - z) * pi**2 / big_pi) - z) / (2.0 * (1.0 - z))
+
+
+def shin_devig(odds: Tuple[float, ...], tol: float = 1e-12) -> Tuple[np.ndarray, float]:
+    """
+    Shin (1993) de-vigging of decimal odds.
+
+    With raw implied probabilities pi_i = 1/odds_i and booksum Pi = sum(pi_i),
+    the fair probabilities are
+
+        p_i(z) = (sqrt(z^2 + 4(1-z) * pi_i^2 / Pi) - z) / (2(1-z))
+
+    where z (the share of insider money) is solved by bisection on [0, 0.5]
+    so that sum_i p_i(z) = 1. sum_i p_i(z) is strictly decreasing in z, so the
+    root is unique. Unlike proportional normalisation this strips more margin
+    from longshots than from favourites (the favourite-longshot bias).
+
+    Returns ``(probs, z)``. A book with no overround (Pi <= 1) has no margin to
+    attribute to insiders: z = 0 and the result is plain normalisation.
+    """
+    pi = 1.0 / np.asarray(odds, dtype=np.float64)
+    big_pi = pi.sum()
+    if big_pi <= 1.0:
+        return pi / big_pi, 0.0
+
+    lo, hi = 0.0, 0.5
+    while hi - lo > tol:
+        mid = 0.5 * (lo + hi)
+        if _shin_probs(pi, mid).sum() > 1.0:
+            lo = mid
+        else:
+            hi = mid
+    z = 0.5 * (lo + hi)
+    return _shin_probs(pi, z), z
+
+
 def oddsapi_to_wdl(
     odds_home: float,
     odds_draw: float,
     odds_away: float,
 ) -> MatchProb:
-    """
-    Convert decimal bookmaker odds into fair outcome probabilities.
+    """Decimal odds → fair W/D/L via Shin de-vigging, then the MIN_PROB floor."""
+    fair, _z = shin_devig((odds_home, odds_draw, odds_away))
+    return _normalise(fair[0], fair[1], fair[2])
 
-    Removes bookmaker margin (overround) using a Shin-style correction,
-    producing calibrated probabilities suitable for simulation rather than
-    raw market-implied probabilities.
 
-    Args:
-        odds_home:
-            Decimal odds for the home team.
-
-        odds_draw:
-            Decimal odds for a draw.
-
-        odds_away:
-            Decimal odds for the away team.
-
-    Returns:
-        Normalized win/draw/loss probability tuple.
-    """
-    raw = np.array([1.0 / odds_home, 1.0 / odds_draw, 1.0 / odds_away])
-    overround = raw.sum() - 1.0
-
-    z = overround / (overround + 2.0)
-
-    fair = np.zeros(3)
-    for i, p in enumerate(raw):
-        disc = z**2 + 4.0 * (1.0 - z) * p**2
-        fair[i] = (np.sqrt(disc) - z) / (2.0 * (1.0 - z))
-
-    p_win, p_draw, p_loss = fair[0], fair[1], fair[2]
-    return _normalise(p_win, p_draw, p_loss)
+# ---------------------------------------------------------------------------
+# Normalisation + floor
+# ---------------------------------------------------------------------------
 
 
 def _normalise(p_win: float, p_draw: float, p_loss: float) -> MatchProb:
-    """
-    Normalize probabilities into a valid probability simplex.
-
-    Applies a minimum probability floor to prevent zero-probability outcomes
-    from causing numerical issues during simulation sampling.
-
-    Args:
-        p_win:
-            Raw win probability.
-
-        p_draw:
-            Raw draw probability.
-
-        p_loss:
-            Raw loss probability.
-
-    Returns:
-        Normalized probabilities where:
-
-            p_win + p_draw + p_loss = 1.0
-    """
+    """Clip to floor then re-normalise to sum exactly to 1.0."""
     arr = np.array([p_win, p_draw, p_loss], dtype=np.float64)
     arr = np.clip(arr, MIN_PROB, None)
     arr /= arr.sum()
     return float(arr[0]), float(arr[1]), float(arr[2])
 
 
+# ---------------------------------------------------------------------------
+# Full prior table builder
+# ---------------------------------------------------------------------------
+
+
 def build_prior_table(
     betfair_odds: Optional[Dict[Tuple[str, str], Tuple[float, float, float]]] = None,
     elo_overrides: Optional[Dict[str, float]] = None,
 ) -> Dict[Tuple[str, str], MatchProb]:
-    """
-    Build the complete tournament match probability prior table.
-
-    Generates probabilities for every ordered team matchup. Market odds are
-    preferred for known fixtures, while Elo-based probabilities provide
-    coverage for unavailable markets.
-
-    Elo overrides allow dynamic team-strength adjustments from live match
-    context, enabling counterfactual simulations after momentum shifts,
-    goals, or other match events.
+    """W/D/L prior for every possible pairing of the 48 WC 2026 teams.
 
     Args:
-        betfair_odds:
-            Optional mapping of fixtures to decimal market odds.
-
-        elo_overrides:
-            Optional team-level Elo adjustments applied before simulation.
+        betfair_odds: optional {(home, away): (decimal_home, decimal_draw,
+                      decimal_away)} market odds; override Elo where present.
 
     Returns:
-        Dictionary mapping ordered team pairs to win/draw/loss probabilities.
+        {(team_a, team_b): (p_win, p_draw, p_loss)} from team_a's perspective.
     """
     teams = WC2026_TEAMS
     n = len(teams)
@@ -204,6 +150,8 @@ def build_prior_table(
             ta = teams[i]
             tb = teams[j]
             key = (ta.name, tb.name)
+            # A conditioned team's matches must reflect its adjusted strength,
+            # so bypass the static Betfair line whenever either side is nudged.
             conditioned = ta.name in ovr or tb.name in ovr
 
             if not conditioned and betfair_odds and key in betfair_odds:
@@ -224,82 +172,74 @@ def build_prior_table(
     return priors
 
 
+def match_wdl(
+    home: str,
+    away: str,
+    *,
+    host_side: Optional[str] = None,
+    odds_table: Optional[Dict[Tuple[str, str], Tuple[float, float, float]]] = None,
+    elo_overrides: Optional[Dict[str, float]] = None,
+) -> MatchProb:
+    """Pre-match W/D/L prior for a real fixture.
+
+    Market odds when quoted and neither side is conditioned, else Elo with
+    home advantage for a host nation playing in its own country.
+    """
+    ovr = elo_overrides or {}
+    if odds_table and home not in ovr and away not in ovr:
+        if (home, away) in odds_table:
+            return oddsapi_to_wdl(*odds_table[(home, away)])
+        if (away, home) in odds_table:
+            w, d, lo = oddsapi_to_wdl(*odds_table[(away, home)])
+            return (lo, d, w)
+    h, a = TEAM_BY_NAME.get(home), TEAM_BY_NAME.get(away)
+    if h is None or a is None:
+        return DEFAULT_WDL
+    rh = h.elo + ovr.get(home, 0.0) + (HOME_ADV if host_side == "home" else 0.0)
+    ra = a.elo + ovr.get(away, 0.0) + (HOME_ADV if host_side == "away" else 0.0)
+    return elo_to_wdl(rh, ra)
+
+
+# ---------------------------------------------------------------------------
+# Knockout version: no draws (extra time / penalties resolve)
+# ---------------------------------------------------------------------------
+
+
 def ko_prob(p_win: float, p_draw: float, p_loss: float) -> Tuple[float, float]:
+    """(p_team_a_advances, p_team_b_advances) from 90' W/D/L.
+
+    Extra time at a third of the fitted Poisson rates, then a 50/50 shootout.
     """
-    Convert match outcome probabilities into knockout advancement probabilities.
-
-    Knockout matches do not contain draws, so draw probability is split
-    equally between both teams to estimate advancement likelihood.
-
-    Args:
-        p_win:
-            Probability of team A winning.
-
-        p_draw:
-            Probability of a draw after regulation.
-
-        p_loss:
-            Probability of team A losing.
-
-    Returns:
-        Tuple containing:
-
-            (
-                team_a_advancement_probability,
-                team_b_advancement_probability
-            )
-    """
-    p_a = p_win + 0.5 * p_draw
-    p_b = p_loss + 0.5 * p_draw
-    total = p_a + p_b
-    return p_a / total, p_b / total
+    p_a = float(ko_advance_batch(np.array([[p_win, p_draw, p_loss]]))[0])
+    return p_a, 1.0 - p_a
 
 
 def build_ko_matrix(
     priors: Dict[Tuple[str, str], MatchProb],
     elo_overrides: Optional[Dict[str, float]] = None,
 ) -> np.ndarray:
-    """
-    Construct the knockout advancement probability matrix.
+    """(48 × 48) float32 matrix: P(team i advances vs team j), neutral venue.
 
-    Creates a vectorized representation where each matrix entry represents
-    the probability of one team advancing against another team.
-
-    The matrix format enables efficient tournament simulation by avoiding
-    repeated probability calculations during large Monte Carlo runs.
-
-    Args:
-        priors:
-            Match outcome probability table generated by build_prior_table.
-
-        elo_overrides:
-            Optional live Elo adjustments for counterfactual scenarios.
-
-    Returns:
-        NumPy matrix of shape:
-
-            (number_of_teams, number_of_teams)
-
-        where matrix[i, j] represents team i's advancement probability
-        against team j.
+    Indexed as ko_matrix[home_idxs, away_idxs] in the simulator.
     """
     teams = WC2026_TEAMS
     n = len(teams)
-    matrix = np.zeros((n, n), dtype=np.float32)
-
-    for i in range(n):
-        for j in range(n):
-            if i == j:
-                continue
-            key = (teams[i].name, teams[j].name)
-            if key in priors:
-                p_w, p_d, p_l = priors[key]
-            else:
-                ovr = elo_overrides or {}
-                p_w, p_d, p_l = elo_to_wdl(
+    ovr = elo_overrides or {}
+    iu, ju = np.triu_indices(n, k=1)
+    wdl = np.array(
+        [
+            priors.get(
+                (teams[i].name, teams[j].name),
+                elo_to_wdl(
                     teams[i].elo + ovr.get(teams[i].name, 0.0),
                     teams[j].elo + ovr.get(teams[j].name, 0.0),
-                )
-            matrix[i, j], matrix[j, i] = ko_prob(p_w, p_d, p_l)
-
+                ),
+            )
+            for i, j in zip(iu, ju)
+        ]
+    )
+    adv = ko_advance_batch(wdl)
+    matrix = np.zeros((n, n), dtype=np.float32)
+    matrix[iu, ju] = adv
+    matrix[ju, iu] = 1.0 - adv
     return matrix

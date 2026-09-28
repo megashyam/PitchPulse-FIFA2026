@@ -1,0 +1,85 @@
+{
+  "data": "StatsBomb Open Data (real FIFA World Cup matches)",
+  "labels": "90-minute result (knockout scores rebuilt from period 1-2 goals)",
+  "home_advantage": "host nation only, as in backtest_elo_wdl",
+  "ci": "paired bootstrap over matches, 95% percentile",
+  "n_matches": 64,
+  "baselines": {
+    "pre_match_prior": {
+      "log_loss": 1.0774,
+      "brier": 0.6518
+    },
+    "base_rate": {
+      "log_loss": 1.0622,
+      "brier": 0.6421
+    }
+  },
+  "in_play_by_checkpoint": {
+    "minute_0": {
+      "log_loss": 1.0773,
+      "brier": 0.6517
+    },
+    "minute_15": {
+      "log_loss": 1.095,
+      "brier": 0.658
+    },
+    "minute_45": {
+      "log_loss": 0.8522,
+      "brier": 0.4963
+    },
+    "minute_75": {
+      "log_loss": 0.6108,
+      "brier": 0.3479
+    }
+  },
+  "in_play_minus_prior": {
+    "minute_0": {
+      "log_loss": -0.0001,
+      "log_loss_ci95": [
+        -0.0003,
+        0.0001
+      ],
+      "brier": -0.0001,
+      "brier_ci95": [
+        -0.0002,
+        0.0
+      ]
+    },
+    "minute_15": {
+      "log_loss": 0.0177,
+      "log_loss_ci95": [
+        -0.0629,
+        0.1051
+      ],
+      "brier": 0.0062,
+      "brier_ci95": [
+        -0.0462,
+        0.0612
+      ]
+    },
+    "minute_45": {
+      "log_loss": -0.2252,
+      "log_loss_ci95": [
+        -0.3632,
+        -0.0765
+      ],
+      "brier": -0.1554,
+      "brier_ci95": [
+        -0.2433,
+        -0.063
+      ]
+    },
+    "minute_75": {
+      "log_loss": -0.4666,
+      "log_loss_ci95": [
+        -0.6494,
+        -0.2619
+      ],
+      "brier": -0.3038,
+      "brier_ci95": [
+        -0.421,
+        -0.1741
+      ]
+    }
+  }
+}

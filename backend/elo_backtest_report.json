@@ -1,0 +1,101 @@
+{
+  "n_matches": 128,
+  "seasons": [
+    106,
+    3
+  ],
+  "labels": "90-minute result (knockout scores rebuilt from period 1-2 goals)",
+  "labels_changed_by_90min": 1,
+  "home_advantage": "60 Elo for the host nation only (Qatar, Russia)",
+  "ci": "paired bootstrap over matches, 5000 resamples, 95% percentile",
+  "predicted_vs_realised_draw": {
+    "mean_predicted": 0.279,
+    "realised": 0.227
+  },
+  "outcome_base_rates": {
+    "home_win": 0.422,
+    "draw": 0.227,
+    "away_win": 0.352
+  },
+  "overall": {
+    "elo": {
+      "n": 128,
+      "log_loss": 1.0682,
+      "brier": 0.6456
+    },
+    "baseline": {
+      "n": 128,
+      "log_loss": 1.068,
+      "brier": 0.6471
+    },
+    "elo_minus_baseline": {
+      "log_loss": 0.0002,
+      "log_loss_ci95": [
+        -0.0339,
+        0.0352
+      ],
+      "brier": -0.0014,
+      "brier_ci95": [
+        -0.0239,
+        0.0218
+      ]
+    }
+  },
+  "warmed_up_second_half": {
+    "elo": {
+      "n": 64,
+      "log_loss": 1.0774,
+      "brier": 0.6518
+    },
+    "baseline": {
+      "n": 64,
+      "log_loss": 1.0657,
+      "brier": 0.6447
+    },
+    "elo_minus_baseline": {
+      "log_loss": 0.0116,
+      "log_loss_ci95": [
+        -0.0419,
+        0.0688
+      ],
+      "brier": 0.0071,
+      "brier_ci95": [
+        -0.0292,
+        0.0463
+      ]
+    }
+  },
+  "baseline_note": "The base rate is fitted in-sample on the same matches, which favours the baseline; Elo is scored prequentially.",
+  "reliability_second_half": [
+    {
+      "range": "0.1-0.2",
+      "n": 1,
+      "mean_pred": 0.178,
+      "emp_freq": 1.0
+    },
+    {
+      "range": "0.2-0.3",
+      "n": 7,
+      "mean_pred": 0.276,
+      "emp_freq": 0.429
+    },
+    {
+      "range": "0.3-0.4",
+      "n": 33,
+      "mean_pred": 0.349,
+      "emp_freq": 0.364
+    },
+    {
+      "range": "0.4-0.5",
+      "n": 17,
+      "mean_pred": 0.433,
+      "emp_freq": 0.471
+    },
+    {
+      "range": "0.5-0.6",
+      "n": 6,
+      "mean_pred": 0.541,
+      "emp_freq": 0.833
+    }
+  ]
+}
