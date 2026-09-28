@@ -1,58 +1,21 @@
 """
-FastAPI application entry point for the hybrid match intelligence platform.
+FastAPI entry point.
 
-This module owns application lifecycle management, API initialization, shared
-infrastructure setup, and background worker orchestration.
+Real WC 2026 match data from ESPN's public API (scores, stats, events,
+lineups, play-by-play), with the committed snapshot in data/wc2026 as the
+permanent fallback. No paid API key is needed.
 
-The service combines:
+Usage:
+    set PYTHONPATH=.
+    set GROQ_API_KEY=gsk_...
+    python -m uvicorn api.main_hybrid:app --host 0.0.0.0 --port 8000 --reload
 
-    Live Match Data
-          +
-    Historical Football Intelligence
-          +
-    ML Feature Pipelines
-          +
-    LLM-Based Analysis Agents
-          ↓
-    Unified Match Intelligence API
-
-
-Core responsibilities:
-    - Initialize FastAPI application and API routes.
-    - Establish shared Redis and Weaviate connections.
-    - Launch and manage background intelligence workers.
-    - Coordinate producer, ML, and agent pipelines.
-    - Provide health monitoring endpoints.
-    - Handle graceful application shutdown.
-
-
-Runtime architecture:
-
-    FastAPI Application
-            |
-            |
-        Redis State Layer
-            |
-    -------------------------
-    |       |       |       |
- Producer Momentum Intel Narrative
-    |
- StatsBomb + Live Feed
-
-
-Background workers:
-    - hybrid producer
-    - momentum model
-    - match intelligence agent
-    - counterfactual engine
-    - tactical analysis
-    - narrative detection
-    - briefing generation
-
-The application intentionally runs with a single process worker because
-several components maintain process-local state. Horizontal scaling should
-occur through independent service instances sharing Redis rather than through
-multiple uvicorn worker processes.
+Runtime:
+    - Leader election (api/supervisor.py): only the instance holding the
+      Redis leader lock runs the producer and workers, so any number of
+      instances can share one Redis.
+    - Crashed workers restart with backoff; /health reports their liveness.
+    - /health caches Weaviate collection counts for 30s.
 """
 
 from __future__ import annotations
@@ -63,6 +26,8 @@ import os
 import time
 from contextlib import asynccontextmanager
 
+# Must run before any other project module is imported: several modules read
+# env vars at import time.
 try:
     from dotenv import load_dotenv
 
@@ -73,9 +38,11 @@ except ImportError:
 import redis.asyncio as aioredis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from agents.weaviate_client import get_weaviate_client
-from api.routes._security import TRIGGER_TOKEN
+from kg.graph_builder import ensure_graph_built
+from kg.neo4j_client import get_neo4j_client
 from api.routes.briefing_routes import router as briefing_router
 from api.routes.counterfactual_routes import router as cf_router
 from api.routes.group_table import router as group_table_router
@@ -91,21 +58,33 @@ from api.routes.tactical import router as tactical_router
 from api.routes.team_form import router as team_form_router
 from api.workers.briefing_worker import run as briefing_worker_run
 from api.workers.counterfactual_worker import run as cf_worker_run
-from api.workers.hybrid_producer import run as hybrid_producer_run
+from api.workers.match_producer import run as match_producer_run
 from api.workers.intel_worker import run as intel_worker_run
 from api.workers.momentum_worker import run as momentum_worker_run
 from api.workers.narrative_worker import run as narrative_worker_run
 from api.workers.prediction_worker import run as prediction_worker_run
 from api.workers.tactical_worker import run as tactical_worker_run
+from api import supervisor
+from api.routes._sse import close_hub
 from ml.tactical_indexer import ensure_indexed as ensure_tactical_indexed
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 PORT = int(os.getenv("PORT", "8000"))
-WEB_CONCURRENCY = int(os.getenv("WEB_CONCURRENCY", "1"))
 HEALTH_CACHE_S = 30.0
 
+# Sole entrypoint — worker/route/agent modules assume logging is configured
+# here rather than configuring it themselves (see match_producer.py's own
+# __main__-gated basicConfig, never hit when imported).
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 log = logging.getLogger(__name__)
 
+# Self-verifying startup check (pre-launch checklist item 0.1/0.5): confirms
+# .env actually loaded into THIS process's environment, not just that the
+# file has the right values on disk. Logged once at import time, well
+# after load_dotenv() ran at the very top of this file.
 log.info(
     "env check — ZAFRONIX_API_KEY=%s GROQ_API_KEY=%s API_SPORTS_KEY=%s TRIGGER_TOKEN=%s",
     "set" if os.getenv("ZAFRONIX_API_KEY") else "MISSING",
@@ -122,124 +101,60 @@ log.info(
     ),
 )
 
-if WEB_CONCURRENCY > 1:
-    raise RuntimeError(
-        "main_hybrid.py holds in-process state (ScoreTracker, momentum EWMA, "
-        "counterfactual coverage) and runs its own background producer/workers. "
-        "Running with WEB_CONCURRENCY > 1 gives each worker process a disjoint "
-        "copy of that state and multiple competing producers. Scale by running "
-        "additional independent instances behind a shared Redis, not via "
-        "uvicorn --workers. (audit H2)"
-    )
+# (fn, interval_s, needs match data) — interval feeds /health staleness.
+WORKERS = {
+    "match_producer": (match_producer_run, 30.0, False),
+    "momentum": (momentum_worker_run, 30.0, True),
+    "intel": (intel_worker_run, 30.0, True),
+    "counterfactual": (cf_worker_run, 30.0, True),
+    "briefing": (briefing_worker_run, 300.0, True),
+    "tactical": (tactical_worker_run, 120.0, True),
+    # narrative and prediction read no match state.
+    "narrative": (narrative_worker_run, 60.0, False),
+    "prediction": (prediction_worker_run, 1800.0, False),
+}
 
 
-async def _wait_for_data(r: aioredis.Redis, timeout: float = 180.0) -> bool:
-    """
-    Wait until initial match data becomes available.
-
-    Used during startup to prevent derived-data workers from executing before
-    the hybrid producer has populated canonical MatchState objects.
-
-    Uses exponential backoff polling to reduce Redis load while allowing
-    slow first-run initialization such as StatsBomb event loading.
-    """
-    deadline = time.monotonic() + timeout
-    delay = 2.0
-    while time.monotonic() < deadline:
-        ids = await r.smembers("matches:active")
-        if ids:
-            log.info(f"Data ready — fixtures: {ids}")
-            return True
-        await asyncio.sleep(delay)
-        delay = min(delay * 1.3, 10.0)
-    log.warning("_wait_for_data: timed out")
-    return False
-
-
-async def _guarded(name: str, r: aioredis.Redis, fn) -> None:
-    """
-    Start a worker only after verifying that source match data is available.
-
-    Prevents downstream ML and agent workers from running against empty state
-    during application startup.
-
-    This creates an ordered dependency chain:
-        Producer → MatchState → Derived Intelligence Workers
-    """
-    if await _wait_for_data(r):
-        await fn(r)
-    else:
-        log.warning(f"{name}: skipping — no data within timeout")
+def _spawn_workers(r: aioredis.Redis) -> list[asyncio.Task]:
+    tasks = [
+        asyncio.create_task(
+            supervisor.supervise(name, fn, r, interval, needs_data=needs_data),
+            name=name,
+        )
+        for name, (fn, interval, needs_data) in WORKERS.items()
+    ]
+    # One-shot: each fills an empty store and exits. Leader-only so two
+    # instances never index at once.
+    tasks.append(asyncio.create_task(ensure_tactical_indexed(), name="tactical_auto_index"))
+    tasks.append(asyncio.create_task(ensure_graph_built(), name="kg_auto_build"))
+    return tasks
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Manage application startup and shutdown lifecycle.
-
-    Startup:
-        - Create Redis connection.
-        - Initialize Weaviate client.
-        - Launch background workers.
-        - Trigger tactical indexing.
-        - Seed active fixtures.
-
-    Shutdown:
-        - Cancel background tasks.
-        - Await worker termination.
-        - Close external connections.
-
-    The lifecycle manager provides centralized ownership of all long-running
-    application processes.
-    """
     app.state.redis = await aioredis.from_url(REDIS_URL, decode_responses=True)
     wv = get_weaviate_client()
+    kg = get_neo4j_client()
     r = app.state.redis
 
-    hybrid_task = asyncio.create_task(hybrid_producer_run(r), name="hybrid_producer")
-    momentum_task = asyncio.create_task(_guarded("momentum", r, momentum_worker_run))
-    intel_task = asyncio.create_task(_guarded("intel", r, intel_worker_run))
-    cf_task = asyncio.create_task(_guarded("counterfactual", r, cf_worker_run))
-    briefing_task = asyncio.create_task(_guarded("briefing", r, briefing_worker_run))
-    tactical_task = asyncio.create_task(_guarded("tactical", r, tactical_worker_run))
-
-    narrative_task = asyncio.create_task(narrative_worker_run(r), name="narrative")
-    prediction_task = asyncio.create_task(prediction_worker_run(r), name="prediction")
-
-    asyncio.create_task(ensure_tactical_indexed(), name="tactical_auto_index")
+    leader_task = asyncio.create_task(
+        supervisor.run_as_leader(r, lambda: _spawn_workers(r)), name="leader"
+    )
 
     yield
 
-    for t in (
-        hybrid_task,
-        momentum_task,
-        intel_task,
-        cf_task,
-        briefing_task,
-        narrative_task,
-        tactical_task,
-        prediction_task,
-    ):
-        t.cancel()
-    await asyncio.gather(
-        hybrid_task,
-        momentum_task,
-        intel_task,
-        cf_task,
-        briefing_task,
-        narrative_task,
-        tactical_task,
-        prediction_task,
-        return_exceptions=True,
-    )
+    leader_task.cancel()
+    await asyncio.gather(leader_task, return_exceptions=True)
+    await close_hub()
     wv.close()
+    kg.close()
     await app.state.redis.aclose()
 
 
 app = FastAPI(
-    title="WC2026 Match Intelligence — HYBRID",
-    version="0.6.0-hybrid",
-    description="Live WC 2026 scores (worldcup26.ir) + StatsBomb historical stats",
+    title="WC2026 Match Intelligence",
+    version="0.7.0",
+    description="Real WC 2026 match data (ESPN public API + committed snapshot)",
     lifespan=lifespan,
 )
 
@@ -250,6 +165,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# HTTP-request-level metrics (latency, in-progress, status codes) at
+# GET /metrics. Worker-tick and SSE-connection metrics (monitoring/metrics.py)
+# cover what this instrumentator has no visibility into.
+Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
 app.include_router(stream_router, prefix="/matches", tags=["stream"])
 app.include_router(momentum_router, prefix="/matches", tags=["momentum"])
@@ -272,19 +192,7 @@ _health_cache: dict = {"at": 0.0, "weaviate": "unavailable", "collections": {}}
 
 
 def _probe_weaviate() -> tuple[str, dict]:
-    """
-    Perform synchronous Weaviate readiness checks.
-
-    Runs outside the async event loop because the client performs blocking
-    operations.
-
-    Returns:
-        - service readiness status
-        - indexed collection statistics
-
-    The probe is isolated so slow vector database responses cannot block API
-    request handling.
-    """
+    """Blocking Weaviate readiness and counts; run via asyncio.to_thread."""
     wv = get_weaviate_client()
     ready = wv.ready
     return ("ready" if ready else "unavailable", wv.counts() if ready else {})
@@ -292,19 +200,6 @@ def _probe_weaviate() -> tuple[str, dict]:
 
 @app.get("/health", tags=["meta"])
 async def health():
-    """
-    Return application readiness and dependency status.
-
-    Reports:
-        - service availability
-        - current operating mode
-        - live fixture visibility
-        - Weaviate readiness
-        - indexed collection statistics
-
-    Weaviate checks are cached briefly to avoid expensive vector database
-    calls during frequent infrastructure health probes.
-    """
     now = time.monotonic()
     if now - _health_cache["at"] > HEALTH_CACHE_S:
         status, collections = await asyncio.to_thread(_probe_weaviate)
@@ -313,10 +208,12 @@ async def health():
         _health_cache["at"] = now
 
     ids = await app.state.redis.sunion("matches:active", "matches:completed")
+    sup = supervisor.health()
     return {
-        "status": "ok",
-        "mode": "hybrid",
-        "data_source": "worldcup26.ir + StatsBomb open-data",
+        "status": sup["status"],
+        "role": sup["role"],
+        "workers": sup["workers"],
+        "data_source": "ESPN public API + data/wc2026 snapshot",
         "fixtures": list(ids),
         "weaviate": _health_cache["weaviate"],
         "collections": _health_cache["collections"],

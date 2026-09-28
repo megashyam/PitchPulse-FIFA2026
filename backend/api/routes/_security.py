@@ -1,4 +1,13 @@
-"""Shared dependency for guarding manual trigger endpoints."""
+"""
+FastAPI dependency guarding the "/trigger" debug endpoints.
+
+Triggers run Monte Carlo simulations or LLM calls, so they accept GET and
+POST but require an `X-Trigger-Token` header matching TRIGGER_TOKEN.
+
+When TRIGGER_TOKEN is unset:
+    - Default: allow the request (local dev) and log one warning per process.
+    - REQUIRE_TRIGGER_TOKEN=true: fail closed with 503 until a token is set.
+"""
 
 import logging
 import os
@@ -22,6 +31,7 @@ async def require_trigger_token(
 ) -> None:
     if not TRIGGER_TOKEN:
         if REQUIRE_TRIGGER_TOKEN:
+            # Fail closed: enforcement demanded but no secret configured.
             raise HTTPException(
                 status_code=503,
                 detail=(
@@ -29,6 +39,7 @@ async def require_trigger_token(
                     "but TRIGGER_TOKEN is not configured."
                 ),
             )
+        # Dev convenience: allow, but make the open state visible once.
         global _warned_open
         if not _warned_open:
             _warned_open = True
