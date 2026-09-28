@@ -1,26 +1,24 @@
 """
-Async LLM generation client with local-first inference and cloud fallback.
+Two-tier text generation client.
 
-Provides a two-tier text generation pipeline:
-    1. Local Ollama inference using a self-hosted Mistral model.
-    2. Groq API fallback using an OpenAI-compatible chat completion endpoint.
+Backends:
+    - Local Ollama first (mistral:7b-instruct-q4_K_M, keep_alive and a
+      capped num_ctx for fast warm calls).
+    - Groq fallback when Ollama is unavailable or times out
+      (llama-3.1-8b-instant, then llama-3.3-70b-versatile on a 429).
 
-The client prioritizes low-latency local generation while maintaining service
-availability through automatic provider fallback. Runtime API key resolution
-ensures environment configuration changes are respected without import-order
-dependencies.
-
-Used by narrative generation agents to produce concise football intelligence
-summaries and match commentary.
+GROQ_API_KEY is read at call time, not at import.
 """
 
-import asyncio
 import logging
 import os
 import re
 from typing import Optional
 
 import httpx
+
+from agents.langsmith_tracing import traceable
+from agents.llm_queue import Pacer, PriorityGate
 
 log = logging.getLogger(__name__)
 
@@ -29,20 +27,29 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral:7b-instruct-q4_K_M")
 OLLAMA_TIMEOUT = 15.0
 
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
-
+# Tried in order if GROQ_MODEL returns 429; each Groq model has its own
+# rate-limit bucket.
 GROQ_FALLBACK_MODELS = [
     m.strip()
     for m in os.getenv("GROQ_FALLBACK_MODELS", "llama-3.3-70b-versatile").split(",")
     if m.strip()
 ]
-
+# Note: a reasoning model here (e.g. qwen/qwen3-*) will burn MAX_TOKENS on a
+# <think> block and often return empty content at this short a budget —
+# needs `reasoning_format`/`reasoning_effort` handling in _groq() if reused.
 GROQ_BASE = "https://api.groq.com/openai/v1"
 
-MAX_TOKENS = 200
+MAX_TOKENS = 150  # ~2-3 sentences of output
 
 _THINK_RE = re.compile(r"<think>.*?(</think>|$)", re.DOTALL | re.IGNORECASE)
 
-_ollama_lock = asyncio.Lock()
+# Ollama runs one generation at a time on this host; Groq allows a few
+# concurrent requests but ~30 per minute per model. Both are priority gates
+# (agents/llm_queue.py), so live narration jumps the backfill queue. A
+# caller's timeout clock starts only once it holds a slot.
+OLLAMA_GATE = PriorityGate("ollama", int(os.getenv("OLLAMA_CONCURRENCY", "1")))
+GROQ_GATE = PriorityGate("groq", int(os.getenv("GROQ_CONCURRENCY", "2")))
+_groq_pacer = Pacer(float(os.getenv("GROQ_MIN_INTERVAL_S", "2.0")))
 
 
 def _groq_key() -> str:
@@ -50,7 +57,7 @@ def _groq_key() -> str:
 
 
 def _clean(text: str) -> str:
-    """Strip reasoning-model <think> blocks"""
+    """Strip <think> blocks, including an unclosed one in a truncated reply."""
     text = _THINK_RE.sub("", text).strip()
     return text
 
@@ -61,35 +68,25 @@ async def generate(
     max_tokens: Optional[int] = None,
     num_ctx: Optional[int] = None,
 ) -> str:
-    """
-    Generate text using the available inference backend.
-
-    Attempts local Ollama inference first for low-latency generation. If the
-    local model is unavailable or fails, automatically falls back to Groq when
-    credentials are configured.
-
-    Args:
-        prompt: Instruction prompt formatted for the language model.
-        timeout: Maximum wait time for local inference requests.
-
-    Returns:
-        str: Generated text response. Returns an empty string when all providers
-        are unavailable, allowing callers to apply template-based fallback logic.
-    """
     text, _ = await generate_with_source(prompt, timeout, max_tokens, num_ctx)
     return text
 
 
+@traceable(name="ollama_client.generate_with_source", run_type="llm")
 async def generate_with_source(
     prompt: str,
     timeout: float = OLLAMA_TIMEOUT,
     max_tokens: Optional[int] = None,
     num_ctx: Optional[int] = None,
 ) -> tuple[str, str]:
+    """Like generate(), plus the backend that served it ("groq"/"ollama"/"").
 
+    `max_tokens` overrides MAX_TOKENS; raise `num_ctx` with it, since the
+    window must hold prompt and response together.
+    """
     budget = max_tokens or MAX_TOKENS
     ctx = num_ctx or 1024
-    async with _ollama_lock:
+    async with OLLAMA_GATE.slot():
         result = await _ollama(prompt, timeout, budget, ctx)
     if result:
         return result, "ollama"
@@ -110,28 +107,28 @@ async def generate_with_source(
 async def _ollama(
     prompt: str, timeout: float, max_tokens: int = MAX_TOKENS, num_ctx: int = 1024
 ) -> Optional[str]:
-    """
-    Generate text using a local Ollama model server.
-
-    Sends an asynchronous generation request to the Ollama HTTP API with
-    controlled sampling parameters optimized for short narrative responses.
-
-    Args:
-        prompt: Model instruction prompt.
-        timeout: HTTP request timeout duration.
-
-    Returns:
-        Optional[str]: Generated response text, or None when inference fails.
-    """
     payload = {
         "model": OLLAMA_MODEL,
         "prompt": prompt,
         "stream": False,
+        # Keeps the model resident in VRAM between calls — without this,
+        # Ollama's default 5-min idle unload means any gap between narration
+        # calls pays a multi-second reload penalty on top of generation time.
+        "keep_alive": "30m",
         "options": {
             "num_predict": max_tokens,
             "temperature": 0.65,
             "top_p": 0.9,
+            # "\n\n" as a stop sequence keeps single-paragraph prompts (the
+            # common case) from drifting into a second paragraph once they've
+            # said what they need to — a mechanical backstop since small
+            # models don't reliably self-limit on a soft length instruction.
             "stop": ["\n\n", "[/INST]", "[INST]"],
+            # Prompt + response must both fit in this window — kept well
+            # below the model's native 4096 for fast prompt eval, but sized
+            # to the caller's actual max_tokens budget so a longer requested
+            # response doesn't evict earlier context (see num_ctx note above).
+            "num_ctx": num_ctx,
         },
     }
 
@@ -154,53 +151,58 @@ async def _ollama(
         return None
 
 
+async def groq_chat(
+    messages: list[dict],
+    model: str,
+    max_tokens: int = MAX_TOKENS,
+    temperature: float = 0.65,
+    timeout: float = 10.0,
+) -> str:
+    """One gated, paced Groq chat completion. Raises httpx errors."""
+    async with GROQ_GATE.slot():
+        await _groq_pacer.wait()
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(
+                f"{GROQ_BASE}/chat/completions",
+                json={
+                    "model": model,
+                    "messages": messages,
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
+                },
+                headers={
+                    "Authorization": f"Bearer {_groq_key()}",
+                    "Content-Type": "application/json",
+                },
+            )
+            resp.raise_for_status()
+            return _clean(resp.json()["choices"][0]["message"]["content"])
+
+
 async def _groq(prompt: str, max_tokens: int = MAX_TOKENS) -> Optional[str]:
-    """
-    Generate text using Groq's OpenAI-compatible inference API.
+    """Groq chat completion from an [INST] prompt.
 
-    Converts local instruction-style prompts into chat completion messages and
-    requests a concise football analysis response from the configured Groq model.
-
-    Args:
-        prompt: Instruction prompt potentially containing [INST] formatting.
-
-    Returns:
-        Optional[str]: Generated completion text, or None on API failure.
+    Tries GROQ_MODEL, then GROQ_FALLBACK_MODELS in order on a 429.
     """
     clean = prompt.replace("[INST]", "").replace("[/INST]", "").strip()
     models = [GROQ_MODEL] + [m for m in GROQ_FALLBACK_MODELS if m != GROQ_MODEL]
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a sharp football analyst providing live WC 2026 match "
+                "commentary. Be specific with numbers. Follow the length "
+                "instructions given in the user prompt exactly."
+            ),
+        },
+        {"role": "user", "content": clean},
+    ]
 
     for i, model in enumerate(models):
-        payload = {
-            "model": model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a sharp football analyst providing live WC 2026 match "
-                        "commentary. Be specific with numbers. Follow the length "
-                        "instructions given in the user prompt exactly."
-                    ),
-                },
-                {"role": "user", "content": clean},
-            ],
-            "max_tokens": max_tokens,
-            "temperature": 0.65,
-        }
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.post(
-                    f"{GROQ_BASE}/chat/completions",
-                    json=payload,
-                    headers={
-                        "Authorization": f"Bearer {_groq_key()}",
-                        "Content-Type": "application/json",
-                    },
-                )
-                resp.raise_for_status()
-                text = _clean(resp.json()["choices"][0]["message"]["content"])
-                log.debug(f"Groq ({model}) generated {len(text.split())} words")
-                return text or None
+            text = await groq_chat(messages, model, max_tokens=max_tokens)
+            log.debug(f"Groq ({model}) generated {len(text.split())} words")
+            return text or None
         except httpx.HTTPStatusError as exc:
             is_last = i == len(models) - 1
             if exc.response.status_code == 429 and not is_last:
