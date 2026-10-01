@@ -13,7 +13,7 @@ import { useEffect, useState } from "react"
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 const LIVE = new Set(["1H", "HT", "2H", "ET", "P"])
 
-export interface TeamMomentumData {
+interface TeamMomentumData {
     momentum_score: number   // 0-1 relative (home + away always = 1)
     goal_prob_5min: number   // absolute P(goal in next 5 min)
     xg_15min: number     // model xG from shots in the last 15 minutes

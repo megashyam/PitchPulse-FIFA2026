@@ -5,7 +5,7 @@ import { useMemo, useState } from "react"
 import { usePredictStream } from "@/hooks/usePredictStream"
 import { PerMatchOddsPanel } from "@/components/predict/PerMatchOddsPanel"
 import { BracketImpactFeed } from "@/components/predict/BracketImpactFeed"
-import type { TeamPrediction, Stage } from "@/types/predict"
+import type { Stage } from "@/types/predict"
 
 const STAGES: Stage[] = ["r32", "r16", "qf", "sf", "final", "champion"]
 const STAGE_LABELS: Record<Stage, string> = { r32: "R32", r16: "R16", qf: "QF", sf: "SF", final: "Final", champion: "Champion" }

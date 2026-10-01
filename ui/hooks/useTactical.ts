@@ -12,7 +12,7 @@ import { useEffect, useState } from "react"
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
-export interface FingerprintMatch {
+interface FingerprintMatch {
     team: string
     opponent: string
     competition: string
@@ -39,7 +39,7 @@ export interface TeamFingerprint {
     }[]
 }
 
-export interface TacticalData {
+interface TacticalData {
     fixture_id: number
     home_name: string
     away_name: string

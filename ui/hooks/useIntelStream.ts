@@ -27,7 +27,7 @@ export interface IntelEntry {
     event_sig?: string
 }
 
-export type IntelPhase = "loading" | "streaming" | "idle_notlive" | "idle_nodata"
+type IntelPhase = "loading" | "streaming" | "idle_notlive" | "idle_nodata"
 
 interface UseIntelStreamResult {
     entries: IntelEntry[]

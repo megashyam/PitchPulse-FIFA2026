@@ -76,7 +76,7 @@ export function UnifiedTabs({ state, fixtureId }: Props) {
                             awayTeam={state.away_name}
                         />
                         <MomentumBar fixtureId={fixtureId} />
-                        <StadiumCard venue={state.venue} round={state.round} />
+                        <StadiumCard venue={state.venue} />
                         {state.referee?.trim() && <RefereeCard state={state} />}
                     </div>
                 )}

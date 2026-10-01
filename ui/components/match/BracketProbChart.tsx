@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { usePredictStream } from "@/hooks/usePredictStream"
 import { Flag } from "@/components/Flag"
-import { STAGES, STAGE_LABELS } from "@/types/predict"
+import { STAGES } from "@/types/predict"
 import type { Stage } from "@/types/predict"
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"

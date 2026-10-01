@@ -2,7 +2,7 @@
 // components/match/MatchTimeline.tsx
 // Horizontal dot timeline showing key events at their minute markers.
 
-import type { MatchEvent, MatchState } from "@/types/match"
+import type { MatchState } from "@/types/match"
 
 const DOT_COLOR: Record<string, string> = {
     goal: "var(--c-goal)",

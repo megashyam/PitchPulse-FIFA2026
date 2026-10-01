@@ -124,7 +124,6 @@ export function LineupCard({ fixtureId, homeTeam, awayTeam }: Props) {
     const awayAbbr = awayTeam.slice(0, 3).toUpperCase()
 
     const active = activeTeam === "home" ? home : away
-    const activeName = activeTeam === "home" ? homeTeam : awayTeam
     const accent = activeTeam === "home" ? "var(--home)" : "var(--away)"
     const groups = groupByLine(active)
     const totalPlayers = home.startingXI.length + away.startingXI.length

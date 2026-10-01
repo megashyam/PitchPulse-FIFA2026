@@ -2,7 +2,6 @@
 // components/match/ScoreHeader.tsx — v3 hero banner
 
 import { useEffect } from "react"
-import type { MatchState } from "@/types/match"
 import { Flag } from "@/components/Flag"
 import { teamColor } from "@/lib/flag"
 

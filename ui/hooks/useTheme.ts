@@ -6,7 +6,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 
-export type Theme = "light" | "dark"
+type Theme = "light" | "dark"
 
 const STORAGE_KEY = "wc2026-theme"
 

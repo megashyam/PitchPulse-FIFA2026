@@ -37,10 +37,6 @@ export function flagUrl(teamName: string, size: "20" | "40" | "80" | "160" = "80
     return `https://flagcdn.com/w${size}/${code}.png`
 }
 
-export function flagCode(teamName: string): string | null {
-    return CODES[teamName] ?? null
-}
-
 // Team primary colors — one bold, recognizable color per WC2026 team (kit/
 // flag primary), used for the hero banner and other team-colored accents.
 // Covers all 48 qualified teams (see backend/ml/wc_2026_config.py) plus a

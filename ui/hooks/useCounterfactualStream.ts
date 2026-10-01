@@ -13,7 +13,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 const COMPLETED = new Set(["FT", "AET", "PEN"])
 const CALCULATING_TIMEOUT_MS = 40_000 // safety net — sims normally finish in ~8-16s
 
-export interface CfChange {
+interface CfChange {
     team: string
     before: number
     after: number

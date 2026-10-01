@@ -65,9 +65,9 @@ function wmoIcon(code: number) {
     return WMO_ICONS[code] ?? WMO_ICONS[Math.floor(code / 10) * 10] ?? { icon: "🌡", desc: "Unknown" }
 }
 
-interface Props { venue: string; round?: string }
+interface Props { venue: string }
 
-export function StadiumCard({ venue, round }: Props) {
+export function StadiumCard({ venue }: Props) {
     const stadium = findStadium(venue)
     const [weather, setWeather] = useState<WeatherData | null>(null)
 

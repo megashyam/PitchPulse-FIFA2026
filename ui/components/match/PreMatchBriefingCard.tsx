@@ -90,7 +90,7 @@ export function PreMatchBriefingCard({ fixtureId }: Props) {
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 10 }}>
-            {entries.map((entry, i) => {
+            {entries.map((entry) => {
                 const genTime = new Date(entry.generated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                 return (
                     <div key={`${entry.match_status}-${entry.generated_at}`} style={{
