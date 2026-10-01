@@ -129,7 +129,7 @@ async def _add_arcs_to_top_trending(
 
 
 async def _tick(r: aioredis.Redis, loop: asyncio.AbstractEventLoop, detector) -> None:
-    spikes = await detector.tick(loop)
+    spikes = await detector.tick()
     if detector._tick_count % STATE_EVERY == 0:
         await save_state(r, detector)
 

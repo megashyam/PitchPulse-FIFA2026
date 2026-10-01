@@ -48,11 +48,10 @@ def _ttl_for(status_short: str) -> int:
 
 async def run(redis_client: aioredis.Redis) -> None:
     log.info("Intel worker started — every 30s (per-event history)")
-    loop = asyncio.get_running_loop()
     while True:
         try:
             with WORKER_TICK_DURATION.labels("intel").time():
-                await _update_all(redis_client, loop)
+                await _update_all(redis_client)
             tick_done("intel")
         except asyncio.CancelledError:
             log.info("Intel worker cancelled")
@@ -63,7 +62,7 @@ async def run(redis_client: aioredis.Redis) -> None:
         await asyncio.sleep(INTERVAL)
 
 
-async def _update_all(r: aioredis.Redis, loop: asyncio.AbstractEventLoop) -> None:
+async def _update_all(r: aioredis.Redis) -> None:
     """Process matches:active, plus completed fixtures that have no feed yet."""
     active_ids = set(await r.smembers("matches:active"))
     completed_ids = set(await r.smembers("matches:completed"))
@@ -93,7 +92,7 @@ async def _update_all(r: aioredis.Redis, loop: asyncio.AbstractEventLoop) -> Non
     if not fixture_ids:
         return
     results = await asyncio.gather(
-        *[_update_fixture(r, fid, loop) for fid in fixture_ids],
+        *[_update_fixture(r, fid) for fid in fixture_ids],
         return_exceptions=True,
     )
     for fid, res in zip(fixture_ids, results):
@@ -115,11 +114,7 @@ def _colour_key(entry: dict) -> str:
     return f"min:{entry.get('minute')}:{entry.get('narration_type')}"
 
 
-async def _update_fixture(
-    r: aioredis.Redis,
-    fid: str,
-    loop: asyncio.AbstractEventLoop,
-) -> None:
+async def _update_fixture(r: aioredis.Redis, fid: str) -> None:
     state_raw = await r.get(f"match:{fid}:state")
     if not state_raw:
         return
@@ -168,7 +163,7 @@ async def _update_fixture(
         if sig in have_event_sigs:
             continue
         try:
-            new_entries.append(await match_intel_agent.analyze_event(state, ev, loop))
+            new_entries.append(await match_intel_agent.analyze_event(state, ev))
             have_event_sigs.add(sig)
         except Exception as exc:
             log.warning(f"[{fid}] analyze_event failed @{ev.elapsed}': {exc}")
@@ -176,7 +171,7 @@ async def _update_fixture(
     # ── 2. Live tactical / xG colour for the current clock ────────────────
     if is_live:
         try:
-            result = await match_intel_agent.update(state, momentum, loop)
+            result = await match_intel_agent.update(state, momentum)
         except Exception as exc:
             log.warning(f"[{fid}] intel update() failed: {exc}")
             result = None
@@ -206,7 +201,7 @@ async def _update_fixture(
         if not already_have_ft and not has_event_narration and not new_entries:
             try:
                 new_entries.append(
-                    await match_intel_agent.analyze_full_time_summary(state, loop)
+                    await match_intel_agent.analyze_full_time_summary(state)
                 )
             except Exception as exc:
                 log.warning(f"[{fid}] FT summary generation failed: {exc}")

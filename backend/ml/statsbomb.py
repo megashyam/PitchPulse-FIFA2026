@@ -49,32 +49,6 @@ def goals_in_regulation(events: list[dict], home: str, away: str) -> tuple[int, 
             score[team] += 1
     return score[home], score[away]
 
-# Shot outcomes that count as "on target". Compared case-insensitively —
-# StatsBomb data contains both "Saved to Post" and "Saved To Post" variants.
-ON_TARGET_SHOT_OUTCOMES = {
-    "goal",
-    "saved",
-    "saved to post",
-    "saved twice",
-}
-
-GK_SAVE_OUTCOMES = {
-    "touched out",
-    "success",
-    "in play safe",
-    "collected twice",
-    "success in play",
-    "success out",
-}
-
-
-def shot_is_on_target(outcome_name: str) -> bool:
-    return (outcome_name or "").strip().lower() in ON_TARGET_SHOT_OUTCOMES
-
-
-def gk_is_save(outcome_name: str) -> bool:
-    return (outcome_name or "").strip().lower() in GK_SAVE_OUTCOMES
-
 
 def card_from_event(ev: dict) -> Optional[str]:
     """'red' | 'yellow' | None for a StatsBomb event.

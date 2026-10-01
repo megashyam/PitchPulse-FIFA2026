@@ -40,10 +40,6 @@ def to_sim(name: str) -> str:
     return canonical(name)
 
 
-def is_sim_team(name: str) -> bool:
-    return canonical(name) in _sim_names()
-
-
 def _sim_names() -> Set[str]:
     # Lazy: the snapshot builder imports this module before a snapshot exists.
     from ml.wc_2026_config import WC2026_TEAMS

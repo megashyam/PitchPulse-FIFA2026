@@ -204,10 +204,6 @@ def run_detector(
     return alerts
 
 
-def run_scorer(day: TopicDay, z_corrob: float) -> List[int]:
-    return run_detector(day, z_corrob, ss.Z_SOLO)
-
-
 # Each detector maps a threshold z to run_detector kwargs. The baselines use
 # the same robust z, so the comparison isolates cross-source corroboration.
 DETECTORS: Dict[str, Callable[[float], dict]] = {

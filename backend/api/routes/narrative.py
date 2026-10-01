@@ -138,7 +138,7 @@ async def trigger_narrative(request: Request):
     loop = asyncio.get_running_loop()
     detector = get_detector()
 
-    spikes = await detector.tick(loop)
+    spikes = await detector.tick()
     if not spikes:
         tick = detector._tick_count
         remaining = detector.warmup_remaining()

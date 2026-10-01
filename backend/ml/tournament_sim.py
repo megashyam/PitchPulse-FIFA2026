@@ -100,9 +100,6 @@ class SimResult:
     def team(self, name: str) -> Optional[TeamResult]:
         return next((t for t in self.teams if t.name == name), None)
 
-    def sorted_by(self, stage: str = "champion") -> List[TeamResult]:
-        return sorted(self.teams, key=lambda t: t.probs.get(stage, 0), reverse=True)
-
 
 def wilson(count: int, n: int, z: float = _Z95) -> Tuple[float, float]:
     if n <= 0:

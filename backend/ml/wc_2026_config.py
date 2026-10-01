@@ -58,7 +58,6 @@ KO_FIXTURE_BY_MATCH_NO: Dict[int, dict] = {
     f["match_no"]: f for f in FIXTURES if f.get("match_no")
 }
 FINAL_STANDINGS: Dict[str, List[dict]] = _SNAPSHOT["groups"]
-ELO_ASOF: str = _SNAPSHOT["elo_asof"]
 
 THIRD_PLACE_TABLE: Dict[str, Dict[str, str]] = json.loads(
     (DATA_DIR / "third_place_table.json").read_text(encoding="utf-8")

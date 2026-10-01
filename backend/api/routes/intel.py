@@ -6,7 +6,6 @@ Match intelligence endpoints.
     GET/POST /matches/{id}/intel/trigger  debug: force one cycle (token-gated)
 """
 
-import asyncio
 import json
 import logging
 
@@ -173,7 +172,6 @@ async def trigger_intel(fixture_id: str, request: Request):
     current_elapsed = state.elapsed or 0
     completed = state.status_short in COMPLETED_STATUSES
     is_live = state.status_short in ("1H", "2H", "ET", "P")
-    loop = asyncio.get_running_loop()
 
     existing_raw = await r.lrange(f"match:{fixture_id}:intel:feed", 0, 29)
     existing = []
@@ -199,7 +197,7 @@ async def trigger_intel(fixture_id: str, request: Request):
         if sig in have_event_sigs:
             continue
         try:
-            new_entries.append(await match_intel_agent.analyze_event(state, ev, loop))
+            new_entries.append(await match_intel_agent.analyze_event(state, ev))
         except Exception as exc:
             event_errors.append(f"{ev.elapsed}'  {ev.type}: {exc}")
     section_status["event_history"] = (
@@ -213,7 +211,7 @@ async def trigger_intel(fixture_id: str, request: Request):
         momentum = json.loads(momentum_raw) if momentum_raw else None
         match_intel_agent.clear_state(state.fixture_id)
         try:
-            colour = await match_intel_agent.update(state, momentum, loop)
+            colour = await match_intel_agent.update(state, momentum)
             if colour:
                 new_entries.append(colour)
                 section_status["colour"] = "generated"
@@ -228,7 +226,7 @@ async def trigger_intel(fixture_id: str, request: Request):
     if completed and not new_entries and not have_event_sigs:
         try:
             new_entries.append(
-                await match_intel_agent.analyze_full_time_summary(state, loop)
+                await match_intel_agent.analyze_full_time_summary(state)
             )
             section_status["ft_summary"] = "generated"
         except Exception as exc:

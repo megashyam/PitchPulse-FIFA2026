@@ -66,7 +66,6 @@ async def generate(
     home_name: str,
     away_name: str,
     competition: str = "WC 2026",
-    loop: Optional[asyncio.AbstractEventLoop] = None,
     fixture_id: Optional[int] = None,
 ) -> tuple[str, str]:
     """Return (briefing_text, model_label); label is "template" without an LLM."""

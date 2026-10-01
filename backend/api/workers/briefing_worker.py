@@ -93,11 +93,9 @@ async def _maybe_brief(r: aioredis.Redis, fid: str) -> None:
         f"{state.away_name}, kickoff in {delta.total_seconds() / 60:.0f} min"
     )
 
-    loop = asyncio.get_running_loop()
     text, model_label = await briefing_agent.generate(
         home_name=state.home_name,
         away_name=state.away_name,
-        loop=loop,
         fixture_id=state.fixture_id,
     )
 

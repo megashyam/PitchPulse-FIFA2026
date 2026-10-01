@@ -50,18 +50,7 @@ KO_TREE: dict[int, tuple[int, int]] = {
     102: (99, 100),
     104: (101, 102),
 }
-THIRD_PLACE_MATCH = 103
 FINAL = 104
-
-STAGE_OF = {
-    **{m: "r32" for m in R32_SLOTS},
-    **{m: "r16" for m in range(89, 97)},
-    **{m: "qf" for m in range(97, 101)},
-    101: "sf",
-    102: "sf",
-    103: "3rd",
-    104: "final",
-}
 
 
 def _leaves(m: int) -> list[int]:

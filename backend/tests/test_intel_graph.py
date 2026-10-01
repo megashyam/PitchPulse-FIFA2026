@@ -211,7 +211,7 @@ def test_analyze_event_end_to_end_on_snapshot(fake_llm):
     ev = next(e for e in state.events if e.type == "goal")
     fake_llm["drafts"] = [f"{state.home_name} lead 7-5 now.", f"{state.home_name} and {state.away_name} play on."]
 
-    entry = _run(mi.analyze_event(state, ev, None))
+    entry = _run(mi.analyze_event(state, ev))
     assert entry["via"] == "ollama"
     assert entry["narrative"] == f"{state.home_name} and {state.away_name} play on."
     assert "scoreline 7-5" in fake_llm["prompts"][1]

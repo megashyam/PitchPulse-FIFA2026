@@ -297,7 +297,7 @@ def test_intel_backfill_is_throttled(monkeypatch):
 
     seen = []
 
-    async def fake_update(r, fid, loop):
+    async def fake_update(r, fid):
         seen.append(fid)
 
     monkeypatch.setattr(intel_worker, "_update_fixture", fake_update)
@@ -307,11 +307,10 @@ def test_intel_backfill_is_throttled(monkeypatch):
         r = fakeredis.FakeAsyncRedis(decode_responses=True)
         await r.sadd("matches:completed", *[str(i) for i in range(10)])
         await r.sadd("matches:active", "99")
-        loop = asyncio.get_running_loop()
         ticks = []
         for _ in range(3):
             seen.clear()
-            await intel_worker._update_all(r, loop)
+            await intel_worker._update_all(r)
             ticks.append(sorted(seen))
         return ticks
 

@@ -14,4 +14,3 @@ TRIGGER_TYPES = SIGNIFICANT_TYPES | frozenset({"yellow", "substitution"})
 
 LIVE_STATUSES = frozenset({"1H", "HT", "2H", "ET", "P"})
 COMPLETED_STATUSES = frozenset({"FT", "AET", "PEN"})
-PROCESSABLE_STATUSES = LIVE_STATUSES | COMPLETED_STATUSES

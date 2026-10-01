@@ -698,9 +698,7 @@ class NarrativeSpikeDetector:
         rows.sort(key=lambda r: (r[0], r[1]), reverse=True)
         return [r[2] for r in rows[:top_n]]
 
-    async def tick(
-        self, loop: Optional[asyncio.AbstractEventLoop] = None
-    ) -> List[NarrativeSpike]:
+    async def tick(self) -> List[NarrativeSpike]:
         """Read all topics, score, and return up to MAX_SPIKES_PER_TICK spikes."""
         self._tick_count += 1
         self._trends.plan(self.topics)

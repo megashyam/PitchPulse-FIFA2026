@@ -17,7 +17,6 @@ Timing is match-minute based, so cadence is independent of replay speed.
 Goals and red cards bypass the 25s rate limit.
 """
 
-import asyncio
 import hashlib
 import logging
 import time
@@ -355,7 +354,6 @@ def _build_template(
 async def update(
     state: MatchState,
     momentum: Optional[dict],
-    loop: asyncio.AbstractEventLoop,
 ) -> Optional[dict]:
     fid = state.fixture_id
     if fid not in _intel_states:
@@ -630,7 +628,6 @@ def event_spec(state: MatchState, ev, wp: Optional[dict], use_llm: bool = True) 
 async def analyze_event(
     state: MatchState,
     ev,
-    loop: asyncio.AbstractEventLoop,
     use_llm: bool = True,
 ) -> dict:
     """One intel entry for a specific goal / red card, stamped at its minute."""
@@ -699,7 +696,6 @@ def _ft_summary_prompt(state: MatchState, rag_docs: List[str]) -> str:
 
 async def analyze_full_time_summary(
     state: MatchState,
-    loop: asyncio.AbstractEventLoop,
     use_llm: bool = True,
 ) -> dict:
     """Full-time wrap-up for a completed match, generated at most once.

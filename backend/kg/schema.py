@@ -9,7 +9,6 @@ from __future__ import annotations
 # Node labels
 TEAM = "Team"
 GROUP = "Group"
-BRACKET_ROUND = "BracketRound"
 HISTORICAL_MATCH = "HistoricalMatch"
 
 # Relationship types
