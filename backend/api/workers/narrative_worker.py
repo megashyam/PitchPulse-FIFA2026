@@ -89,40 +89,47 @@ async def _store_comment_samples_for_all_topics(r: aioredis.Redis, detector) -> 
         )
 
 
-async def _add_arcs_to_top_trending(
-    r: aioredis.Redis, snapshot: list, loop: asyncio.AbstractEventLoop
-) -> None:
-    """Arcs for the top trending rows.
+async def arc_for_row(
+    r: aioredis.Redis, row: dict, loop: asyncio.AbstractEventLoop
+) -> str:
+    """Arc for one trending row.
 
     Rows with surging sources get an LLM arc at background priority, cached
     by (topic, surging set); quiet rows get the template.
     """
+    spike = NarrativeSpike(
+        spike_id=row["spike_id"],
+        topic=row["topic"],
+        tick=row["tick"],
+        severity=row["severity"],
+        sources=row["sources"],
+        source_names=row["source_names"],
+        summary=row["summary"],
+        timestamp=row["timestamp"],
+        data_sources=row.get("data_sources"),
+        z_scores=row.get("z_scores"),
+    )
+    surging = sorted(row["source_names"] or [])
+    if not surging:
+        return narrative_arc_agent.template_arc(spike)
+    key = f"narrative:arc:cache:{row['topic']}:{','.join(surging)}"
+    cached = await r.get(key)
+    if cached:
+        return cached
+    with llm_priority(Priority.BACKGROUND):
+        arc = await narrative_arc_agent.synthesise(spike, loop)
+    await r.setex(key, ARC_CACHE_TTL, arc)
+    return arc
+
+
+async def _add_arcs_to_top_trending(
+    r: aioredis.Redis, snapshot: list, loop: asyncio.AbstractEventLoop
+) -> None:
+    """Arcs for the top trending rows. The rest are generated on demand by
+    GET /narrative/topic/{topic}/arc."""
     for row in snapshot[:ARC_TOP_N]:
         try:
-            spike = NarrativeSpike(
-                spike_id=row["spike_id"],
-                topic=row["topic"],
-                tick=row["tick"],
-                severity=row["severity"],
-                sources=row["sources"],
-                source_names=row["source_names"],
-                summary=row["summary"],
-                timestamp=row["timestamp"],
-                data_sources=row.get("data_sources"),
-                z_scores=row.get("z_scores"),
-            )
-            surging = sorted(row["source_names"] or [])
-            if not surging:
-                row["arc"] = narrative_arc_agent.template_arc(spike)
-                continue
-            key = f"narrative:arc:cache:{row['topic']}:{','.join(surging)}"
-            cached = await r.get(key)
-            if cached:
-                row["arc"] = cached
-                continue
-            with llm_priority(Priority.BACKGROUND):
-                row["arc"] = await narrative_arc_agent.synthesise(spike, loop)
-            await r.setex(key, ARC_CACHE_TTL, row["arc"])
+            row["arc"] = await arc_for_row(r, row, loop)
         except Exception as exc:
             topic_name = row.get("topic")
             log.debug(f"trending arc synthesis failed for {topic_name}: {exc}")

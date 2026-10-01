@@ -6,6 +6,7 @@ Narrative Hub endpoints.
     GET      /narrative/trending           tournament-wide trending topics
     GET      /narrative/stream             SSE (pub/sub-backed)
     GET      /narrative/arc/{spike_id}     fetch or generate the arc for a spike
+    GET      /narrative/topic/{topic}/arc  arc for a row in the trending snapshot
     GET/POST /narrative/trigger            debug: force one detector tick (token-gated)
 """
 
@@ -125,6 +126,22 @@ async def get_or_generate_arc(spike_id: str, request: Request):
     await r.setex(f"narrative:spike:{spike_id}", 86_400, json.dumps(spike_dict))
 
     return {"spike_id": spike_id, "arc": arc, "cached": False}
+
+
+@router.get("/topic/{topic}/arc")
+async def get_topic_arc(topic: str, request: Request):
+    """Arc for a trending row the worker didn't pre-fill (below ARC_TOP_N)."""
+    from api.workers.narrative_worker import arc_for_row
+
+    r = request.app.state.redis
+    raw = await r.get("narrative:trending:latest")
+    row = next((x for x in json.loads(raw) if x.get("topic") == topic), None) if raw else None
+    if row is None:
+        raise HTTPException(404, f"Topic {topic} not in trending snapshot")
+    if row.get("arc"):
+        return {"topic": topic, "arc": row["arc"], "cached": True}
+    arc = await arc_for_row(r, row, asyncio.get_running_loop())
+    return {"topic": topic, "arc": arc, "cached": False}
 
 
 @router.api_route(

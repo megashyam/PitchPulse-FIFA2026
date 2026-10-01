@@ -319,3 +319,34 @@ def test_intel_backfill_is_throttled(monkeypatch):
     assert all(len(t) == 1 + per_tick and "99" in t for t in ticks)
     backfilled = [f for t in ticks for f in t if f != "99"]
     assert len(set(backfilled)) == 3 * per_tick  # no fixture repeats
+
+
+def test_topic_arc_fills_rows_below_top_n():
+    import json
+    from types import SimpleNamespace
+
+    from fastapi import HTTPException
+
+    from api.routes import narrative
+
+    row = {
+        "spike_id": "trend-abc", "topic": "Brazil", "tick": 1, "severity": 0.4,
+        "sources": {"wikipedia": 1.0}, "source_names": [], "summary": "s",
+        "timestamp": 0,
+    }
+
+    async def main():
+        r = fakeredis.FakeAsyncRedis(decode_responses=True)
+        await r.set("narrative:trending:latest", json.dumps([row]))
+        req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(redis=r)))
+        hit = await narrative.get_topic_arc("Brazil", req)
+        try:
+            await narrative.get_topic_arc("Peru", req)
+            missing = None
+        except HTTPException as e:
+            missing = e.status_code
+        return hit, missing
+
+    hit, missing = _run(main())
+    assert hit["topic"] == "Brazil" and hit["arc"] and not hit["cached"]
+    assert missing == 404
