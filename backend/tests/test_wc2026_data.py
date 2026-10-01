@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 
 from api.match_timeline import around, at_minute
+from api.schemas.espn_schema import EspnKeyEvent, EspnStatus
 from api.schemas.schema import MatchEvent, MatchState
 from api.tournament_state import red_counts
 from feeds import espn
@@ -87,40 +88,41 @@ def test_bracket_order_reproduces_tree():
 
 def test_parse_event_real_fields():
     f = next(espn.parse_event(e) for e in _events() if e["id"] == "760513")
-    assert f["stage"] == "qf" and f["status"] == "AET"
-    assert (f["home_name"], f["away_name"]) == ("Argentina", "Switzerland")
-    assert (f["home_score"], f["away_score"], f["winner"]) == (3, 1, "Argentina")
-    assert f["neutral"] and f["host_side"] is None
+    assert f.stage == "qf" and f.status == "AET"
+    assert (f.home_name, f.away_name) == ("Argentina", "Switzerland")
+    assert (f.home_score, f.away_score, f.winner) == (3, 1, "Argentina")
+    assert f.neutral and f.host_side is None
 
 
 def test_parse_status_stoppage_and_extra_time():
-    assert espn.parse_status(
-        {"displayClock": "90'+4'", "type": {"name": "STATUS_SECOND_HALF"}}
-    ) == ("2H", 90, 4)
-    assert espn.parse_status({"type": {"name": "STATUS_FINAL_PEN"}, "displayClock": "120'"})[0] == "PEN"
-    assert espn.parse_status({"type": {"name": "STATUS_SCHEDULED"}}) == ("NS", None, None)
+    def decode(raw):
+        return EspnStatus.model_validate(raw).decode()
+
+    assert decode({"displayClock": "90'+4'", "type": {"name": "STATUS_SECOND_HALF"}}) == ("2H", 90, 4)
+    assert decode({"type": {"name": "STATUS_FINAL_PEN"}, "displayClock": "120'"})[0] == "PEN"
+    assert decode({"type": {"name": "STATUS_SCHEDULED"}}) == ("NS", None, None)
 
 
 def test_parse_summary_real_stats_events_lineups():
     f = next(espn.parse_event(e) for e in _events() if e["id"] == "760513")
     d = espn.parse_summary(_summary(), f)
-    assert d["home_stats"].possession == 59 and d["home_stats"].shots_total == 22
-    assert d["home_stats"].expected_goals > d["away_stats"].expected_goals > 0
-    goals = [e for e in d["events"] if e.type == "goal"]
+    assert d.home_stats.possession == 59 and d.home_stats.shots_total == 22
+    assert d.home_stats.expected_goals > d.away_stats.expected_goals > 0
+    goals = [e for e in d.events if e.type == "goal"]
     assert goals[0].player_name == "Alexis Mac Allister" and goals[0].elapsed == 10
-    assert all(e.source == "espn" for e in d["events"])
-    xi = d["lineups"]["home"]["startingXI"]
-    assert len(xi) == 11 and xi[0]["line"] == "G"
-    assert all(s["side"] in (1, 2) for s in d["shots"])
+    assert all(e.source == "espn" for e in d.events)
+    xi = d.lineups["home"].startingXI
+    assert len(xi) == 11 and xi[0].line == "G"
+    assert all(s["side"] in (1, 2) for s in d.shots)
 
 
 def test_own_goal_credits_conceding_side():
-    f = {"home_espn_id": "1", "away_espn_id": "2", "home_name": "H", "away_name": "A"}
-    ke = [{"type": {"text": "Own Goal"}, "team": {"id": "1"}, "clock": {"displayValue": "30'"},
-           "participants": [{"athlete": {"displayName": "X"}}]}]
-    ev = espn._events(ke, {"1": (1, "H"), "2": (2, "A")})[0]
+    ke = EspnKeyEvent.model_validate(
+        {"type": {"text": "Own Goal"}, "team": {"id": 1}, "clock": {"displayValue": "30'"},
+         "participants": [{"athlete": {"displayName": "X"}}]}
+    )
+    ev = MatchEvent.from_espn(ke, {"1": (1, "H"), "2": (2, "A")})
     assert ev.type == "own_goal" and ev.team_id == 2  # scored by A's player, benefits H
-    assert f  # parse_summary contract uses the same id map
 
 
 def test_shot_xg_both_coordinate_conventions_agree():
@@ -260,7 +262,9 @@ class _FakeRedis:
 def test_ns_fixture_publishes_once_and_fetches_nothing():
     from api.workers import match_producer as mp
 
-    ns = {**espn.parse_event(_events()[0]), "status": "NS", "home_score": None, "away_score": None}
+    ns = espn.parse_event(_events()[0]).model_copy(
+        update={"status": "NS", "home_score": None, "away_score": None}
+    )
     r = _FakeRedis()
     p = mp.Producer(r)
     calls = []
@@ -282,7 +286,7 @@ def test_ns_fixture_publishes_once_and_fetches_nothing():
         espn.fetch_summary = orig
     assert calls == []
     assert [c for c, _ in r.published] == ["match_update"]
-    st = MatchState.model_validate_json(r.kv[f"match:{ns['fixture_id']}:state"])
+    st = MatchState.model_validate_json(r.kv[f"match:{ns.fixture_id}:state"])
     assert st.status_short == "NS" and st.stats_source == "unavailable"
 
 
@@ -291,4 +295,4 @@ def test_snapshot_match_detail_loads(fid):
     from feeds import snapshot
 
     d = snapshot.match_detail(fid)
-    assert d and d["home_stats"].shots_total > 0 and d["lineups"]
+    assert d and d.home_stats.shots_total > 0 and d.lineups

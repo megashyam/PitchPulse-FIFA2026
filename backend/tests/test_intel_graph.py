@@ -206,8 +206,8 @@ def test_facts_excludes_instructions():
 def test_analyze_event_end_to_end_on_snapshot(fake_llm):
     """Real snapshot match through the production event path: a fabricated
     first draft is retried, and the entry carries the grounded retry."""
-    f = next(f for f in snapshot.fixtures() if f["status"] == "FT" and snapshot.match_detail(f["fixture_id"]))
-    state = build_state(f, snapshot.match_detail(f["fixture_id"]))
+    f = next(f for f in snapshot.fixtures() if f.status == "FT" and snapshot.match_detail(f.fixture_id))
+    state = build_state(f, snapshot.match_detail(f.fixture_id))
     ev = next(e for e in state.events if e.type == "goal")
     fake_llm["drafts"] = [f"{state.home_name} lead 7-5 now.", f"{state.home_name} and {state.away_name} play on."]
 

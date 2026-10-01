@@ -994,9 +994,10 @@ backend/
 │   │   ├── tactical.py              Tactical fingerprint endpoint and cache
 │   │   └── team_form.py             Last-five-match form endpoint
 │   ├── schemas/
+│   │   ├── espn_schema.py           Raw ESPN payload models and code tables
 │   │   ├── event_types.py           Shared event-type and status-code vocabulary
 │   │   ├── predict.py               Validated prediction response models
-│   │   └── schema.py                MatchState, MatchEvent, TeamStats definitions
+│   │   └── schema.py                MatchState, Fixture, MatchDetail and their from_espn builders
 │   └── workers/
 │       ├── briefing_worker.py       300s kickoff-window scan and briefing trigger
 │       ├── counterfactual_worker.py 30s trigger detection and simulation dispatch
@@ -1014,7 +1015,7 @@ backend/
 │   └── eval_retrieval.py            Retrieval eval against the live NarrativeArcs index
 ├── feeds/
 │   ├── build_snapshot.py            Builds the committed WC 2026 snapshot
-│   ├── espn.py                      ESPN public API client and pure parsers
+│   ├── espn.py                      ESPN public API client and parsers (raw JSON → models)
 │   └── snapshot.py                  Read side of the snapshot
 ├── ml/
 │   ├── backtest_elo_wdl.py          Elo calibration backtest against real WC 2018/2022 results

@@ -99,6 +99,7 @@ async def test_espn_scoreboard_parses():
     """Fetch and normalize the real ESPN WC scoreboard."""
     import httpx
 
+    from api.schemas.espn_schema import STATUS_LONG
     from feeds import espn
 
     try:
@@ -109,8 +110,8 @@ async def test_espn_scoreboard_parses():
     parsed = [p for g in raw if (p := espn.parse_event(g))]
     assert len(parsed) == 104
     for p in parsed:
-        assert p["status"] in espn.STATUS_LONG
-        assert p["home_name"] and p["away_name"]
+        assert p.status in STATUS_LONG
+        assert p.home_name and p.away_name
 
 
 # --------------------------------------------------------------- Weaviate retrieval

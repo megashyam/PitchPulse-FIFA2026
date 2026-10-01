@@ -27,8 +27,8 @@ def _form(team: str, before: str) -> list[dict]:
             continue
         home = f["home_name"] == team
         d = snapshot.match_detail(f["fixture_id"])
-        mine = (d["home_stats"] if home else d["away_stats"]) if d else None
-        theirs = (d["away_stats"] if home else d["home_stats"]) if d else None
+        mine = (d.home_stats if home else d.away_stats) if d else None
+        theirs = (d.away_stats if home else d.home_stats) if d else None
         out.append(
             {
                 "opponent": f["away_name"] if home else f["home_name"],

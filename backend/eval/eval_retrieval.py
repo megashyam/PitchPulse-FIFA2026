@@ -47,10 +47,10 @@ N_BOOT = 2000
 def build_queries() -> list[dict]:
     queries = []
     fixtures = sorted(
-        (f for f in snapshot.fixtures() if f.get("kickoff")), key=lambda f: f["kickoff"]
+        (f for f in snapshot.fixtures() if f.kickoff), key=lambda f: f.kickoff
     )
     for order, f in enumerate(fixtures):
-        detail = snapshot.match_detail(f["fixture_id"])
+        detail = snapshot.match_detail(f.fixture_id)
         if not detail:
             continue
         state = build_state(f, detail)
@@ -69,7 +69,7 @@ def build_queries() -> list[dict]:
             text, ev_filter = event_query(state, ev)
             queries.append(
                 {
-                    "fixture_id": f["fixture_id"],
+                    "fixture_id": f.fixture_id,
                     "order": order,
                     "query": text,
                     "event_type": ev_filter,

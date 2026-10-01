@@ -96,10 +96,10 @@ async def _generate(out: Path, graph: bool = False) -> None:
         ),
         "prompt": "agents.match_intel_agent._event_prompt, live Weaviate retrieval, Elo prior",
     }
-    fixtures = sorted((f for f in snapshot.fixtures() if f.get("kickoff")), key=lambda f: f["kickoff"])
+    fixtures = sorted((f for f in snapshot.fixtures() if f.kickoff), key=lambda f: f.kickoff)
     rows = []
     for f in fixtures:
-        detail = snapshot.match_detail(f["fixture_id"])
+        detail = snapshot.match_detail(f.fixture_id)
         if not detail:
             continue
         state = build_state(f, detail)

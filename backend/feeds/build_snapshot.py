@@ -120,7 +120,7 @@ async def _build(cache: Path | None) -> None:
     (DATA / "matches").mkdir(exist_ok=True)
     async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
         events = await espn.fetch_scoreboard(client)
-        groups = espn.parse_standings(await espn.fetch_standings(client))
+        standings = espn.parse_standings(await espn.fetch_standings(client))
         annex_raw = (await client.get(ANNEX_C_URL, headers=WIKI_HEADERS)).text
         results = elo_ratings.load_results((await client.get(elo_ratings.RESULTS_URL)).text)
 
@@ -129,8 +129,13 @@ async def _build(cache: Path | None) -> None:
             json.dumps({"source": ANNEX_C_URL, "table": annex}, indent=1), encoding="utf-8"
         )
 
-        fixtures = [f for e in events if (f := espn.parse_event(e))]
-        fixtures.sort(key=lambda f: (f["date"], f["fixture_id"]))
+        parsed = sorted(
+            (f for e in events if (f := espn.parse_event(e))),
+            key=lambda f: (f.date, f.fixture_id),
+        )
+        # Plain records from here on: the build adds match_no, Elo and h2h.
+        fixtures = [f.model_dump() for f in parsed]
+        groups = {g: [r.model_dump() for r in rows] for g, rows in standings.items()}
         if len(fixtures) != 104:
             raise ValueError(f"expected 104 fixtures, got {len(fixtures)}")
         team_names = {r["team"] for rows in groups.values() for r in rows}
@@ -157,8 +162,8 @@ async def _build(cache: Path | None) -> None:
                 if m["date"] < day and {m["home"], m["away"]} == pair
             ][:5]
 
-        for f in fixtures:
-            fid = f["fixture_id"]
+        for f in parsed:
+            fid = f.fixture_id
             raw = None
             if cache and (cache / f"{fid}.json").exists():
                 raw = json.loads((cache / f"{fid}.json").read_text(encoding="utf-8"))
@@ -166,15 +171,8 @@ async def _build(cache: Path | None) -> None:
                 raw = await espn.fetch_summary(client, fid)
                 if cache:
                     (cache / f"{fid}.json").write_text(json.dumps(raw), encoding="utf-8")
-            detail = espn.parse_summary(raw, f)
-            out = {
-                "home_stats": detail["home_stats"].model_dump(),
-                "away_stats": detail["away_stats"].model_dump(),
-                "events": [e.model_dump() for e in detail["events"]],
-                "lineups": detail["lineups"],
-                "shots": detail["shots"],
-            }
-            (DATA / "matches" / f"{fid}.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
+            detail = espn.parse_summary(raw, f).model_dump()
+            (DATA / "matches" / f"{fid}.json").write_text(json.dumps(detail, indent=1), encoding="utf-8")
 
     by_team = {r["team"]: (letter, r) for letter, rows in groups.items() for r in rows}
     teams = [
@@ -186,8 +184,6 @@ async def _build(cache: Path | None) -> None:
         }
         for name in sorted(team_names, key=lambda n: (by_team[n][0], -elo_start[n]))
     ]
-    for f in fixtures:
-        f.pop("kickoff", None)
     snapshot = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "sources": {

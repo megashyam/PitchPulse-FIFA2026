@@ -28,7 +28,8 @@ from pathlib import Path
 
 import numpy as np
 
-from feeds.espn import _events
+from api.schemas.espn_schema import EspnSummary
+from feeds.espn import match_events
 from ml import shot_xg
 from ml.fit_shot_xg import _fit_logistic, _logloss
 from ml.momentum_features import (
@@ -67,7 +68,7 @@ def match_samples(summary: dict) -> list[tuple[dict, int]]:
             shots.append({"side": side, "minute": s.minute, "extra": s.extra, "xg": s.xg})
 
     goals, reds = [], []
-    for e in _events(summary.get("keyEvents", []), ids):
+    for e in match_events(EspnSummary.model_validate(summary).key_events, ids):
         if e.type in ("goal", "penalty_goal"):
             goals.append((e.elapsed, e.extra, e.team_id))
         elif e.type == "own_goal":

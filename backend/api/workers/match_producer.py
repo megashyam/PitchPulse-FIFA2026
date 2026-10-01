@@ -48,7 +48,8 @@ except ImportError:
     pass
 
 from api.schemas.event_types import COMPLETED_STATUSES, LIVE_STATUSES
-from api.schemas.schema import MatchState
+from api.schemas.espn_schema import NOT_PLAYED, STATUS_LONG
+from api.schemas.schema import Fixture, MatchDetail, MatchState
 from feeds import espn, snapshot
 from monitoring.metrics import WORKER_ERRORS, tick_done
 
@@ -60,7 +61,6 @@ FT_ACTIVE_GRACE_S = int(os.getenv("FT_ACTIVE_GRACE_S", str(6 * 3600)))
 FT_AT_TTL = 40 * 24 * 3600
 MATCH_SPAN_S = 3 * 3600  # kickoff to final whistle, incl. ET and pens
 DETAIL_TTL = 12 * 3600
-NOT_PLAYED = {"NS", "PST", "CANC"}
 
 
 # ── Redis persistence ──────────────────────────────────────────────────────
@@ -129,35 +129,34 @@ async def expire_stale(r: aioredis.Redis, seen_ids: set[int]) -> None:
 # ── State assembly ─────────────────────────────────────────────────────────
 
 
-def build_state(f: dict, detail: Optional[dict]) -> MatchState:
-    status = f["status"]
-    played = status not in NOT_PLAYED
+def build_state(f: Fixture, detail: Optional[MatchDetail]) -> MatchState:
+    played = f.status not in NOT_PLAYED
     return MatchState(
-        fixture_id=f["fixture_id"],
+        fixture_id=f.fixture_id,
         league_id=1,
         season=2026,
-        round=f["round"],
-        venue=f.get("venue", ""),
-        status_short=status,
-        status_long=espn.STATUS_LONG.get(status, status),
-        elapsed=f.get("elapsed") if played else None,
-        elapsed_extra=f.get("elapsed_extra") if played else None,
-        kickoff_time=f.get("kickoff"),
+        round=f.round,
+        venue=f.venue,
+        status_short=f.status,
+        status_long=STATUS_LONG.get(f.status, f.status),
+        elapsed=f.elapsed if played else None,
+        elapsed_extra=f.elapsed_extra if played else None,
+        kickoff_time=f.kickoff,
         home_id=1,
-        home_name=f["home_name"],
-        home_logo=f.get("home_logo", ""),
-        home_score=f.get("home_score") or 0,
-        home_pens=f.get("home_pens"),
+        home_name=f.home_name,
+        home_logo=f.home_logo,
+        home_score=f.home_score or 0,
+        home_pens=f.home_pens,
         away_id=2,
-        away_name=f["away_name"],
-        away_logo=f.get("away_logo", ""),
-        away_score=f.get("away_score") or 0,
-        away_pens=f.get("away_pens"),
+        away_name=f.away_name,
+        away_logo=f.away_logo,
+        away_score=f.away_score or 0,
+        away_pens=f.away_pens,
         **(
             {
-                "home_stats": detail["home_stats"],
-                "away_stats": detail["away_stats"],
-                "events": detail["events"],
+                "home_stats": detail.home_stats,
+                "away_stats": detail.away_stats,
+                "events": detail.events,
                 "stats_source": "espn",
             }
             if detail and played
@@ -170,11 +169,11 @@ class Producer:
     def __init__(self, r: aioredis.Redis) -> None:
         self.r = r
         self.last_payload: dict[int, str] = {}
-        self.detail_cache: dict[int, dict] = {}  # completed, non-snapshot
-        self.last_live_detail: dict[int, dict] = {}
+        self.detail_cache: dict[int, MatchDetail] = {}  # completed, non-snapshot
+        self.last_live_detail: dict[int, MatchDetail] = {}
         self.last_aux: dict[tuple[int, str], tuple[str, float]] = {}
 
-    async def fixtures(self, client: httpx.AsyncClient) -> list[dict]:
+    async def fixtures(self, client: httpx.AsyncClient) -> list[Fixture]:
         try:
             events = await espn.fetch_scoreboard(client)
             fx = [f for e in events if (f := espn.parse_event(e))]
@@ -185,8 +184,8 @@ class Producer:
             log.warning(f"ESPN scoreboard failed ({e}) — using snapshot")
         return snapshot.fixtures()
 
-    async def detail(self, client: httpx.AsyncClient, f: dict) -> Optional[dict]:
-        fid, status = f["fixture_id"], f["status"]
+    async def detail(self, client: httpx.AsyncClient, f: Fixture) -> Optional[MatchDetail]:
+        fid, status = f.fixture_id, f.status
         if status in NOT_PLAYED:
             return None
         if status in COMPLETED_STATUSES:
@@ -218,16 +217,17 @@ class Producer:
     async def tick(self, client: httpx.AsyncClient) -> set[int]:
         seen: set[int] = set()
         for f in await self.fixtures(client):
-            fid = f["fixture_id"]
+            fid = f.fixture_id
             seen.add(fid)
             try:
                 d = await self.detail(client, f)
                 state = build_state(f, d)
                 await self._persist_if_changed(state)
                 if d:
-                    if d.get("lineups"):
-                        await self._set_aux(fid, "lineups", {**d["lineups"], "source": "espn"})
-                    await self._set_aux(fid, "shots", d.get("shots", []))
+                    if d.lineups:
+                        lineups = {side: lu.model_dump() for side, lu in d.lineups.items()}
+                        await self._set_aux(fid, "lineups", {**lineups, "source": "espn"})
+                    await self._set_aux(fid, "shots", d.shots)
             except Exception as e:
                 WORKER_ERRORS.labels("match_producer").inc()
                 log.error(f"Fixture {fid} failed: {e}", exc_info=True)
