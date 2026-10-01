@@ -1,8 +1,7 @@
 "use client"
 // components/match/NarrativeCarousel.tsx
 // Detail panel first, 2-column spike grid below it.
-// Clicking any spike (in the grid or elsewhere) opens SpikeCommentModal
-// with floating, non-overlapping real comment bubbles for that topic.
+// The comments toggle in the detail panel shows real comments for the topic.
 
 import { useState } from "react"
 import { useNarrativeStream } from "@/hooks/useNarrativeStream"

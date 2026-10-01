@@ -965,7 +965,6 @@ backend/
 │   ├── match_intel_agent.py         Live event/xG/tactical scoring and narrative generation
 │   ├── narrative_arc_agent.py       Evidence-grounded narrative synthesis for detected spikes
 │   ├── narrative_spike_detector.py  Four-source signal collection (per-hour rates, Trends lift)
-│   ├── narrative_topics.py          Fixture-aware topic tracking for the Narrative Hub
 │   ├── spike_scorer.py              Robust z-score surge scorer with cross-source corroboration
 │   ├── langsmith_tracing.py         Standalone LangSmith @traceable
 │   ├── llm_queue.py                 Priority gates for Ollama and Groq calls
@@ -982,7 +981,6 @@ backend/
 │   │   ├── _security.py             Trigger-token dependency for debug endpoints
 │   │   ├── _sse.py                  Shared Redis pub/sub-backed SSE generator
 │   │   ├── briefing_routes.py       Briefing feed and trigger endpoints
-│   │   ├── comment_sampler.py       Duplicate comment-sample storage, not mounted in the app
 │   │   ├── counterfactual_routes.py Counterfactual feed, prediction, and live-prob endpoints
 │   │   ├── group_table.py           Live group-stage standings from completed fixtures
 │   │   ├── intel.py                 Intel feed and SSE stream endpoints
@@ -997,7 +995,6 @@ backend/
 │   │   └── team_form.py             Last-five-match form endpoint
 │   ├── schemas/
 │   │   ├── event_types.py           Shared event-type and status-code vocabulary
-│   │   ├── intel_schema.py          Pydantic intel schema, defined but unused at runtime
 │   │   ├── predict.py               Validated prediction response models
 │   │   └── schema.py                MatchState, MatchEvent, TeamStats definitions
 │   └── workers/
@@ -1032,8 +1029,6 @@ backend/
 │   ├── odds_api_client.py           Odds API client with TTL cache and stale-on-failure fallback
 │   ├── prior_builder.py             Elo-to-WDL and exact Shin de-vig probability construction
 │   ├── shot_xg.py                   Shot-level model xG for ESPN plays
-│   ├── schemas/
-│   │   └── momentum_schema.py       Pydantic momentum schema, defined but unused at runtime
 │   ├── statsbomb.py                 Shared StatsBomb parsing constants and helpers
 │   ├── tactical_indexer.py          Offline PPDA feature extraction and TacticalProfiles indexing
 │   ├── team_names.py                Team name alias mapping across three naming systems
@@ -1067,14 +1062,14 @@ ui/
 │   ├── narrative/page.tsx           Narrative Hub page
 │   └── predict/page.tsx             Tournament predictor page
 ├── components/
-│   ├── Flag.tsx, NavBar.tsx, ThemeToggle.tsx, theme-provider.tsx   Shared UI chrome
+│   ├── Flag.tsx, NavBar.tsx, ThemeToggle.tsx   Shared UI chrome
 │   ├── match/                       Score, stats, momentum, tactical, counterfactual, lineup panels
 │   ├── narrative/CommentBubbles.tsx Auto-scrolling live comment sample row
-│   └── predict/                     Group, bracket-impact, and probability chart panels
+│   └── predict/                     Bracket-impact feed and per-match odds panels
 ├── hooks/
 │   ├── useCounterfactualStream.ts, useIntelStream.ts, useMatchStream.ts,
 │   │   useMomentumStream.ts, useNarrativeStream.ts   One SSE hook per Redis pub/sub channel
-│   ├── useMatchBriefing.ts, useMatchPrediction.ts, usePredictStream.ts, useTactical.ts
+│   ├── usePredictStream.ts, useTactical.ts
 │   │                                Polling hooks for non-SSE endpoints
 │   └── useTheme.ts                  Light/dark theme state
 ├── lib/api.ts, flag.ts, via.ts
@@ -1157,7 +1152,7 @@ PYTHONPATH=. python ml/backtest_elo_wdl.py --json report.json
 | Languages | Python 3.12, TypeScript |
 | ML | NumPy (vectorized simulator, logistic shot-xG and momentum fits), `sentence-transformers` (`all-MiniLM-L6-v2`) on PyTorch |
 | Backend | FastAPI, Uvicorn, `sse-starlette`, Pydantic v2, `httpx`, `redis.asyncio`, `weaviate-client`, `neo4j`, `prometheus-fastapi-instrumentator` |
-| Frontend | Next.js 14 App Router, React 18, `next-themes` |
+| Frontend | Next.js 14 App Router, React 18 |
 | Data | Redis 7, Weaviate 1.27, Neo4j 5 |
 | Observability | Prometheus, Grafana, LangSmith (agent/LLM tracing, standalone SDK) |
 | Orchestration | LangGraph (match-intel narration graph) |
