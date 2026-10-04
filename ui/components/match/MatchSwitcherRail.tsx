@@ -1,9 +1,6 @@
 "use client"
-// components/match/MatchSwitcherRail.tsx
-// Left icon rail for jumping between matches without going back to the
-// list — live matches first, then every finished match (most recent
-// first). The list scrolls internally (.mp-rail-list has its own
-// max-height).
+// left icon rail for jumping between matches: live first, then finished (most recent
+// first); the list scrolls internally (.mp-rail-list has its own max-height)
 
 import { useEffect, useState } from "react"
 import Link from "next/link"

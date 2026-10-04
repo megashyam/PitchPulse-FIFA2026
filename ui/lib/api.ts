@@ -1,8 +1,7 @@
-// lib/api.ts
-// Shared helper for the handful of /trigger debug endpoints that require a
-// shared-secret X-Trigger-Token header once TRIGGER_TOKEN is configured on
-// the backend (see backend/api/routes/_security.py). Unset by default —
-// fails open on a local/dev box, exactly like the backend does.
+// helper for the /trigger debug endpoints; sends the shared-secret X-Trigger-Token
+// header once TRIGGER_TOKEN is set on the backend (see
+// backend/api/routes/_security.py); unset by default, so open on a local box like the
+// backend
 
 const TRIGGER_TOKEN = process.env.NEXT_PUBLIC_TRIGGER_TOKEN ?? ""
 

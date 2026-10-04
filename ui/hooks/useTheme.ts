@@ -1,8 +1,6 @@
 "use client"
-// hooks/useTheme.ts
-// Light/dark theme toggle — persists to localStorage, applies
-// data-theme="light"|"dark" to <html>, defaults to system preference
-// on first visit, falls back to dark if unavailable.
+// light/dark theme: persists to localStorage, sets data-theme="light"|"dark" on <html>,
+// defaults to the system preference, falls back to dark
 
 import { useEffect, useState, useCallback } from "react"
 

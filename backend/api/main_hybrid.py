@@ -26,8 +26,7 @@ import os
 import time
 from contextlib import asynccontextmanager
 
-# Must run before any other project module is imported: several modules read
-# env vars at import time.
+# runs before other project imports; several modules read env vars at import time
 try:
     from dotenv import load_dotenv
 
@@ -72,19 +71,15 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 PORT = int(os.getenv("PORT", "8000"))
 HEALTH_CACHE_S = 30.0
 
-# Sole entrypoint — worker/route/agent modules assume logging is configured
-# here rather than configuring it themselves (see match_producer.py's own
-# __main__-gated basicConfig, never hit when imported).
+# sole entrypoint; logging is configured here only (match_producer.py configures its own
+# under __main__)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 log = logging.getLogger(__name__)
 
-# Self-verifying startup check (pre-launch checklist item 0.1/0.5): confirms
-# .env actually loaded into THIS process's environment, not just that the
-# file has the right values on disk. Logged once at import time, well
-# after load_dotenv() ran at the very top of this file.
+# logs which API keys are set in the process env
 log.info(
     "env check — ZAFRONIX_API_KEY=%s GROQ_API_KEY=%s API_SPORTS_KEY=%s TRIGGER_TOKEN=%s",
     "set" if os.getenv("ZAFRONIX_API_KEY") else "MISSING",
@@ -101,7 +96,7 @@ log.info(
     ),
 )
 
-# (fn, interval_s, needs match data) — interval feeds /health staleness.
+# (fn, interval_s, needs match data); interval feeds /health staleness
 WORKERS = {
     "match_producer": (match_producer_run, 30.0, False),
     "momentum": (momentum_worker_run, 30.0, True),
@@ -123,8 +118,8 @@ def _spawn_workers(r: aioredis.Redis) -> list[asyncio.Task]:
         )
         for name, (fn, interval, needs_data) in WORKERS.items()
     ]
-    # One-shot: each fills an empty store and exits. Leader-only so two
-    # instances never index at once.
+    # one-shot: each fills an empty store and exits; leader only, so two instances never
+    # index at once
     tasks.append(asyncio.create_task(ensure_tactical_indexed(), name="tactical_auto_index"))
     tasks.append(asyncio.create_task(ensure_graph_built(), name="kg_auto_build"))
     return tasks
@@ -166,9 +161,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# HTTP-request-level metrics (latency, in-progress, status codes) at
-# GET /metrics. Worker-tick and SSE-connection metrics (monitoring/metrics.py)
-# cover what this instrumentator has no visibility into.
+# HTTP request metrics (latency, in-progress, status codes) at GET /metrics; worker-tick
+# and SSE metrics are in monitoring/metrics.py
 Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
 app.include_router(stream_router, prefix="/matches", tags=["stream"])

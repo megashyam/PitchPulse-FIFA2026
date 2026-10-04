@@ -334,14 +334,14 @@ Without the `event_type` filter, production P@5 is 0.127.
     - The live prior uses point-in-time Elo from 49.5k internationals (`ml/elo_ratings.py`).
 * **Metric:** log-loss and Brier score against the in-sample outcome base rate.
 * **Result:**
-    - Δ log-loss +0.000 [−0.034, +0.035] over all 128 matches.
-    - Predicted draw rate is 27.9% against 22.7% realised.
+    - Δ log-loss +0.010 [−0.033, +0.052] over all 128 matches.
+    - Predicted draw rate is 30.4% against 22.7% realised.
 * **Source:** `backend/elo_backtest_report.json`
 
 | Matches | Elo log-loss | Base-rate log-loss | Δ log-loss (95% CI) | Δ Brier (95% CI) |
 |:---|---:|---:|---:|---:|
-| All 128 | 1.068 | 1.068 | +0.000 [−0.034, +0.035] | −0.001 [−0.024, +0.022] |
-| Second 64 (warmed up) | 1.077 | 1.066 | +0.012 [−0.042, +0.069] | +0.007 [−0.029, +0.046] |
+| All 128 | 1.078 | 1.068 | +0.010 [−0.033, +0.052] | +0.004 [−0.023, +0.031] |
+| Second 64 (warmed up) | 1.088 | 1.066 | +0.022 [−0.044, +0.093] | +0.012 [−0.030, +0.058] |
 
 ### In-Play Model Calibration (n=64)
 
@@ -351,17 +351,17 @@ Without the `event_type` filter, production P@5 is 0.127.
     - At each checkpoint the true score and red cards are fed to `inplay_wdl`.
     - CIs are a paired bootstrap over matches against the pre-match prior.
 * **Metric:** log-loss and Brier score at minutes 0, 15, 45, and 75.
-* **Result:** log-loss falls from 1.077 (prior) to 0.852 at minute 45 and 0.611 at minute 75.
+* **Result:** log-loss falls from 1.088 (prior) to 0.864 at minute 45 and 0.627 at minute 75.
 * **Source:** `backend/inplay_report.json`
 
 | Checkpoint | Log-loss | Brier | Δ log-loss vs prior (95% CI) |
 |:---|---:|---:|---:|
-| Pre-match prior (Elo) | 1.077 | 0.652 | — |
+| Pre-match prior (Elo) | 1.088 | 0.657 | — |
 | Base rate (in-sample) | 1.062 | 0.642 | — |
-| Minute 0 | 1.077 | 0.652 | −0.000 [−0.000, +0.000] |
-| Minute 15 | 1.095 | 0.658 | +0.018 [−0.063, +0.105] |
-| Minute 45 | 0.852 | 0.496 | −0.225 [−0.363, −0.077] |
-| Minute 75 | 0.611 | 0.348 | −0.467 [−0.649, −0.262] |
+| Minute 0 | 1.088 | 0.657 | +0.000 [−0.000, +0.000] |
+| Minute 15 | 1.114 | 0.665 | +0.026 [−0.064, +0.125] |
+| Minute 45 | 0.864 | 0.501 | −0.224 [−0.376, −0.060] |
+| Minute 75 | 0.627 | 0.354 | −0.461 [−0.666, −0.235] |
 
 ## Performance
 
@@ -572,21 +572,15 @@ Where:
 - $R_a$ = Elo rating of Team A
 - $R_b$ = Elo rating of Team B
 
-Three-outcome distribution with a rating-gap-sensitive draw model:
+Three-outcome distribution from a symmetric ordered logit on the rating gap:
 
 $$
-p_{\text{draw}}=\mathrm{clip}\left(0.25e^{-\Delta R/450}+0.05,\;0.03,\;0.30\right)
+p_{\text{win}}=\sigma(\beta x-\theta),\qquad
+p_{\text{loss}}=\sigma(-\beta x-\theta),\qquad
+p_{\text{draw}}=1-p_{\text{win}}-p_{\text{loss}}
 $$
 
-$$
-p_{\text{win}}=(1-p_{\text{draw}})E_a
-$$
-
-$$
-p_{\text{loss}}=(1-p_{\text{draw}})(1-E_a)
-$$
-
-where $\Delta R = |R_a - R_b|$ is the absolute rating gap between the two teams.
+where $x = R_a - R_b$, plus home advantage $h$ for a host playing at home. $\beta$, $\theta$ and $h$ are fitted by maximum likelihood on 25k internationals since 2000, using prequential Elo gaps (`ml/fit_wdl_prior.py`, `ml/wdl_prior_coef.json`). On 2022 to mid-2026 held out, log loss is 0.8756 against 0.8804 for the previous hand-set draw curve.
 
 ---
 

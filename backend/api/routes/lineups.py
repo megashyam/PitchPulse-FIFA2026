@@ -39,14 +39,13 @@ ZAFRONIX_KEY = os.getenv("ZAFRONIX_API_KEY", "")
 ZAFRONIX_BASE = "https://api.zafronix.com/fifa/worldcup/v1"
 ZAFRONIX_SEASON = int(os.getenv("ZAFRONIX_SEASON", "2026"))
 
-PHOTO_CACHE_TTL = 7 * 86_400  # 7 days — headshots don't change
+PHOTO_CACHE_TTL = 7 * 86_400  # 7 days: headshots don't change
 PHOTO_LOOKUP_TIMEOUT = 4.0
 ROSTER_CACHE_TTL = 6 * 3600
 
-# Zafronix position codes (GK/DF/MF/FW) → a plausible pitch-role formation.
-# Zafronix rosters aren't ordered as a starting XI, so we pick the most
-# senior 11 (captain + starters first, then by shirt number) and infer a
-# formation from how many of each line that gives us.
+# Zafronix position codes (GK/DF/MF/FW) to a pitch-role formation
+# rosters aren't ordered as a starting XI: take the 11 most senior (captain and starters
+# first, then shirt number) and infer the formation from the line counts
 _POS_LINE = {"GK": 0, "DF": 1, "MF": 2, "FW": 3}
 
 
@@ -67,7 +66,7 @@ def _formation_from_counts(n_def: int, n_mid: int, n_fwd: int) -> str:
     }
     if key in known:
         return known[key]
-    # Nearest by defender count, then a sane default.
+    # nearest by defender count, else a default
     return {3: "3-4-3", 4: "4-3-3", 5: "5-3-2"}.get(n_def, "4-3-3")
 
 
@@ -98,9 +97,7 @@ async def _photo_for(r, client: httpx.AsyncClient, name: str) -> str | None:
     return photo or None
 
 
-# ── Tier 1: Zafronix 2026 roster ───────────────────────────────────────────
-
-# Feed (ESPN) team names → the names Zafronix uses (FIFA English naming).
+# ESPN team names to Zafronix names (FIFA English naming)
 _ZAFRONIX_NAME_ALIAS = {
     "Bosnia-Herzegovina": "Bosnia & Herzegovina",
     "USA": "United States",
@@ -185,14 +182,11 @@ def _select_starting_xi(roster: list[dict]) -> tuple[list[dict], str]:
             p.get("jersey") or 99,
         )
 
-    # Standard shapes to try, in order of preference — (def, mid, fwd) counts
-    # only, since Zafronix tags players as DF/MF/FW with no DM/AM
-    # granularity to split further. Must match keys in
-    # _formation_from_counts' `known` dict exactly, so the chosen formation
-    # string's assumed per-line counts always equal the xi's real counts.
-    # Picking the target shape from what's actually AVAILABLE (rather than
-    # deriving a formation from an arbitrary top-11 cut) is what guarantees
-    # every slot gets a player of the right position type.
+    # standard (def, mid, fwd) shapes in preference order; Zafronix tags DF/MF/FW only, no DM/AM
+    # must match the keys in _formation_from_counts' known dict, so the formation's
+    # per-line counts equal the XI's
+    # the shape is picked from the available squad, so every slot gets a player of the
+    # right position type
     _TARGET_SHAPES = [
         (4, 3, 3),
         (4, 4, 2),
@@ -206,14 +200,14 @@ def _select_starting_xi(roster: list[dict]) -> tuple[list[dict], str]:
     mids = sorted([p for p in roster if p.get("position") == "MF"], key=sort_key)
     fwds = sorted([p for p in roster if p.get("position") == "FW"], key=sort_key)
 
-    # Pick the first shape the available squad can actually fill.
+    # first shape the squad can fill
     n_def, n_mid, n_fwd = 4, 3, 3
     for d, m, f in _TARGET_SHAPES:
         if len(defs) >= d and len(mids) >= m and len(fwds) >= f:
             n_def, n_mid, n_fwd = d, m, f
             break
     else:
-        # Squad is short in some line — take what's there.
+        # short in some line: use what's there
         n_def = min(len(defs), 5) or 4
         n_mid = min(len(mids), 5) or 3
         n_fwd = min(len(fwds), 3) or 3
@@ -221,14 +215,12 @@ def _select_starting_xi(roster: list[dict]) -> tuple[list[dict], str]:
     xi: list[dict] = []
     if keepers:
         xi.append(keepers[0])
-    # Order matters: DF block, then MF block, then FW block — this is what
-    # keeps array index aligned with H_POS's GK→DEF→MID→FWD slot ordering.
+    # DF, MF, FW block order keeps indices aligned with H_POS (GK, DEF, MID, FWD)
     xi.extend(defs[:n_def])
     xi.extend(mids[:n_mid])
     xi.extend(fwds[:n_fwd])
 
-    # If the squad was short somewhere, pad from whatever's left over so we
-    # still return 11 total rather than an incomplete XI.
+    # pad from the remaining players to reach 11 if the squad was short
     if len(xi) < 11:
         leftover = [p for p in (defs + mids + fwds) if p not in xi]
         xi.extend(leftover[: 11 - len(xi)])
@@ -236,7 +228,7 @@ def _select_starting_xi(roster: list[dict]) -> tuple[list[dict], str]:
     n_def = sum(1 for p in xi if p.get("position") == "DF")
     n_mid = sum(1 for p in xi if p.get("position") == "MF")
     n_fwd = sum(1 for p in xi if p.get("position") == "FW")
-    # If counts don't reach 10 outfield (missing position data), pad mids.
+    # fewer than 10 outfield (missing position data): pad mids
     formation = _formation_from_counts(n_def or 4, n_mid or 3, n_fwd or 3)
     return xi, formation
 
@@ -309,9 +301,6 @@ async def _fetch_from_zafronix(
     return result, "ok"
 
 
-# ── Tier 2: API-Sports live lineups ────────────────────────────────────────
-
-
 def _parse_player(raw: dict) -> dict:
     pl = raw.get("player", {})
     stats = raw.get("statistics", [{}])
@@ -361,9 +350,6 @@ async def _fetch_from_api_sports(fixture_id: str) -> dict | None:
     return result if len(result) == 2 else None
 
 
-# ── Route ──────────────────────────────────────────────────────────────────
-
-
 @router.get("/{fixture_id}/lineups")
 async def lineups(fixture_id: str, request: Request):
     r = request.app.state.redis
@@ -387,12 +373,12 @@ async def lineups(fixture_id: str, request: Request):
             away_entry = next((t for t in teams if t["team"] == state.away_name), teams[1])
             return {"home": home_entry, "away": away_entry, "source": "api-sports"}
 
-    # Tier 3: real 2026 squad with a PROJECTED XI — not a confirmed lineup.
+    # Tier 3: real 2026 squad with a PROJECTED XI; not a confirmed lineup.
     zx, zx_reason = await _fetch_from_zafronix(r, state.home_name, state.away_name)
     if zx:
         return zx
 
-    # Tier 4: nothing known — empty XI, no guessed formation.
+    # Tier 4: nothing known; empty XI, no guessed formation.
     return {
         "home": {"team": state.home_name, "formation": "", "startingXI": [], "coach": None},
         "away": {"team": state.away_name, "formation": "", "startingXI": [], "coach": None},

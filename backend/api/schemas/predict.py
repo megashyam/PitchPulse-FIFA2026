@@ -16,14 +16,14 @@ class TeamPrediction(BaseModel):
     elo: float
     fifa_rank: int
 
-    # ── Group stage finishing position ────────────────────────────────────
+    # group stage finishing position
     group_exit: StageProbability = Field(default_factory=StageProbability)
     group_first: StageProbability = Field(default_factory=StageProbability)
     group_second: StageProbability = Field(default_factory=StageProbability)
     group_third: StageProbability = Field(default_factory=StageProbability)
     group_fourth: StageProbability = Field(default_factory=StageProbability)
 
-    # ── Knockout stages ───────────────────────────────────────────────────
+    # knockout stages
     r32: StageProbability = Field(default_factory=StageProbability)
     r16: StageProbability = Field(default_factory=StageProbability)
     qf: StageProbability = Field(default_factory=StageProbability)

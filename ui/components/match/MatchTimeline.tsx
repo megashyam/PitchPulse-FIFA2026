@@ -1,6 +1,5 @@
 "use client"
-// components/match/MatchTimeline.tsx
-// Horizontal dot timeline showing key events at their minute markers.
+// horizontal dot timeline of key events at their minute markers
 
 import type { MatchState } from "@/types/match"
 
@@ -27,12 +26,10 @@ export function MatchTimeline({ state }: Props) {
         <div className="timeline-wrap">
             <h3 className="panel-title">Timeline</h3>
             <div className="timeline">
-                {/* HT line */}
                 <div className="timeline-ht" style={{ left: `${(45 / maxMin) * 100}%` }}>
                     <span className="ht-label">HT</span>
                 </div>
 
-                {/* progress line */}
                 <div className="timeline-track">
                     <div
                         className="timeline-progress"
@@ -40,7 +37,6 @@ export function MatchTimeline({ state }: Props) {
                     />
                 </div>
 
-                {/* event dots */}
                 {keyEvs.map((ev, i) => {
                     const pct = Math.min(99, (ev.elapsed / maxMin) * 100)
                     const color = DOT_COLOR[ev.type] ?? "var(--c-muted)"
@@ -60,7 +56,6 @@ export function MatchTimeline({ state }: Props) {
                     )
                 })}
 
-                {/* minute markers */}
                 <div className="tl-markers">
                     {[0, 15, 30, 45, 60, 75, 90].map(m => (
                         <span

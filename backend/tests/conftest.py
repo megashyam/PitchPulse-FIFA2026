@@ -34,7 +34,6 @@ import pytest_asyncio
 
 from ml.statsbomb import SB_BASE, COMPETITION_ID, SEASON_IDS
 
-# --------------------------------------------------------------- markers / async
 
 
 def pytest_configure(config):
@@ -47,9 +46,6 @@ def event_loop():
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()
-
-
-# --------------------------------------------------------------- Redis
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -83,9 +79,6 @@ async def redis_client():
         await r.aclose()
 
 
-# --------------------------------------------------------------- Weaviate
-
-
 @pytest.fixture(scope="session")
 def weaviate():
     """Process-wide Weaviate client; skips if not ready or not indexed."""
@@ -111,9 +104,6 @@ def embedder():
         pytest.skip(f"Embedding model unavailable: {exc}")
 
 
-# --------------------------------------------------------------- odds
-
-
 @pytest_asyncio.fixture(scope="session")
 async def live_odds():
     """Odds snapshot from the configured provider; skips if empty."""
@@ -125,17 +115,11 @@ async def live_odds():
     return odds
 
 
-# --------------------------------------------------------------- LLM
-
-
 @pytest.fixture(scope="session")
 def has_llm():
     if not (os.getenv("GROQ_API_KEY") or os.getenv("OLLAMA_URL")):
         pytest.skip("No GROQ_API_KEY / OLLAMA_URL configured")
     return True
-
-
-# --------------------------------------------------------------- StatsBomb real data
 
 
 @pytest.fixture(scope="session")

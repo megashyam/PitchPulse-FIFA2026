@@ -23,7 +23,6 @@ from kg.schema import (
     TEAM,
 )
 
-# --------------------------------------------------------------- pure schema shape
 
 
 def test_constraint_statements_reference_declared_labels():
@@ -42,9 +41,6 @@ def test_constraint_statements_are_idempotent():
 def test_relationship_types_are_distinct():
     rels = {PLAYS_IN, HEAD_TO_HEAD}
     assert len(rels) == 2
-
-
-# --------------------------------------------------------------- real Neo4j round-trip
 
 
 @pytest.fixture(scope="module")

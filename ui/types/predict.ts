@@ -1,5 +1,3 @@
-// types/predict.ts — updated with group finishing position fields
-
 interface StageProbability {
     p: number   // probability 0..1
     ci_lo: number   // 95% CI lower

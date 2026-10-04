@@ -1,10 +1,7 @@
 "use client"
-// components/narrative/CommentBubbles.tsx
-//
-// Netflix-style auto-scrolling row of live comment cards. The whole row
-// marquees horizontally on its own, pausing on hover/touch so the user can
-// read. Cards are duplicated once so the scroll loops seamlessly.
-// Data: GET /narrative/{topic}/comments, polled every 15s.
+// auto-scrolling row of live comment cards; the row marquees on its own and pauses on
+// hover/touch; cards are duplicated once so the scroll loops; data: GET
+// /narrative/{topic}/comments, polled every 15s
 
 import { useEffect, useState } from "react"
 
@@ -102,8 +99,8 @@ export function CommentBubbles({ topic }: Props) {
         )
     }
 
-    // Duplicate the list so the marquee can loop seamlessly (translateX
-    // -50% lands exactly at the start of the second copy).
+    // duplicate the list so the marquee loops (translateX -50% lands at the start of
+    // the second copy)
     const loopItems = [...samples, ...samples]
     const durationS = Math.max(18, samples.length * 5)
 
@@ -130,9 +127,8 @@ export function CommentBubbles({ topic }: Props) {
             </div>
 
             <style jsx>{`
-                /* .comment-row-track is absolutely positioned inside this
-                   fixed-height wrapper so the marquee can't widen any flex or
-                   grid ancestor. */
+                /* .comment-row-track is absolutely positioned in this fixed-height
+                   wrapper so the marquee can't widen flex/grid ancestors */
                 .comment-row-wrap {
                     position: relative;
                     width: 100%;

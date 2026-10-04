@@ -1,7 +1,6 @@
 "use client"
-// components/predict/BracketImpactFeed.tsx
-// Same stale result guard as CounterfactualPanel.
-// Fetches current match elapsed to filter out results from previous cycles.
+// same stale-result guard as CounterfactualPanel: uses the current match elapsed to
+// filter out results from previous cycles
 
 import { useEffect, useState } from "react"
 
@@ -64,7 +63,7 @@ function useBracketImpact() {
 export function BracketImpactFeed() {
     const { entries, matchName, matchElapsed, loading } = useBracketImpact()
 
-    // Filter out stale results from previous replay cycles
+    // drop stale results from previous replay cycles
     const freshEntries = entries.filter(e => e.minute <= matchElapsed + 5)
 
     return (

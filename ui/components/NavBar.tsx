@@ -1,7 +1,6 @@
 "use client"
-// components/NavBar.tsx
-// Three-zone layout (left/center/right) keeps the wordmark centered; the
-// match page's back button lives here.
+// three zones (left/center/right) keep the wordmark centered; the match page's back
+// button lives here
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"

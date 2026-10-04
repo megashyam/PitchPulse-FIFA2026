@@ -49,11 +49,10 @@ log = logging.getLogger(__name__)
 
 MAX_MATCHES = 500
 
-# Defensive-action event types that count toward PPDA denominator.
-# StatsBomb: a Duel of sub-type Tackle, plus Interception / Block / Foul Committed.
+# defensive action types counted in the PPDA denominator
+# StatsBomb: a Duel of sub-type Tackle, plus Interception / Block / Foul Committed
 DEF_ACTION_TYPES = {"Interception", "Block", "Foul Committed"}
 
-# Pitch geometry
 PITCH_X = 120.0
 PRESS_LINE = 40.0  # standard PPDA boundary: actions/passes with x >= 40
 MID_LINE = 40.0
@@ -98,18 +97,18 @@ def build_fingerprints(
                      (O-frame x' sits at T-frame x = 120 - x')
         denominator  T's defensive actions at T-frame x >= 40
     """
-    # Per-team accumulators
+    # per-team accumulators
     # opp_passes_by_zone[T][zone] = opponent completed passes T allowed in that
     #   T-frame zone; def_actions_by_zone[T][zone] = T's defensive actions there.
     opp_passes = {home: defaultdict(float), away: defaultdict(float)}
     def_actions = {home: defaultdict(float), away: defaultdict(float)}
 
-    # Also track simple team identity stats for the descriptor text.
+    # team identity stats for the descriptor text
     poss_events = {home: 0, away: 0}
     shots = {home: 0, away: 0}
     xg = {home: 0.0, away: 0.0}
-    # Pressure events in the press region — not part of canonical PPDA, but a
-    # strong signal of pressing *effort* (work that doesn't force a turnover).
+    # pressure events in the press region; not canonical PPDA, but they signal pressing
+    # effort (work that doesn't force a turnover)
     pressures = {home: 0, away: 0}
 
     def opponent(t: str) -> str:
@@ -125,7 +124,7 @@ def build_fingerprints(
 
         poss_events[team_name] += 1
 
-        # ── Opponent passes → numerator for the *pressing* team ──────────────
+        # opponent passes: numerator for the pressing team
         if etype == "Pass":
             # completed pass = no outcome key (StatsBomb marks only failures)
             completed = (ev.get("pass") or {}).get("outcome") is None
@@ -143,12 +142,12 @@ def build_fingerprints(
             if sx is not None:
                 xg[team_name] += float(sx)
 
-        # ── Defensive actions → denominator for the acting team ─────────────
+        # defensive actions: denominator for the acting team
         is_def_action = etype in DEF_ACTION_TYPES or _is_tackle(ev)
         if is_def_action and x is not None and x >= PRESS_LINE:
             def_actions[team_name][_zone(x)] += 1.0
 
-        # ── Pressure events (effort signal, not in PPDA) ────────────────────
+        # pressure events (effort signal, not in PPDA)
         if etype == "Pressure" and x is not None and x >= PRESS_LINE:
             pressures[team_name] += 1
 
@@ -163,20 +162,20 @@ def build_fingerprints(
         a_mid = def_actions[team]["mid"]
         a_att = def_actions[team]["att"]
 
-        # Overall PPDA over the full press region (x >= 40)
+        # overall PPDA over the press region (x >= 40)
         ppda_overall = _safe_ppda(p_mid + p_att, a_mid + a_att)
         ppda_mid = _safe_ppda(p_mid, a_mid)
         ppda_att = _safe_ppda(p_att, a_att)
-        # Defensive-third PPDA is not part of the standard metric; report a
-        # nominal high value so the fingerprint vector still has the slot.
+        # defensive-third PPDA is not in the standard metric; a nominal high value fills
+        # the fingerprint slot
         ppda_def = 50.0
 
         possession = (
             round(poss_events[team] / total_events * 100, 1) if total_events else 50.0
         )
 
-        # press_intensity: blends inverse-PPDA (turnover-forcing press) with
-        # raw pressure volume (pressing effort). 0–1, higher = more intense.
+        # press_intensity: inverse PPDA (turnover-forcing press) blended with raw
+        # pressure volume; 0-1, higher = more intense
         #   inverse-PPDA term: 4.0 PPDA ≈ 1.0, 20+ PPDA ≈ ~0.2
         #   pressure term: ~150 pressures in press region ≈ 1.0
         ppda_term = min(1.0, 8.0 / max(ppda_overall, 1.0))
@@ -217,8 +216,8 @@ def build_fingerprints(
                     "possession": possession,
                     "press_intensity": press_intensity,
                 },
-                # Text the embedding model sees. Keep it descriptive so the
-                # runtime descriptor (also natural language) matches well.
+                # text the embedding model sees; descriptive, to match the runtime
+                # descriptor (also natural language)
                 "embed_text": content,
             }
         )

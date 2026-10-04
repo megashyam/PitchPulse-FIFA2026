@@ -6,10 +6,9 @@ GOAL_TYPES = frozenset({"goal", "own_goal", "penalty_goal"})
 RED_TYPES = frozenset({"red", "yellow_red"})
 SIGNIFICANT_TYPES = GOAL_TYPES | RED_TYPES
 
-# Everything that can trigger a counterfactual cycle. Yellows/subs resolve to
-# an exact-zero bracket shift by construction (see counterfactual_agent), but
-# remain triggers so both live and completed matches surface an honest
-# "no impact" entry alongside the goals/reds that actually move the bracket.
+# triggers for a counterfactual cycle; yellows and subs give an exact-zero bracket shift
+# (see counterfactual_agent) but stay triggers, so each match shows a "no impact" entry
+# next to the goals/reds that move the bracket
 TRIGGER_TYPES = SIGNIFICANT_TYPES | frozenset({"yellow", "substitution"})
 
 LIVE_STATUSES = frozenset({"1H", "HT", "2H", "ET", "P"})

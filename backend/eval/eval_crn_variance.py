@@ -42,14 +42,14 @@ def measure(team: str, elo_boost: float, n_sims: int, repeats: int) -> dict:
         )
 
     for k in range(repeats):
-        # --- CRN: identical seed for both legs
+        # CRN: identical seed for both legs
         seed = 10_000 + k
         base = run_simulation(n_sims=n_sims, seed=seed)
         cf = run_simulation(n_sims=n_sims, seed=seed, elo_overrides={team: elo_boost})
         deltas_crn.append(champ(cf, team) - champ(base, team))
         shifts_crn.append(path_shift(base, cf))
 
-        # --- independent: two different seeds
+        # independent: two different seeds
         base_i = run_simulation(n_sims=n_sims, seed=20_000 + 2 * k)
         cf_i = run_simulation(
             n_sims=n_sims, seed=20_001 + 2 * k, elo_overrides={team: elo_boost}

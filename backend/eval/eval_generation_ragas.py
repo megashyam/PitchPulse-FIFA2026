@@ -61,7 +61,7 @@ def facts_block(prompt: str) -> str:
     return prompt.split(INST_RULES)[0].replace(INST_HEAD, "").strip()
 
 
-# ── stage 1 ─────────────────────────────────────────────────────────────────
+# stage 1
 
 
 async def _generate(out: Path, graph: bool = False) -> None:
@@ -151,7 +151,7 @@ async def _generate(out: Path, graph: bool = False) -> None:
           f"{sum(r['grounding_violation'] for r in ok)} grounding violations -> {out}")
 
 
-# ── stage 2 ─────────────────────────────────────────────────────────────────
+# stage 2
 
 
 def _judge_metric():

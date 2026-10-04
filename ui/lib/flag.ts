@@ -1,6 +1,5 @@
-// lib/flag.ts
-// Image-based flags via flagcdn.com — always render (unlike emoji on Windows).
-// Maps team name → ISO 3166-1 alpha-2 code.
+// image flags via flagcdn.com (emoji flags do not render on Windows); maps team name to
+// ISO 3166-1 alpha-2 code
 
 const CODES: Record<string, string> = {
     // CONCACAF
@@ -37,12 +36,10 @@ export function flagUrl(teamName: string, size: "20" | "40" | "80" | "160" = "80
     return `https://flagcdn.com/w${size}/${code}.png`
 }
 
-// Team primary colors — one bold, recognizable color per WC2026 team (kit/
-// flag primary), used for the hero banner and other team-colored accents.
-// Covers all 48 qualified teams (see backend/ml/wc_2026_config.py) plus a
-// few common name aliases. Where a team's literal primary color is too low-
-// contrast to use as a bold banner fill (England/white, Germany/black), a
-// strong secondary associated with the team is used instead.
+// primary color per WC2026 team (kit/flag), used for the hero banner and other accents;
+// covers all 48 teams (backend/ml/wc_2026_config.py) plus a few aliases; where the
+// literal primary is too low-contrast for a banner fill (England/white, Germany/black),
+// a secondary color is used
 const TEAM_COLORS: Record<string, string> = {
     // Pot 1
     "Argentina": "#6cb4ee",
@@ -97,11 +94,10 @@ const TEAM_COLORS: Record<string, string> = {
     "Honduras": "#0073cf",
     "Cameroon": "#007a33",
 
-    // Remaining CODES entries not in the current placeholder 48-team draw
-    // (backend/ml/wc_2026_config.py is explicitly marked as needing an
-    // update once the real draw is known) — kept here so any team the live
-    // worldcup26.ir feed actually returns still gets a real color instead
-    // of falling through to the generic default.
+    // remaining CODES entries not in the placeholder 48-team draw
+    // (backend/ml/wc_2026_config.py is marked as needing an update once the real draw
+    // is known); kept so any team the live worldcup26.ir feed returns still gets a real
+    // color instead of the default
     "Guatemala": "#4997d0",
     "El Salvador": "#0047ab",
     "Jamaica": "#007847",

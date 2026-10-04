@@ -38,8 +38,7 @@ STALE_GRACE_S = 300.0  # slack on top of 3 intervals before a worker is stale
 
 WorkerFn = Callable[[aioredis.Redis], Awaitable[None]]
 
-# Compare-and-set on the lock value, so an instance can only extend or
-# release a lock it still owns.
+# compare-and-set on the lock value: an instance only extends or releases a lock it owns
 _RENEW = (
     "if redis.call('get', KEYS[1]) == ARGV[1] then "
     "return redis.call('pexpire', KEYS[1], ARGV[2]) else return 0 end"
@@ -61,9 +60,6 @@ class WorkerStatus:
 
 _workers: dict[str, WorkerStatus] = {}
 _role = {"role": "follower", "since": time.monotonic()}
-
-
-# ── Leader lock ────────────────────────────────────────────────────────────
 
 
 class LeaderLock:
@@ -144,9 +140,6 @@ async def run_as_leader(
             except Exception as exc:
                 log.warning(f"Leader lock release failed: {exc!r}")
             _role.update(role="follower", since=time.monotonic())
-
-
-# ── Supervision ────────────────────────────────────────────────────────────
 
 
 async def wait_for_data(r: aioredis.Redis, name: str, warn_every_s: float = 180.0) -> None:

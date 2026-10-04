@@ -15,7 +15,7 @@ from monitoring.metrics import WORKER_ERRORS, WORKER_TICK_DURATION, tick_done
 
 log = logging.getLogger(__name__)
 
-INTERVAL = 1800.0  # 30 min — a 50k-sim run is ~1.3s, cheap to repeat often
+INTERVAL = 1800.0  # 30 min; a 50k-sim run is ~1.3s, cheap to repeat often
 
 
 async def run(redis_client: aioredis.Redis) -> None:

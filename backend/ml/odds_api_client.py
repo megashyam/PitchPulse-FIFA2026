@@ -123,8 +123,8 @@ class _OddsApiClient:
                 self._cache = fresh
                 self._cached_at = now
             elif self._cache is not None:
-                # stale-if-error: keep serving the last good snapshot rather
-                # than flipping the whole prior table to Elo mid-match
+                # stale-if-error: keep serving the last good snapshot instead of
+                # flipping the prior table to Elo mid-match
                 log.warning("Odds API fetch failed — serving stale cached odds")
             else:
                 self._cache = {}

@@ -1,5 +1,4 @@
 "use client"
-// components/predict/PerMatchOddsPanel.tsx
 
 import { useEffect, useState } from "react"
 
@@ -54,7 +53,6 @@ export function PerMatchOddsPanel() {
     return (
         <div className="pred-card">
             <div className="pred-card-top">
-                {/* Source badge */}
                 <span className="src src-api">The Odds API · market odds</span>
                 <span className="pred-card-label">consumed directly</span>
             </div>

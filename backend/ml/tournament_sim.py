@@ -271,7 +271,7 @@ class TournamentSimulator:
         N, n = self.n_sims, self.n_teams
         M = len(self.g_home)
 
-        # ── Group scores ────────────────────────────────────────────────
+        # group scores
         u = rng.random((N, M, 2), dtype=np.float32)
         hg = self.g_base[:, 0] + _poisson_ppf(u[:, :, 0], self.g_rates[:, 0])
         ag = self.g_base[:, 1] + _poisson_ppf(u[:, :, 1], self.g_rates[:, 1])
@@ -285,13 +285,13 @@ class TournamentSimulator:
         noise = rng.random((N, n), dtype=np.float32)
         comp = pts.astype(np.float64) * 1e4 + (gf - ga + 100.0) * 100.0 + gf + noise + self.official
 
-        # ── Group ranks ─────────────────────────────────────────────────
+        # group ranks
         gcomp = comp[:, self.group_idx]  # (N, 12, 4)
         order = np.argsort(-gcomp, axis=2)
         ranked = self.group_idx[np.arange(12)[None, :, None], order]  # (N, 12, 4)
         winners, runners, thirds, fourths = (ranked[:, :, k] for k in range(4))
 
-        # ── Best eight thirds → Annex C placement ──────────────────────
+        # best eight thirds, Annex C placement
         tcomp = np.take_along_axis(gcomp, order[:, :, 2:3], axis=2)[:, :, 0]  # (N, 12)
         best8 = np.argsort(-tcomp, axis=1)[:, :8]
         mask = (1 << best8.astype(np.int64)).sum(axis=1)
@@ -315,7 +315,7 @@ class TournamentSimulator:
         away = np.stack([slot(R32_SLOTS[m][1], R32_SLOTS[m][0]) for m in R32_ORDER], axis=1)
         matches = list(R32_ORDER)
 
-        # ── Knockouts ───────────────────────────────────────────────────
+        # knockouts
         for stage in ("r16", "qf", "sf", "final", "champion"):
             w = self._ko_round(rng, matches, home, away)
             reach[rows[:, None], w] = np.maximum(reach[rows[:, None], w], STAGE_IDX[stage])
@@ -324,7 +324,7 @@ class TournamentSimulator:
             matches = [_PARENT[frozenset(matches[i : i + 2])] for i in range(0, len(matches), 2)]
             home, away = w[:, 0::2], w[:, 1::2]
 
-        # ── Aggregate ───────────────────────────────────────────────────
+        # aggregate
         pos_counts = [np.bincount(x.ravel(), minlength=n) for x in (winners, runners, thirds, fourths)]
         teams_out: List[TeamResult] = []
         stage_counts: Dict[str, Dict[str, int]] = {}

@@ -162,9 +162,6 @@ class MatchState(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-# ── Feed records ───────────────────────────────────────────────────────────
-
-
 class Fixture(BaseModel):
     """One scoreboard fixture; the shape of tournament.json "fixtures"."""
 

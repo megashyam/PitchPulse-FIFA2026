@@ -43,7 +43,7 @@ ANNEX_C_URL = (
     "https://en.wikipedia.org/w/index.php?title="
     "Template:2026_FIFA_World_Cup_third-place_table&action=raw"
 )
-# Wikimedia rejects default UAs; ESPN rejects custom ones — set per request.
+# Wikimedia rejects default UAs; ESPN rejects custom ones; set per request.
 WIKI_HEADERS = {"User-Agent": "PitchPulse/1.0 (WC2026 snapshot builder)"}
 
 

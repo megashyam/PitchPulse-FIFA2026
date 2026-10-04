@@ -25,7 +25,7 @@ from api.schemas.schema import MatchState
 router = APIRouter()
 log = logging.getLogger(__name__)
 
-CACHE_TTL = 600  # 10 min — fingerprints drift slowly within a match
+CACHE_TTL = 600  # 10 min; fingerprints drift slowly within a match
 CACHE_TTL_COMPLETED = 30 * 86_400  # a finished match never changes
 
 
@@ -41,8 +41,7 @@ async def compute_and_cache(r, fixture_id: str, state: MatchState, loop) -> dict
     )
 
     if home_match is None and away_match is None:
-        # Distinguish WHY, so the frontend can show something more useful
-        # than a permanent "run the indexer yourself" instruction.
+        # separate reasons, so the frontend can show more than "run the indexer yourself"
         wv = get_weaviate_client()
         indexed_count = await asyncio.to_thread(_indexed_count, wv)
         reason = (
@@ -109,10 +108,9 @@ async def get_tactical(fixture_id: str, request: Request):
             else "No tactical fingerprint yet — the background worker refreshes "
             "this every ~2 minutes."
         )
-        # 200, not 404: this is the normal state right after kickoff (worker
-        # hasn't had its first successful tick yet) or during first-run
-        # indexing — both self-resolve, and a 404 always shows as a red
-        # console error regardless of how the frontend handles it.
+        # 200, not 404: normal right after kickoff (worker has no successful tick yet)
+        # or during first-run indexing; both resolve themselves, and a 404 logs a red
+        # console error in the browser
         return {
             "fixture_id": int(fixture_id),
             "status": "pending",

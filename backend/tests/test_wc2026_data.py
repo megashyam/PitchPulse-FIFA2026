@@ -44,9 +44,6 @@ def _summary():
     return json.loads((FIX / "espn_summary_760513.json").read_text(encoding="utf-8"))
 
 
-# ── Snapshot integrity ───────────────────────────────────────────────────────
-
-
 def test_snapshot_is_the_real_field():
     assert len(WC2026_TEAMS) == 48
     assert len(GROUPS) == 12 and all(len(g) == 4 for g in GROUPS.values())
@@ -81,9 +78,6 @@ def test_bracket_order_reproduces_tree():
     while len(ms) > 1:
         ms = [parent[frozenset(ms[i : i + 2])] for i in range(0, len(ms), 2)]
     assert ms == [104]
-
-
-# ── ESPN parsing ─────────────────────────────────────────────────────────────
 
 
 def test_parse_event_real_fields():
@@ -137,9 +131,6 @@ def test_shot_xg_both_coordinate_conventions_agree():
     assert shot_xg.xg(shot_xg.Shot(x=50.0, y=50.0, **base)) < shot_xg.xg(new)
 
 
-# ── Only real (ESPN) red cards condition models ──────────────────────────────
-
-
 def _state(events, **kw) -> MatchState:
     return MatchState(fixture_id=1, home_name="H", away_name="A", events=events, **kw)
 
@@ -150,9 +141,6 @@ def test_red_counts_ignore_non_feed_events():
         MatchEvent(elapsed=30, team_id=2, team_name="A", type="red", source="synthesised"),
     ]
     assert red_counts(_state(evs)) == (1, 0)
-
-
-# ── State as of the event, not the final score ───────────────────────────────
 
 
 def test_around_uses_running_score():
@@ -175,9 +163,6 @@ def test_around_orders_stoppage_time_and_same_minute():
     assert around(s, a)[0][:2] == (2, 0)
     assert around(s, c)[0][:2] == (1, 0)
     assert at_minute(s, 90, 1)[:2] == (2, 0)
-
-
-# ── Simulator on the real tournament ─────────────────────────────────────────
 
 
 def _sums(res):
@@ -209,9 +194,6 @@ def test_common_random_numbers_are_deterministic():
     a = run_simulation(n_sims=2000, seed=9)
     b = run_simulation(n_sims=2000, seed=9)
     assert [t.probs for t in a.teams] == [t.probs for t in b.teams]
-
-
-# ── A not-started fixture persists once, with no detail fetch ────────────────
 
 
 class _FakeRedis:

@@ -1,5 +1,5 @@
 "use client"
-// components/match/TacticalCard.tsx — bigger pitch, 2-column stat grid
+// bigger pitch, 2-column stat grid
 
 import type { MatchState } from "@/types/match"
 import { useTactical, type TeamFingerprint } from "@/hooks/useTactical"
@@ -116,25 +116,25 @@ export function TacticalCard({ state, fixtureId }: { state: MatchState; fixtureI
     const awayAbbr = state.away_name.slice(0, 3).toUpperCase()
     const fp = tactical?.home ?? null
     const fpAway = tactical?.away ?? null
-    // Historical PPDA only — live stats carry no per-zone pressing data.
+    // historical PPDA only; live stats carry no per-zone pressing data
     const ppdaDisplay = fp ? fp.match.ppda.toFixed(1) : "—"
     const hasFingerprint = !!fp && !!fp.match.team
     const hasAwayFingerprint = !!fpAway && !!fpAway.match.team
 
     return (
         <div>
-            {/* Two columns: pitch + raw stats on the left, fingerprint match
-                and both teams' narratives on the right. */}
+            {/* two columns: pitch + raw stats on the left, fingerprint match and
+                both teams' narratives on the right */}
             <div className="tactical-2col">
                 <div className="tactical-col-left">
 
-                    {/* Pitch — bigger, real football green */}
+                    {/* pitch */}
                     <div className="tactical-pitch-v2">
                         <div className="tactical-pitch-circle" />
                         <div className="tactical-pitch-box-home" />
                         <div className="tactical-pitch-box-away" />
 
-                        {/* Home zone */}
+                        {/* home zone */}
                         <div
                             className="tactical-zone-overlay home"
                             style={{
@@ -147,7 +147,7 @@ export function TacticalCard({ state, fixtureId }: { state: MatchState; fixtureI
                             <span className="tactical-zone-label">{homeAbbr}</span>
                         </div>
 
-                        {/* Away zone */}
+                        {/* away zone */}
                         <div
                             className="tactical-zone-overlay away"
                             style={{
@@ -161,10 +161,8 @@ export function TacticalCard({ state, fixtureId }: { state: MatchState; fixtureI
                         </div>
                     </div>
 
-                    {/* 2-column stat grid — compressed (smaller padding/font)
-                        to free up vertical room. Scoped styles so this
-                        doesn't touch the global tactical-stat-* classes used
-                        elsewhere. */}
+                    {/* 2-column stat grid; scoped styles, so the global
+                        tactical-stat-* classes are untouched */}
                     <div className="tactical-stats-grid tactical-stats-grid-compact">
 
                         <div className="tactical-stat-cell">
@@ -209,9 +207,8 @@ export function TacticalCard({ state, fixtureId }: { state: MatchState; fixtureI
 
                     </div>
 
-                    {/* Fingerprint match summary — lives with the raw stats
-                        on the left; only the prose narratives (below) are
-                        on the right. */}
+                    {/* fingerprint match summary, with the raw stats on the left;
+                        the prose narratives are on the right */}
                     <div className="tactical-fingerprint-block">
                         <div>
                             <div className="tactical-fp-label">Closest tactical profile</div>
@@ -244,11 +241,10 @@ export function TacticalCard({ state, fixtureId }: { state: MatchState; fixtureI
 
                 <div className="tactical-col-right">
 
-                    {/* Narrative — the real, already-computed descriptor text
-                        behind each fingerprint match (built from actual
-                        StatsBomb PPDA/xG/pressure counts at index time, not
-                        LLM-generated), plus the per-zone PPDA values the
-                        backend already returns but the card never showed. */}
+                    {/* narrative: the already-computed descriptor text behind each
+                        fingerprint match (built from StatsBomb PPDA/xG/pressure
+                        counts at index time, not LLM-generated), plus the per-zone
+                        PPDA values the backend returns */}
                     {hasFingerprint && (
                         <FingerprintNarrative fp={fp!} />
                     )}

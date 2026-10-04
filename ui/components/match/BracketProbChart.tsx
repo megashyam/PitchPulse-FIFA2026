@@ -1,7 +1,6 @@
 "use client"
-// components/match/BracketProbChart.tsx
-// Top 8 win distribution (hover reveals probabilities) plus market odds for
-// this fixture from GET /matches/{fixture_id}/prediction.
+// top 8 win distribution (hover shows probabilities) plus market odds for this fixture
+// from GET /matches/{fixture_id}/prediction
 
 import { useEffect, useMemo, useState } from "react"
 import { usePredictStream } from "@/hooks/usePredictStream"
@@ -43,7 +42,7 @@ export function BracketProbChart({ defaultTeams = [], fixtureId }: Props) {
     const isRunning = status?.status === "running" || isLoading
     const hasData = !!prediction
 
-    // Top 8 teams by champion probability — this IS the Win Distribution chart
+    // top 8 teams by champion probability (the Win Distribution chart)
     const top8 = useMemo(() =>
         hasData ? [...prediction!.teams].sort((a, b) => b.champion.p - a.champion.p).slice(0, 8) : []
         , [prediction])
@@ -56,7 +55,7 @@ export function BracketProbChart({ defaultTeams = [], fixtureId }: Props) {
         setSelected(preferred ?? top8[0]?.name ?? null)
     }, [hasData, top8])
 
-    // Fetch odds for THIS match only
+    // odds for this match only
     useEffect(() => {
         if (!fixtureId) return
         fetch(`${API}/matches/${fixtureId}/prediction`)
@@ -95,7 +94,7 @@ export function BracketProbChart({ defaultTeams = [], fixtureId }: Props) {
     return (
         <div>
 
-            {/* ── Win distribution — top 8, hover reveals bracket path ── */}
+            {/* win distribution: top 8, hover shows the bracket path */}
             <div style={{ padding: "12px 14px 4px" }}>
                 <div style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -132,7 +131,7 @@ export function BracketProbChart({ defaultTeams = [], fixtureId }: Props) {
                                     gap: 4, cursor: "pointer", position: "relative",
                                 }}
                             >
-                                {/* Hover tooltip — champion % */}
+                                {/* hover tooltip: champion % */}
                                 {isHov && (
                                     <div style={{
                                         position: "absolute", bottom: barH + 22, left: "50%", transform: "translateX(-50%)",
@@ -162,7 +161,7 @@ export function BracketProbChart({ defaultTeams = [], fixtureId }: Props) {
                 </div>
             </div>
 
-            {/* Selected/hovered team's full bracket path */}
+            {/* selected/hovered team's bracket path */}
             {activeTeam && (
                 <div style={{ padding: "14px 14px 10px", borderTop: "1px solid var(--border)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10 }}>
@@ -194,7 +193,7 @@ export function BracketProbChart({ defaultTeams = [], fixtureId }: Props) {
                 </div>
             )}
 
-            {/* ── Per-match market odds — THIS fixture only ── */}
+            {/* per-match market odds, this fixture only */}
             <div style={{ padding: "12px 14px 14px", borderTop: "1px solid var(--border-bright)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
                     <span style={{ width: 3, height: 10, background: "var(--away)", borderRadius: 2, flexShrink: 0 }} />

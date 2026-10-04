@@ -45,9 +45,6 @@ MIN_COUNT = {
 }
 
 
-# ---------------------------------------------------------------- signal maths
-
-
 def window_rate(
     timestamps: Iterable[float], now: float, window_s: float, page_limit: int
 ) -> float:
@@ -86,9 +83,6 @@ def transform(source: str, value: float) -> float:
     if source == "trends":
         return math.log(max(value, 1e-3))
     return math.log1p(max(value, 0.0))
-
-
-# ---------------------------------------------------------------- scorer
 
 
 @dataclass

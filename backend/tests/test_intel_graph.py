@@ -52,9 +52,6 @@ def _v(text, state=None, docs=(FACTS,)):
     return violations(text, FACTS, state or _state(), docs, (56, 90))
 
 
-# ── grounding check ────────────────────────────────────────────────────────
-
-
 def test_grounded_text_passes():
     text = (
         "Kaoru Mitoma levelled it 1-1 at 56', lifting Japan's win probability from 5% "
@@ -88,9 +85,6 @@ def test_formation_and_true_progression_not_flagged():
 
 def test_roster_has_snapshot_players():
     assert "Lionel Messi" in _roster().values()
-
-
-# ── graph paths ────────────────────────────────────────────────────────────
 
 
 class _Model:

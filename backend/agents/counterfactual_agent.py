@@ -43,8 +43,8 @@ CF_SIMS = int(
     os.getenv("CF_SIMS", "20000")
 )  # paths per before/after simulation
 
-# The prompt asks for one ~60-80 word paragraph; small models don't reliably
-# self-limit, so this token cap (~80-90 words) is the backstop.
+# prompt asks for one 60-80 word paragraph; small models ignore that, so this token cap
+# (~80-90 words) enforces it
 CF_NARRATIVE_MAX_TOKENS = 130
 CF_NARRATIVE_NUM_CTX = 1280  # prompt + response must both fit this window
 
@@ -59,10 +59,8 @@ _states: Dict[int, CfState] = {}
 
 
 def _sig(ev: MatchEvent) -> str:
-    # ev.extra distinguishes same-minute events (e.g. two stoppage-time
-    # subs both at elapsed=45) — without it a team's second trigger event
-    # in the same displayed minute collides with the first and is silently
-    # treated as already-covered.
+    # ev.extra separates same-minute events (two stoppage-time subs at elapsed=45);
+    # without it the second collides with the first and counts as covered
     return f"{ev.elapsed}:{ev.extra or 0}:{ev.type}:{ev.team_id}"
 
 
@@ -134,9 +132,6 @@ def _find_all_triggers(state: MatchState, cf: CfState) -> List[MatchEvent]:
     return out
 
 
-# ── No-impact events ───────────────────────────────────────────────────────
-
-
 def _no_impact_entry(
     state: MatchState, trigger: MatchEvent, swing: Tuple[float, float], conditioned: bool
 ) -> dict:
@@ -168,9 +163,6 @@ def _no_impact_entry(
     }
 
 
-# ── Divergence between two conditioned brackets ────────────────────────────
-
-
 def _divergence(
     before_teams, after_teams
 ) -> Tuple[List[Tuple[str, float, float, float]], float]:
@@ -185,13 +177,10 @@ def _divergence(
         if abs(d) >= DELTA_THRESHOLD:
             changes.append((name, pb, pa, d))
     changes.sort(key=lambda x: abs(x[3]), reverse=True)
-    # Sum of |Δ| double-counts (one team's gain is another's loss); halving
-    # gives the champion-probability mass that actually relocated.
+    # sum of |Δ| counts every move twice (one team's gain is another's loss); halved it
+    # is the champion-probability mass that moved
     path_shift = min(1.0, total_abs / 2.0)
     return changes, path_shift
-
-
-# ── Narrative ──────────────────────────────────────────────────────────────
 
 
 def _team_stage_line(after_teams, sim_name: str) -> Optional[str]:
@@ -320,7 +309,7 @@ def _template(state, trigger, changes, path_shift, after_teams, swing) -> str:
     ev_desc = trigger.type.replace("_", " ")
     score = f"{state.home_score}–{state.away_score}"
 
-    # Swing line (this team's in-match win prob before/after the event).
+    # this team's in-match win prob before and after the event
     swing_txt = ""
     if swing and abs(swing[1] - swing[0]) > 0.005:
         swing_txt = (
@@ -329,7 +318,7 @@ def _template(state, trigger, changes, path_shift, after_teams, swing) -> str:
         )
 
     if changes:
-        # Biggest riser and biggest faller across the whole bracket.
+        # biggest riser and faller across the bracket
         risers = [c for c in changes if c[3] > 0]
         fallers = [c for c in changes if c[3] < 0]
         top = changes[0]
@@ -343,7 +332,7 @@ def _template(state, trigger, changes, path_shift, after_teams, swing) -> str:
             f"({'+' if delta > 0 else ''}{delta * 100:.1f} points)"
         )
 
-        # Add a contrasting second team for texture.
+        # second team: the biggest faller
         second = ""
         if delta > 0 and fallers:
             fn, fpb, fpa, fd = fallers[0]
@@ -370,7 +359,7 @@ def _template(state, trigger, changes, path_shift, after_teams, swing) -> str:
             f"result — it reweighted the whole draw.{swing_txt}"
         )
 
-    # No material bracket change: explain why.
+    # no material bracket change
     top = sorted(after_teams, key=lambda t: t.probs["champion"], reverse=True)[:3]
     leaders = (
         ", ".join(f"{t.name} ({_ordinal_pct(t.probs['champion'])})" for t in top)
@@ -389,9 +378,6 @@ def _template(state, trigger, changes, path_shift, after_teams, swing) -> str:
         f"sending-off — not a caution or a fresh legs substitution — to move "
         f"any of those numbers again."
     )
-
-
-# ── Main entry point ───────────────────────────────────────────────────────
 
 
 def _stable_seed(fid: int, trigger: MatchEvent) -> int:
@@ -478,7 +464,7 @@ async def _analyze_trigger(
             log.warning(f"[{fid}] on_start callback failed", exc_info=True)
 
     odds_client = get_oddsapi_client()
-    odds_table = await odds_client.get_all_odds()  # cached — see odds_api_client
+    odds_table = await odds_client.get_all_odds()  # cached: see odds_api_client
 
     cf.covered.add(_sig(trigger))
 
@@ -489,7 +475,7 @@ async def _analyze_trigger(
         home_c, away_c, host_side=fx.get("host_side") if fx else None, odds_table=odds_table
     )
 
-    # Match state just before / just after the event, not the final score.
+    # match state just before and just after the event, not the final score
     before, after = around(state, trigger)
     minute = trigger.elapsed
     after_wdl = inplay_wdl(pre_wdl, minute, *after, extra=trigger.extra)
@@ -500,8 +486,8 @@ async def _analyze_trigger(
         (before_wdl[0], after_wdl[0]) if acted_home else (before_wdl[2], after_wdl[2])
     )
 
-    # An event that changes neither score nor numbers on the pitch cannot
-    # move the bracket — skip both simulations and the LLM call.
+    # an event that changes neither score nor players on the pitch cannot move the
+    # bracket: skip both simulations and the LLM
     if not conditioned or before == after:
         return _no_impact_entry(state, trigger, swing, conditioned)
 
@@ -533,7 +519,7 @@ async def _analyze_trigger(
 
     changes, path_shift = _divergence(before_result.teams, after_result.teams)
 
-    # No team moved past DELTA_THRESHOLD: the template says so; skip the LLM.
+    # no team past DELTA_THRESHOLD: template, no LLM call
     narrative, via = "", "template"
     if changes:
         prompt = _build_prompt(state, trigger, changes, path_shift, after_result.teams, swing)

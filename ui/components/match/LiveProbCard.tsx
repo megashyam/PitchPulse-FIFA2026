@@ -1,8 +1,7 @@
 "use client"
-// components/match/LiveProbCard.tsx
-// Live win probability from GET /matches/{id}/live-prob (the in-play model
-// in ml/in_play.py), polled every 30s. Falls back to the local calcProbs()
-// heuristic only if that fetch fails.
+// live win probability from GET /matches/{id}/live-prob (in-play model in
+// ml/in_play.py), polled every 30s; falls back to the local calcProbs() if the fetch
+// fails
 
 import { useEffect, useState } from "react"
 import { useMomentumStream } from "@/hooks/useMomentumStream"
@@ -23,7 +22,7 @@ interface LiveProbResponse {
     pre_match_source: string
 }
 
-// Fallback-only heuristic — used if /live-prob is unreachable.
+// fallback heuristic, used if /live-prob is unreachable
 function calcProbs(
     homeGoals: number, awayGoals: number,
     homeMom: number, elapsed: number, status: string
@@ -133,7 +132,6 @@ export function LiveProbCard({ state, fixtureId }: Props) {
 
             <div style={{ padding: "3px 14px 5px" }}>
 
-                {/* Team abbreviations + percentages, one line */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 4, marginBottom: 3, alignItems: "baseline" }}>
                     <span style={{ fontSize: ".68rem", fontWeight: 700, color: "var(--home)" }}>
                         {hn} <span style={{ fontSize: ".76rem" }}>{homeW}%</span>
@@ -144,15 +142,13 @@ export function LiveProbCard({ state, fixtureId }: Props) {
                     </span>
                 </div>
 
-                {/* Tricolor bar */}
                 <div style={{ height: 4, borderRadius: 2, overflow: "hidden", display: "flex", gap: 1 }}>
                     <div style={{ width: `${homeW}%`, background: "var(--home)" }} />
                     <div style={{ width: `${drawW}%`, background: "var(--text-3)" }} />
                     <div style={{ width: `${awayW}%`, background: "var(--away)" }} />
                 </div>
 
-                {/* Model note — kept, but as small as possible; drops entirely
-                    on narrow renders rather than getting clipped mid-word. */}
+                {/* model note; hidden on narrow renders instead of clipping */}
                 <div style={{
                     marginTop: 3, fontFamily: "var(--font-mono)", fontSize: ".5rem",
                     color: "var(--text-3)", whiteSpace: "nowrap", overflow: "hidden",

@@ -1,11 +1,9 @@
 "use client"
-// hooks/useNarrativeStream.ts
-// Feeds the tournament-wide "trending now" hub: fetches /narrative/trending
-// (ALL topics ranked by buzz, not only alerted surges), polls every
-// 20s, and re-fetches whenever the SSE stream signals a new anomaly.
+// feeds the tournament-wide "trending now" hub: fetches /narrative/trending (all topics
+// ranked by buzz, not only alerted surges), polls every 20s, and re-fetches when SSE
+// signals a new anomaly
 //
-// Spikes may carry optional `fixture_id` / `match_status` fields for the
-// live/kickoff badge.
+// spikes may carry fixture_id / match_status for the live/kickoff badge
 
 import { useEffect, useState, useCallback, useRef } from "react"
 

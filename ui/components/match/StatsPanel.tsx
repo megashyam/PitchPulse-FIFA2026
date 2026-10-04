@@ -1,6 +1,5 @@
 "use client"
-// components/match/StatsPanel.tsx
-// FM-style bilateral rows: every stat gets a proportional home/away bar.
+// FM-style bilateral rows: every stat gets a proportional home/away bar
 
 import type { TeamStats } from "@/types/match"
 

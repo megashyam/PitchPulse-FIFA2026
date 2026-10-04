@@ -39,7 +39,7 @@ MAX_ATTEMPTS = 2  # first draft + one grounded retry
 
 @dataclass(frozen=True)
 class NarrationSpec:
-    kind: str  # "event" | "colour" | "ft_summary" — metrics label
+    kind: str  # "event" | "colour" | "ft_summary": metrics label
     state: MatchState
     query: str
     collection: str

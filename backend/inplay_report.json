@@ -6,8 +6,8 @@
   "n_matches": 64,
   "baselines": {
     "pre_match_prior": {
-      "log_loss": 1.0774,
-      "brier": 0.6518
+      "log_loss": 1.0878,
+      "brier": 0.6571
     },
     "base_rate": {
       "log_loss": 1.0622,
@@ -16,69 +16,69 @@
   },
   "in_play_by_checkpoint": {
     "minute_0": {
-      "log_loss": 1.0773,
-      "brier": 0.6517
+      "log_loss": 1.0878,
+      "brier": 0.6571
     },
     "minute_15": {
-      "log_loss": 1.095,
-      "brier": 0.658
+      "log_loss": 1.1138,
+      "brier": 0.665
     },
     "minute_45": {
-      "log_loss": 0.8522,
-      "brier": 0.4963
+      "log_loss": 0.8636,
+      "brier": 0.5005
     },
     "minute_75": {
-      "log_loss": 0.6108,
-      "brier": 0.3479
+      "log_loss": 0.6265,
+      "brier": 0.354
     }
   },
   "in_play_minus_prior": {
     "minute_0": {
-      "log_loss": -0.0001,
+      "log_loss": 0.0,
       "log_loss_ci95": [
-        -0.0003,
-        0.0001
-      ],
-      "brier": -0.0001,
-      "brier_ci95": [
         -0.0002,
-        0.0
+        0.0002
+      ],
+      "brier": 0.0,
+      "brier_ci95": [
+        -0.0001,
+        0.0001
       ]
     },
     "minute_15": {
-      "log_loss": 0.0177,
+      "log_loss": 0.026,
       "log_loss_ci95": [
-        -0.0629,
-        0.1051
+        -0.0644,
+        0.1248
       ],
-      "brier": 0.0062,
+      "brier": 0.008,
       "brier_ci95": [
-        -0.0462,
-        0.0612
+        -0.0489,
+        0.0673
       ]
     },
     "minute_45": {
-      "log_loss": -0.2252,
+      "log_loss": -0.2242,
       "log_loss_ci95": [
-        -0.3632,
-        -0.0765
+        -0.3759,
+        -0.0603
       ],
-      "brier": -0.1554,
+      "brier": -0.1566,
       "brier_ci95": [
-        -0.2433,
-        -0.063
+        -0.2511,
+        -0.0572
       ]
     },
     "minute_75": {
-      "log_loss": -0.4666,
+      "log_loss": -0.4613,
       "log_loss_ci95": [
-        -0.6494,
-        -0.2619
+        -0.6655,
+        -0.2352
       ],
-      "brier": -0.3038,
+      "brier": -0.303,
       "brier_ci95": [
-        -0.421,
-        -0.1741
+        -0.4303,
+        -0.1626
       ]
     }
   }

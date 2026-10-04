@@ -1,7 +1,6 @@
 "use client"
-// components/match/NarrativeCarousel.tsx
-// Detail panel first, 2-column spike grid below it.
-// The comments toggle in the detail panel shows real comments for the topic.
+// detail panel first, 2-column spike grid below; the comments toggle shows real
+// comments for the topic
 
 import { useState } from "react"
 import { useNarrativeStream } from "@/hooks/useNarrativeStream"
@@ -47,10 +46,8 @@ function seededPoints(seed: string, n = 8): number[] {
     return pts
 }
 
-// Deterministic pseudo-random walk, NOT real historical tick data — there's
-// no per-minute time series backing this signal, only the current severity/
-// source snapshot. <title> makes that discoverable on hover instead of the
-// sparkline silently reading as a real trend line next to genuine numbers.
+// deterministic pseudo-random walk, not real tick data: no per-minute series backs this
+// signal, only the current severity/source snapshot; <title> says so on hover
 function Sparkline({ seed, color }: { seed: string; color: string }) {
     const pts = seededPoints(seed)
     const w = 100, h = 26
@@ -78,9 +75,8 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
     const [commentsOpen, setCommentsOpen] = useState(false)
     const [selSource, setSelSource] = useState<string | null>(null)
 
-    // Tournament-wide "trending now": the most-discussed stories across all
-    // teams, sorted by how far above baseline each spike sits. The current
-    // match's teams are flagged with a marker.
+    // tournament-wide "trending now": most-discussed stories across all teams, sorted
+    // by lift over baseline; the current match's teams get a marker
     const matchTeams = new Set(
         [canonTeam(homeTeam), canonTeam(awayTeam)].filter(Boolean)
     )
@@ -89,7 +85,7 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
 
     const selected = trending.find(s => s.spike_id === selectedId) ?? trending[0] ?? null
 
-    // Default the source detail to the top driving source (never "stuck on mastodon").
+    // default the source detail to the top driving source
     const drivingDefault = selected
         ? (selected.source_names?.[0]
             ?? SOURCES.reduce((a, b) =>
@@ -128,11 +124,11 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
     return (
         <div>
 
-            {/* ── Detail panel — the selected/most-recent spike, stacked FIRST ── */}
+            {/* detail panel: the selected or most recent spike, first */}
             {selected && (
                 <div style={{ padding: "16px 14px", borderBottom: "1px solid var(--border-bright)" }}>
 
-                    {/* Narrative Arc, above everything else in this panel */}
+                    {/* narrative arc, top of the panel */}
                     <div style={{ marginBottom: 16 }}>
                         <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "none", letterSpacing: "normal", color: "var(--c-ai)", display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
                             <span style={{ width: 3, height: 10, background: "var(--c-ai)", borderRadius: 2, flexShrink: 0 }} />
@@ -181,7 +177,7 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
 
                     <p style={{ fontSize: ".76rem", color: "var(--text-2)", marginBottom: 10 }}>{selected.summary}</p>
 
-                    {/* Compact single-row source stats; driving sources get a ▲ marker. */}
+                    {/* single-row source stats; driving sources get a ▲ */}
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 10 }}>
                         {SOURCES.map(src => {
                             const val = selected.sources[src] ?? 0
@@ -204,10 +200,9 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
                         })}
                     </div>
 
-                    {/* Per-source detail — updates when a source button above is clicked.
-                        The number is real (severity/source data from the backend); the
-                        sparkline beside it is a seeded pseudo-random walk, not real
-                        historical tick data — labelled so it doesn't read as one. */}
+                    {/* per-source detail, follows the source buttons above; the
+                        number is real (backend severity/source data), the sparkline
+                        is a seeded pseudo-random walk, not tick data */}
                     <div style={{ marginBottom: 10 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "var(--font-mono)", fontSize: ".56rem", color: "var(--text-3)", marginBottom: 4 }}>
                             <span>{SRC_LABELS[activeSource]}</span>
@@ -230,7 +225,7 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
                         💬 {commentsOpen ? "Hide live comments" : "View live comments"}
                     </button>
 
-                    {/* Inline sliding carousel, directly beneath this button. */}
+                    {/* inline sliding carousel under this button */}
                     {commentsOpen && <CommentBubbles topic={selected.topic} />}
 
                     <div style={{ fontFamily: "var(--font-mono)", fontSize: ".56rem", color: "var(--text-3)", marginTop: 8 }}>
@@ -239,7 +234,7 @@ export function NarrativeCarousel({ homeTeam, awayTeam }: { homeTeam?: string; a
                 </div>
             )}
 
-            {/* ── 2-column grid of all spikes ── */}
+            {/* 2-column grid of all spikes */}
             <div style={{ padding: "12px 14px 14px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                     <span style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-3)" }}>

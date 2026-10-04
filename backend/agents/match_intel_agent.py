@@ -39,30 +39,24 @@ from api.schemas.schema import MatchState
 log = logging.getLogger(__name__)
 
 
-# ── Per-fixture state ─────────────────────────────────────────────────────
-
-
 @dataclass
 class MatchIntelState:
-    # Signatures of events already narrated: "elapsed:type:team_id"
+    # signatures of narrated events, "elapsed:type:team_id"
     covered_events: set = field(default_factory=set)
-    # Match minute of the last generated narrative (NOT real-world time)
+    # match minute of the last narrative (not wall-clock)
     last_narrated_minute: int = 0
-    # Hash of the context that produced the last narrative — dedup guard
+    # context hash behind the last narrative
     last_context_hash: str = ""
-    # Rolling momentum history for delta calculation
+    # recent momentum scores, for the delta term
     momentum_history: deque = field(default_factory=lambda: deque(maxlen=10))
-    # Wall-clock time of last narrative — 25s guard against rapid-fire
+    # wall-clock time of the last narrative
     last_narrative_time: float = 0.0
     MIN_INTERVAL_SECS: float = 25.0
-    # How many match minutes between periodic tactical narratives
+    # match minutes between periodic tactical narratives
     PERIODIC_INTERVAL_MINS: int = 5
 
 
 _intel_states: Dict[int, MatchIntelState] = {}
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────
 
 
 def _uncovered_key_events(
@@ -98,9 +92,6 @@ def _context_hash(state: MatchState, momentum: Optional[dict], extra: str = "") 
     return hashlib.md5(key.encode()).hexdigest()[:8]
 
 
-# ── Score ─────────────────────────────────────────────────────────────────
-
-
 def _score(
     state: MatchState,
     intel_state: MatchIntelState,
@@ -109,21 +100,21 @@ def _score(
     minute = state.elapsed or 0
     score = 0.0
 
-    # Key events since last narrated minute
+    # +0.40 per goal, +0.35 per red not yet narrated
     for ev in _uncovered_key_events(state, intel_state):
         if ev.type in ("goal", "own_goal", "penalty_goal"):
             score += 0.40
         elif ev.type in ("red", "yellow_red"):
             score += 0.35
 
-    # Momentum delta
+    # momentum change vs oldest history entry, capped at 0.30
     if momentum and len(intel_state.momentum_history) >= 2:
         delta = abs(
             momentum["home"]["momentum_score"] - intel_state.momentum_history[0]
         )
         score += min(0.30, delta * 2.5)
 
-    # xG divergence
+    # xG minus score: +0.20 above 0.8, +0.10 above 0.4
     h_div = abs(state.home_stats.expected_goals - state.home_score)
     a_div = abs(state.away_stats.expected_goals - state.away_score)
     max_div = max(h_div, a_div)
@@ -132,15 +123,15 @@ def _score(
     elif max_div > 0.4:
         score += 0.10
 
-    # Time sensitivity
+    # +0.10 at 40-46', 85-95' and extra time
     if (40 <= minute <= 46) or (85 <= minute <= 95) or state.status_short == "ET":
         score += 0.10
 
-    # Context hash guard — nothing has changed, nothing to say
+    # unchanged context hash scores 0
     if _context_hash(state, momentum) == intel_state.last_context_hash:
         return 0.0
 
-    # Rate limit — goals/reds always bypass, other types respect 25s gap
+    # goals and reds bypass the rate limit; others need MIN_INTERVAL_SECS since the last narrative
     has_key_event = bool(_uncovered_key_events(state, intel_state))
     if not has_key_event:
         if (
@@ -150,9 +141,6 @@ def _score(
             return 0.0
 
     return round(score, 3)
-
-
-# ── Narration type ────────────────────────────────────────────────────────
 
 
 def event_query(state: MatchState, ev) -> Tuple[str, Optional[str]]:
@@ -178,12 +166,12 @@ def _narration_type_and_query(
 ) -> Tuple[str, str]:
     minute = state.elapsed or 0
 
-    # Priority 1: uncovered key event
+    # key event not yet narrated
     key_evs = _uncovered_key_events(state, intel_state)
     if key_evs:
         return "event_reaction", event_query(state, key_evs[-1])[0]
 
-    # Priority 2: xG divergence
+    # xG divergence above 0.6
     h_div = abs(state.home_stats.expected_goals - state.home_score)
     a_div = abs(state.away_stats.expected_goals - state.away_score)
     if max(h_div, a_div) > 0.6:
@@ -200,7 +188,7 @@ def _narration_type_and_query(
         )
         return "xg_divergence", query
 
-    # Priority 3: tactical
+    # tactical
     if momentum:
         dom = (
             state.home_name
@@ -216,9 +204,6 @@ def _narration_type_and_query(
         f"WC tactical dominance high press minute {minute}"
     )
     return "tactical", query
-
-
-# ── Prompt / template ─────────────────────────────────────────────────────
 
 
 def _build_prompt(
@@ -290,7 +275,7 @@ def _build_template(
     score_line = f"{state.home_score}–{state.away_score}"
 
     if narration_type == "event_reaction":
-        # Find the most recent goal/card to describe
+        # latest goal or card
         for ev in reversed(state.events):
             if ev.type in ("goal", "own_goal", "penalty_goal"):
                 return (
@@ -348,9 +333,6 @@ def _build_template(
     )
 
 
-# ── Main entry point ──────────────────────────────────────────────────────
-
-
 async def update(
     state: MatchState,
     momentum: Optional[dict],
@@ -366,15 +348,14 @@ async def update(
     is_live = state.status_short in ("1H", "2H", "ET", "P")
     elapsed = state.elapsed or 0
 
-    # ── Decide whether to generate ────────────────────────────────────────
     score = _score(state, intel_state, momentum)
     has_key_event = bool(_uncovered_key_events(state, intel_state))
 
-    # Baseline: first narrative of this cycle once match is underway
+    # first narrative once the match is live and past minute 5
     force_baseline = is_live and intel_state.last_narrated_minute == 0 and elapsed >= 5
 
-    # Periodic: every PERIODIC_INTERVAL_MINS match minutes since last narrative.
-    # Uses MATCH minutes (not real seconds) so it fires correctly at any replay speed.
+    # every PERIODIC_INTERVAL_MINS match minutes since the last narrative; match
+    # minutes, so replay speed does not matter
     minutes_since = elapsed - intel_state.last_narrated_minute
     force_periodic = (
         is_live
@@ -390,12 +371,10 @@ async def update(
     ):
         return None
 
-    # ── Narration type + query ────────────────────────────────────────────
     narration_type, query_text = _narration_type_and_query(state, intel_state, momentum)
 
-    # ── Retrieve → generate → ground → retry/template (agents.intel_graph) ─
-    # LLM for key events (always), periodic (always), and high scores;
-    # template for low-score tactical fills.
+    # narrate() in agents.intel_graph: retrieve, generate, ground, retry, template fallback
+    # LLM for key events, periodic ticks and score > 0.50; template for other tactical fills
     use_llm = has_key_event or force_periodic or score > 0.50
     rag_collection = TACTICAL_PROFILES if narration_type == "tactical" else NARRATIVE_ARCS
     event_filter = None
@@ -421,15 +400,14 @@ async def update(
     if not narrative:
         return None
 
-    # ── Update state ──────────────────────────────────────────────────────
-    # Use elapsed as the extra seed for periodic ticks so hash is unique
-    # even with identical match state (prevents SSE diff-check suppression).
+    # periodic ticks add elapsed to the hash seed so identical match state still changes
+    # the hash (SSE diff check)
     extra = str(elapsed) if force_periodic else ""
     intel_state.last_context_hash = _context_hash(state, momentum, extra=extra)
     intel_state.last_narrative_time = time.time()
     intel_state.last_narrated_minute = elapsed
 
-    # Cover all events up to now — they won't re-trigger
+    # mark all events up to now as covered
     for ev in state.events:
         if ev.elapsed <= elapsed:
             intel_state.covered_events.add(f"{ev.elapsed}:{ev.type}:{ev.team_id}")
@@ -508,11 +486,11 @@ async def _win_prob_swing(state: MatchState, ev) -> Optional[dict]:
         wdl_after = inplay_wdl(pre_wdl, ev.elapsed, *after, extra=ev.extra)
 
         if ev.type in RED_TYPES:
-            # a red card hurts the carded player's team, benefiting the opponent
+            # red card: the carded team's opponent benefits
             beneficiary_is_home = ev.team_id != 1
         else:
-            # around() credits the opponent on an own goal, so the side whose
-            # score rose is the beneficiary in every case.
+            # around() credits the opponent on an own goal; the side whose score rose is
+            # the beneficiary
             beneficiary_is_home = after.home_score > before.home_score
 
         p_before = wdl_before[0] if beneficiary_is_home else wdl_before[2]

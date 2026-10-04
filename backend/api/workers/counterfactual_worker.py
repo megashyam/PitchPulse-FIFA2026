@@ -31,8 +31,8 @@ log = logging.getLogger(__name__)
 INTERVAL = 30.0
 
 PROCESSABLE = {"1H", "HT", "2H", "ET", "P", "FT", "AET", "PEN"}
-TTL_LIVE = 3_600  # 1 hour — match in progress
-TTL_COMPLETED = 2_592_000  # 30 days — match history
+TTL_LIVE = 3_600  # 1 hour: match in progress
+TTL_COMPLETED = 2_592_000  # 30 days: match history
 FEED_MAX = 19  # up to 20 entries (0-indexed ltrim)
 BACKFILL_PER_TICK = 1  # completed fixtures without a feed, per tick
 
@@ -66,7 +66,7 @@ async def _update_all(r: aioredis.Redis, loop) -> None:
     active = set(await r.smembers("matches:active"))
     completed_ids = await r.smembers("matches:completed")
 
-    # Release memory for fixtures that left the active set.
+    # drop fixtures that left the active set
     for stale in [fid for fid in list(_prev_elapsed) if fid not in active]:
         _prev_elapsed.pop(stale, None)
         _seeded.discard(stale)
@@ -75,12 +75,11 @@ async def _update_all(r: aioredis.Redis, loop) -> None:
         except (TypeError, ValueError):
             pass
 
-    # Backfill completed fixtures this worker never saw while active
-    # (same as intel_worker).
+    # backfill completed fixtures never seen while active (same as intel_worker)
     fixtures_to_process = set(active)
     backfill = 0
-    # A match with no trigger events never gets a feed; _backfilled keeps it
-    # from taking the slot every tick.
+    # a match with no trigger events never gets a feed; _backfilled keeps it from using
+    # the slot every tick
     for cid in sorted(set(completed_ids) - active - _backfilled):
         if backfill >= BACKFILL_PER_TICK:
             break
@@ -147,7 +146,7 @@ async def _update_fixture(r: aioredis.Redis, fid: str, loop) -> None:
 
     completed = state.status_short in COMPLETED_STATUSES
 
-    # Completed matches with nothing sim-worthy: don't even wake the agent.
+    # completed, nothing sim-worthy: skip the agent
     if completed and not any(ev.type in TRIGGER_TYPES for ev in state.events):
         return
 
@@ -156,8 +155,7 @@ async def _update_fixture(r: aioredis.Redis, fid: str, loop) -> None:
     current_elapsed = state.elapsed or 0
     prev_elapsed = _prev_elapsed.get(fid, current_elapsed)
 
-    # Replay restart detection (a no-op for live data, where elapsed only
-    # increases).
+    # replay restart detection (no-op for live data, where elapsed only increases)
     if prev_elapsed - current_elapsed > 10:
         log.info(
             f"[{fid}] Replay restart — elapsed dropped from {prev_elapsed}' "
@@ -172,14 +170,12 @@ async def _update_fixture(r: aioredis.Redis, fid: str, loop) -> None:
     ttl = _ttl_for(state.status_short)
 
     if completed:
-        # update() only ever surfaces ONE (the most-recently-added,
-        # regardless of minute) uncovered trigger per call and is
-        # MIN_GAP-throttled — for a completed match that means it could get
-        # stuck offering a low-priority yellow-card event forever while the
-        # real goals never get their turn, and even in the best case only
-        # one event backfills per ~30s tick before the fixture ages out of
-        # matches:active. update_all() exists precisely for this: analyse
-        # every uncovered trigger for the match in a single pass.
+        # update() surfaces one uncovered trigger per call (the latest added, any
+        # minute) and is MIN_GAP-throttled
+        # on a completed match it can offer a yellow card forever while goals wait, and
+        # backfills at most one event per ~30s tick before the fixture leaves
+        # matches:active
+        # update_all() analyses every uncovered trigger in one pass
         pinned = await results_before(r, state.kickoff_time)
         with llm_priority(Priority.BACKGROUND):
             results = await counterfactual_agent.update_all(state, loop, results=pinned)

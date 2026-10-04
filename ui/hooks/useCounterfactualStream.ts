@@ -1,17 +1,15 @@
 "use client"
-// hooks/useCounterfactualStream.ts
-// REST /feed for history plus SSE for new results, deduped by
-// (minute, type, team) signature. Completed matches (FT/AET/PEN) skip SSE.
+// REST /feed for history plus SSE for new results, deduped by (minute, type, team);
+// completed matches (FT/AET/PEN) skip SSE
 //
-// `calculating` is set by the "counterfactual_calculating" SSE event when a
-// simulation starts, and cleared when a matching result lands or after a
-// safety timeout.
+// calculating is set by the "counterfactual_calculating" SSE event when a simulation
+// starts, and cleared when a matching result lands or on timeout
 
 import { useEffect, useRef, useState } from "react"
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 const COMPLETED = new Set(["FT", "AET", "PEN"])
-const CALCULATING_TIMEOUT_MS = 40_000 // safety net — sims normally finish in ~8-16s
+const CALCULATING_TIMEOUT_MS = 40_000  // sims normally finish in ~8-16s
 
 interface CfChange {
     team: string
@@ -79,7 +77,7 @@ export function useCounterfactualStream(
         if (!fixtureId) return
         let mounted = true
 
-        // Initial REST fetch — this is the full history for the match so far
+        // initial REST fetch: full history so far
         fetch(`${API}/matches/${fixtureId}/counterfactual/feed`)
             .then(r => (r.ok ? r.json() : null))
             .then((data: { entries: CfResult[] } | null) => {
@@ -89,11 +87,10 @@ export function useCounterfactualStream(
             })
             .catch(() => { })
 
-        // Completed matches: no live updates left to stream — REST fetch above
-        // is the complete and final history. Skip SSE entirely.
+        // completed matches: the REST fetch is the final history, skip SSE
         if (isCompleted) return () => { mounted = false }
 
-        // Live/upcoming matches: subscribe for real-time updates
+        // live/upcoming matches: subscribe for updates
         const es = new EventSource(`${API}/matches/${fixtureId}/counterfactual/stream`)
 
         es.addEventListener("counterfactual_calculating", (e: MessageEvent) => {
@@ -108,7 +105,8 @@ export function useCounterfactualStream(
                     if (mounted) setCalculating(null)
                 }, CALCULATING_TIMEOUT_MS)
             } catch {
-                // ignore malformed calculating pings — worst case the loader never shows for this one
+                // ignore malformed calculating pings; worst case the loader does not
+                // show for one event
             }
         })
 
@@ -120,7 +118,7 @@ export function useCounterfactualStream(
                 setWaiting(false)
                 setError(null)
 
-                // Clear the loader once the matching (or any newer) result lands.
+                // clear the loader once the matching (or a newer) result lands
                 setCalculating(prev => {
                     if (!prev) return prev
                     if (sigOf(prev) === sigOf(result) || result.minute >= prev.minute) {

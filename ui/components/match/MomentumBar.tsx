@@ -1,5 +1,5 @@
 "use client"
-// components/match/MomentumBar.tsx — hero percentage numbers + 3-cell grid
+// hero percentage numbers + 3-cell grid
 
 import { useMomentumStream } from "@/hooks/useMomentumStream"
 import type { MomentumSnapshot } from "@/hooks/useMomentumStream"
@@ -24,7 +24,6 @@ function Display({ m }: { m: MomentumSnapshot }) {
     return (
         <div className="momentum-wrap">
 
-            {/* Header */}
             <div className="momentum-header" style={{ cursor: "pointer" }} onClick={toggle}>
                 <div>
                     <div className="momentum-title">Momentum</div>
@@ -44,7 +43,6 @@ function Display({ m }: { m: MomentumSnapshot }) {
             {open && (
                 <div style={{ animation: "card-expand .18s ease" }}>
 
-                    {/* Hero numbers */}
                     <div className="momentum-hero">
                         <div>
                             <div className="momentum-hero-pct home">
@@ -70,7 +68,6 @@ function Display({ m }: { m: MomentumSnapshot }) {
                         </div>
                     </div>
 
-                    {/* 3-cell breakdown */}
                     <div className="momentum-grid">
 
                         <div className="momentum-grid-cell">

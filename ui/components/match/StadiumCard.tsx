@@ -1,6 +1,5 @@
 "use client"
-// components/match/StadiumCard.tsx
-// WC 2026 venue info + live weather from Open-Meteo (free, no key needed)
+// WC 2026 venue info + live weather from Open-Meteo (free, no key)
 
 import { useEffect, useState } from "react"
 
@@ -14,7 +13,7 @@ interface StadiumInfo {
     lon: number
 }
 
-// Complete WC 2026 stadium database
+// WC 2026 stadium database
 const STADIUMS: Record<string, StadiumInfo> = {
     "MetLife Stadium": { fullName: "MetLife Stadium", city: "East Rutherford, NJ", country: "USA", capacity: 82500, surface: "Grass", lat: 40.8135, lon: -74.0745 },
     "AT&T Stadium": { fullName: "AT&T Stadium", city: "Arlington, TX", country: "USA", capacity: 80000, surface: "FieldTurf", lat: 32.7473, lon: -97.0945 },
@@ -36,9 +35,9 @@ const STADIUMS: Record<string, StadiumInfo> = {
 
 function findStadium(venue: string): StadiumInfo | null {
     if (!venue) return null
-    // Exact match
+    // exact match
     if (STADIUMS[venue]) return STADIUMS[venue]
-    // Partial match
+    // partial match
     const lower = venue.toLowerCase()
     for (const [key, info] of Object.entries(STADIUMS)) {
         if (lower.includes(key.toLowerCase()) || key.toLowerCase().includes(lower))
@@ -114,7 +113,6 @@ export function StadiumCard({ venue }: Props) {
             overflow: "hidden"
         }}>
 
-            {/* Header */}
             <div style={{ padding: "16px", borderBottom: "1px solid var(--glass-border-inner)" }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                     <div>
@@ -131,7 +129,6 @@ export function StadiumCard({ venue }: Props) {
                 </div>
             </div>
 
-            {/* Details */}
             <div style={{ padding: "16px" }}>
 
                 <div style={{

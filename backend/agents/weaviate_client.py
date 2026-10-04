@@ -51,11 +51,11 @@ def rest_headers() -> dict:
         h["Authorization"] = f"Bearer {WEAVIATE_API_KEY}"
     return h
 
-# ── Collection registry ───────────────────────────────────────────────────
-#   NarrativeArcs    — historical WC storylines (goals, red cards, momentum).
-#                      Used by event_reaction / xg_divergence narration + briefings.
-#   TacticalProfiles — per-team-per-match pressing fingerprints (PPDA per zone).
-#                      Used by tactical narration + the /tactical route.
+# collections
+#   NarrativeArcs     historical WC storylines (goals, red cards, momentum); used by
+# event_reaction / xg_divergence narration and briefings
+#   TacticalProfiles  per-team-per-match pressing fingerprints (PPDA per zone); used by
+# tactical narration and /tactical
 NARRATIVE_ARCS = "NarrativeArcs"
 TACTICAL_PROFILES = "TacticalProfiles"
 
@@ -138,8 +138,6 @@ class WeaviateClient:
         self._ready_at = now
         return self._ready
 
-    # ── Schema management ─────────────────────────────────────────────────
-
     def ensure_collections(self) -> None:
         """Create any missing collections. Safe to call on every startup."""
         if not self._client:
@@ -160,8 +158,6 @@ class WeaviateClient:
             vector_config=wvc.config.Configure.Vectors.self_provided(name=VECTOR_NAME),
         )
         log.info(f"Created Weaviate collection '{name}'")
-
-    # ── Counts ────────────────────────────────────────────────────────────
 
     def get_count(self, collection: str = DEFAULT_COLLECTION) -> int:
         if collection not in _SCHEMAS:
@@ -185,8 +181,6 @@ class WeaviateClient:
     def counts(self) -> dict:
         """All collection counts — used by /health and debug routes."""
         return {name: self.get_count(name) for name in _SCHEMAS}
-
-    # ── Search ────────────────────────────────────────────────────────────
 
     def hybrid_search(
         self,
@@ -253,7 +247,7 @@ class WeaviateClient:
             log.warning(f"Weaviate search error [{collection}]: {exc}")
             return []
 
-    # ── Insert (REST path — bypasses Python client version quirks) ─────────
+    # insert via REST, bypassing Python client version differences
 
     def insert_document(self, collection: str, properties: dict, vector: List[float]) -> bool:
         """Generic insert. Caller supplies the full properties dict."""

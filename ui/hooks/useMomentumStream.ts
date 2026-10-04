@@ -1,12 +1,9 @@
 "use client"
-// hooks/useMomentumStream.ts
-// SSE subscription for live momentum data.
-// Mirrors the pattern of useMatchStream.ts — REST fetch for immediate
-// display then SSE for live updates every ~30s.
+// SSE subscription for live momentum data; same pattern as useMatchStream.ts: REST
+// fetch first, then SSE updates every ~30s
 //
-// A 200 {"status": "not_started"} from the REST endpoint is normalized to
-// `momentum: null`. No SSE stream is opened before kickoff; pass
-// `statusShort` so the hook knows to wait.
+// a 200 {"status": "not_started"} from REST becomes momentum: null; no SSE stream is
+// opened before kickoff, so pass statusShort
 
 import { useEffect, useState } from "react"
 
@@ -50,9 +47,8 @@ export function useMomentumStream(
     const [isWaiting, setWaiting] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
-    // If status isn't known yet, don't assume NS — fetch once regardless so
-    // a live/completed match with real data doesn't wait on a status prop
-    // that hasn't arrived from a parent yet.
+    // status unknown: fetch once anyway, so a live/completed match does not wait on a
+    // status prop that has not arrived
     const knownNotLive = statusShort !== undefined && !LIVE.has(statusShort)
 
     useEffect(() => {
@@ -66,9 +62,8 @@ export function useMomentumStream(
             })
             .catch(() => { })
 
-        // Nothing will ever arrive on the stream for a match that isn't
-        // live — skip opening the connection entirely rather than leaving
-        // an idle EventSource sitting on the "waiting" heartbeat.
+        // nothing arrives on the stream for a match that is not live; skip opening the
+        // connection
         if (knownNotLive) return () => { mounted = false }
 
         const es = new EventSource(`${API}/matches/${fixtureId}/momentum/stream`)

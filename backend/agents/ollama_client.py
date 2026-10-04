@@ -27,26 +27,24 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral:7b-instruct-q4_K_M")
 OLLAMA_TIMEOUT = 15.0
 
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
-# Tried in order if GROQ_MODEL returns 429; each Groq model has its own
-# rate-limit bucket.
+# fallback order on a GROQ_MODEL 429; each Groq model has its own rate-limit bucket
 GROQ_FALLBACK_MODELS = [
     m.strip()
     for m in os.getenv("GROQ_FALLBACK_MODELS", "llama-3.3-70b-versatile").split(",")
     if m.strip()
 ]
-# Note: a reasoning model here (e.g. qwen/qwen3-*) will burn MAX_TOKENS on a
-# <think> block and often return empty content at this short a budget —
-# needs `reasoning_format`/`reasoning_effort` handling in _groq() if reused.
+# a reasoning model (e.g. qwen/qwen3-*) spends MAX_TOKENS on a <think> block and returns
+# empty content;
+# _groq() needs reasoning_format/reasoning_effort handling to use one
 GROQ_BASE = "https://api.groq.com/openai/v1"
 
 MAX_TOKENS = 150  # ~2-3 sentences of output
 
 _THINK_RE = re.compile(r"<think>.*?(</think>|$)", re.DOTALL | re.IGNORECASE)
 
-# Ollama runs one generation at a time on this host; Groq allows a few
-# concurrent requests but ~30 per minute per model. Both are priority gates
-# (agents/llm_queue.py), so live narration jumps the backfill queue. A
-# caller's timeout clock starts only once it holds a slot.
+# Ollama runs one generation at a time; Groq allows a few concurrent requests, ~30/min per model
+# both are priority gates (agents/llm_queue.py): live narration goes ahead of backfill
+# a caller's timeout starts once it holds a slot
 OLLAMA_GATE = PriorityGate("ollama", int(os.getenv("OLLAMA_CONCURRENCY", "1")))
 GROQ_GATE = PriorityGate("groq", int(os.getenv("GROQ_CONCURRENCY", "2")))
 _groq_pacer = Pacer(float(os.getenv("GROQ_MIN_INTERVAL_S", "2.0")))
@@ -111,23 +109,15 @@ async def _ollama(
         "model": OLLAMA_MODEL,
         "prompt": prompt,
         "stream": False,
-        # Keeps the model resident in VRAM between calls — without this,
-        # Ollama's default 5-min idle unload means any gap between narration
-        # calls pays a multi-second reload penalty on top of generation time.
+        # Ollama unloads idle models after 5 min; keep_alive holds it for 30
         "keep_alive": "30m",
         "options": {
             "num_predict": max_tokens,
             "temperature": 0.65,
             "top_p": 0.9,
-            # "\n\n" as a stop sequence keeps single-paragraph prompts (the
-            # common case) from drifting into a second paragraph once they've
-            # said what they need to — a mechanical backstop since small
-            # models don't reliably self-limit on a soft length instruction.
+            # stops at the first blank line; small models do not follow length instructions
             "stop": ["\n\n", "[/INST]", "[INST]"],
-            # Prompt + response must both fit in this window — kept well
-            # below the model's native 4096 for fast prompt eval, but sized
-            # to the caller's actual max_tokens budget so a longer requested
-            # response doesn't evict earlier context (see num_ctx note above).
+            # context window for prompt + response; below the native 4096 for faster prompt eval
             "num_ctx": num_ctx,
         },
     }

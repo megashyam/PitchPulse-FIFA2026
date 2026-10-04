@@ -1,12 +1,10 @@
 "use client"
-// components/match/RefereeCard.tsx
-//
-// Actual cards are counted from the match's yellow/red events on every update.
-// Avg cards/match and press tolerance are static, labelled sample values.
+// actual cards counted from the match's yellow/red events on every update; avg
+// cards/match and press tolerance are static sample values
 
 import type { MatchState } from "@/types/match"
 
-// Card event types from schema.py
+// card event types from schema.py
 const CARD_TYPES = new Set(["yellow", "red", "yellow_red"])
 
 interface Props { state: MatchState }
@@ -14,10 +12,10 @@ interface Props { state: MatchState }
 export function RefereeCard({ state }: Props) {
     if (!state.referee || state.referee.trim() === "") return null
 
-    // Count actual cards from the match events
+    // count actual cards from the match events
     const actualCards = state.events.filter(ev => CARD_TYPES.has(ev.type)).length
 
-    // Expected baseline (static)
+    // expected baseline (static)
     const expectedCards = 3.8
 
     const refName = state.referee.trim()
@@ -32,7 +30,7 @@ export function RefereeCard({ state }: Props) {
             <div className="ref-name">{refName}</div>
             <div className="ref-sub">Illustrative baseline · not this referee's actual history</div>
 
-            {/* Static sample values, the same for every referee. */}
+            {/* static sample values, the same for every referee */}
             <div className="ref-row">
                 <span className="ref-row-label">Avg cards / match (sample)</span>
                 <span className="ref-row-val">3.2</span>
@@ -46,7 +44,7 @@ export function RefereeCard({ state }: Props) {
                 </span>
             </div>
 
-            {/* Dynamic — updates on every SSE event via state.events count */}
+            {/* updates on every SSE event via state.events count */}
             <div className="ref-row">
                 <span className="ref-row-label">Expected → actual</span>
                 <span className="ref-row-val">

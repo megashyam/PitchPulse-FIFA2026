@@ -61,9 +61,6 @@ def _point(p: float) -> dict:
     return {"p": round(p, 4), "ci_lo": round(p, 4), "ci_hi": round(p, 4)}
 
 
-# ── Per-match pre-tournament prediction ────────────────────────────────────
-
-
 @router.get("/{fixture_id}/prediction")
 async def get_match_prediction(fixture_id: str, request: Request):
     """Pre-match W/D/L (market odds or Elo) plus tournament-path odds."""
@@ -105,9 +102,6 @@ async def get_match_prediction(fixture_id: str, request: Request):
         "home_tournament": home_tournament,
         "away_tournament": away_tournament,
     }
-
-
-# ── In-play live probability ──────────────────────────────────────────────
 
 
 @router.get("/{fixture_id}/live-prob")
@@ -158,9 +152,6 @@ async def get_live_prob(fixture_id: str, request: Request):
         "home_advance": home_advance,
         "pre_match_source": source,
     }
-
-
-# ── Counterfactual narrator ────────────────────────────────────────────────
 
 
 async def _pending_response(r, fixture_id: str) -> dict:
@@ -240,7 +231,7 @@ async def counterfactual_stream(fixture_id: str, request: Request):
                     continue
 
                 if payload.get("status") == "calculating":
-                    # Own payload IS the info — no key to re-fetch.
+                    # own payload, no key to re-fetch
                     yield {
                         "event": "counterfactual_calculating",
                         "data": json.dumps(payload),

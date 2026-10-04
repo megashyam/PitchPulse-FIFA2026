@@ -1,5 +1,5 @@
 "use client"
-// app/page.tsx — grid of match cards, loaded with one GET /matches/summary call
+// grid of match cards, loaded with one GET /matches/summary call
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
@@ -49,7 +49,7 @@ export default function HomePage() {
   useEffect(() => {
     async function load() {
       try {
-        // Single bulk call for every fixture.
+        // one bulk call for all fixtures
         const r = await fetch(`${API}/matches/summary`)
         const { fixtures: raw } = await r.json()
         const details: (Fixture | null)[] = (raw || []).map(toFixture)
@@ -82,7 +82,6 @@ export default function HomePage() {
   return (
     <div className="v4-home">
 
-      {/* Hero */}
       <div className="v4-home-hero">
         <div className="v4-hero-eyebrow">FIFA World Cup 2026 · USA · Canada · Mexico</div>
         <div className="v4-hero-title">Match Center</div>
@@ -92,7 +91,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Filter tabs */}
       <div className="v4-home-tabs">
         <button className={`v4-home-tab${filter === "all" ? " active" : ""}`} onClick={() => setFilter("all")}>All Matches</button>
         <button className={`v4-home-tab${filter === "live" ? " active" : ""}`} onClick={() => setFilter("live")}>

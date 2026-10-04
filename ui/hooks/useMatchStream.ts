@@ -1,10 +1,8 @@
 "use client"
-// hooks/useMatchStream.ts
-//
-// Opens an SSE connection to GET /matches/{fixtureId}/stream
-// On each "match_update" event, replaces local state with the new MatchState.
-// On "waiting" event, sets isWaiting=true so the UI can show a loading state.
-// Reconnects automatically — EventSource does this natively.
+// SSE connection to GET /matches/{fixtureId}/stream
+// "match_update" replaces local state with the new MatchState; "waiting" sets
+// isWaiting=true for a loading state
+// reconnects automatically (EventSource does this natively)
 
 import { useEffect, useState } from "react"
 import type { MatchState } from "@/types/match"
@@ -48,12 +46,12 @@ export function useMatchStream(fixtureId: string): UseMatchStreamResult {
         const data = JSON.parse(e.data)
         setError(data.message)
       } catch {
-        // SSE connection error — EventSource will retry automatically
+        // SSE connection error: EventSource retries automatically
       }
     })
 
-    // Native EventSource error (connection drop) — don't set error state,
-    // let EventSource handle the reconnect silently
+    // native EventSource error (connection drop): no error state, EventSource
+    // reconnects silently
     es.onerror = () => { }
 
     return () => es.close()

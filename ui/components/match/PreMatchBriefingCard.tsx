@@ -1,8 +1,6 @@
 "use client"
-// components/match/PreMatchBriefingCard.tsx
-// Polls /briefing/trigger every 60s; the backend generates a new briefing
-// only when match status changes, so most polls are no-ops. Renders the
-// full feed, newest first.
+// polls /briefing/trigger every 60s; the backend generates a briefing only when match
+// status changes, so most polls are no-ops; renders the full feed, newest first
 
 import { useEffect, useState, useRef } from "react"
 import { triggerHeaders } from "@/lib/api"

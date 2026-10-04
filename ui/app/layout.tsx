@@ -1,4 +1,3 @@
-// app/layout.tsx
 // data-theme is set only by the pre-hydration init script, never by React.
 
 import type { Metadata } from "next"

@@ -1,26 +1,22 @@
-# ── How to use ─────────────────────────────────────────────────────────────
+# Real WC 2026 match data from ESPN's public API, with the committed snapshot in
+# backend/data/wc2026 as the permanent fallback (see api/main_hybrid.py and
+# api/workers/match_producer.py). No paid API key is required. Ports bind to 127.0.0.1
+# only and every service needs a secret; put a reverse proxy in front before exposing
+# anything.
 #
-# Real WC 2026 match data from ESPN's public API, with the committed
-# snapshot in backend/data/wc2026 as the permanent fallback — see
-# api/main_hybrid.py and api/workers/match_producer.py. No paid API key is
-# required. Ports bind to 127.0.0.1 only and every service needs a secret;
-# put a reverse proxy in front before exposing anything.
-#
-# Required env vars (compose refuses to start without them — see .env.example):
+# Required env vars (compose refuses to start without them, see .env.example):
 #   REDIS_PASSWORD, WEAVIATE_API_KEY, NEO4J_PASSWORD, GRAFANA_ADMIN_PASSWORD
 #
 #   GROQ_API_KEY=gsk_... docker-compose up --build
 #
 # Optional env vars:
-#   TRIGGER_TOKEN     — shared secret for the /trigger debug endpoints. If you
-#                       set this, also set NEXT_PUBLIC_TRIGGER_TOKEN to the
-#                       same value in ui/.env.local — the UI's briefing and
-#                       narrative "trigger" buttons send it as X-Trigger-Token,
-#                       and 401 silently otherwise (the ui/ Next.js app isn't
-#                       in this compose file; run it separately via `npm run dev`).
-#   ODDS_API_KEY      — enables market odds via The Odds API (else Elo fallback)
-#   ESPN_LEAGUE / ESPN_SEASON — feed competition (default fifa.world / 2026)
-# ────────────────────────────────────────────────────────────────────────────
+#   TRIGGER_TOKEN: shared secret for the /trigger debug endpoints. If set, also set
+#   NEXT_PUBLIC_TRIGGER_TOKEN to the same value in ui/.env.local; the UI's briefing and
+#   narrative trigger buttons send it as X-Trigger-Token and get a silent 401
+#   otherwise. The ui/ Next.js app is not in this compose file; run it separately with
+#   `npm run dev`.
+#   ODDS_API_KEY: enables market odds via The Odds API (else Elo fallback)
+#   ESPN_LEAGUE / ESPN_SEASON: feed competition (default fifa.world / 2026)
 
 services:
 

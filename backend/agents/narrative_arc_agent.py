@@ -114,7 +114,7 @@ def _build_prompt(spike: NarrativeSpike, rag_docs: List[str]) -> str:
         f"Stayed near baseline: {', '.join(sorted(quiet)) or 'none — all four moved together'}."
     )
 
-    # Disclose mock-data provenance so synthetic numbers aren't narrated as real.
+    # states when the data is mock
     mock_note = ""
     if spike.data_sources:
         mock_sources = [s for s, kind in spike.data_sources.items() if kind == "mock"]
@@ -199,7 +199,7 @@ def template_arc(spike: NarrativeSpike) -> str:
     if spike.data_sources and any(v == "mock" for v in spike.data_sources.values()):
         mock_note = " (signal is partly simulated — live source unavailable)"
 
-    # Lead with the loudest concrete number available.
+    # loudest concrete number first
     lead_parts = []
     if s.get("mastodon", 0) > 6:
         lead_parts.append(f"{s['mastodon']:.0f} Mastodon posts/hr")
@@ -211,7 +211,7 @@ def template_arc(spike: NarrativeSpike) -> str:
         lead_parts.append(f"{s['wikipedia']:.0f} Wikipedia edits/hr")
     lead = lead_parts[0] if lead_parts else "an elevated multi-source signal"
 
-    # Shape-based reasoning — same logic the LLM prompt is instructed to use.
+    # shape-based rules, same as the LLM prompt
     if len(driving) == 1:
         shape_sentence = (
             f"The move is concentrated entirely on {driving[0]}, with "

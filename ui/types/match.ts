@@ -1,5 +1,4 @@
-// types/match.ts
-// Mirrors Python MatchState / TeamStats / MatchEvent from schemas/schema.py
+// mirrors MatchState / TeamStats / MatchEvent from backend schemas/schema.py
 
 export interface TeamStats {
   possession: number

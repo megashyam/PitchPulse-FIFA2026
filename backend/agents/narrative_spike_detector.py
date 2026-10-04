@@ -45,7 +45,7 @@ from ml.executors import IO_EXECUTOR
 log = logging.getLogger(__name__)
 
 HTTP_TIMEOUT = 8.0
-# Mastodon search is slower than the other sources under normal load.
+# Mastodon search is slower than the other sources
 MASTODON_TIMEOUT = 15.0
 
 MASTODON_WINDOW_S = 30 * 60

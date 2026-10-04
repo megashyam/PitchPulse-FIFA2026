@@ -27,7 +27,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
-      # Hard gate: the backend is ruff-clean, so any new lint error fails CI.
+      # the backend is ruff-clean; any new lint error fails CI
       - name: Lint (ruff)
         run: ruff check .
 

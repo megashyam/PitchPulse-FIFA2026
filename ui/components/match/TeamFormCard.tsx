@@ -1,6 +1,5 @@
 "use client"
-// components/match/TeamFormCard.tsx
-// Last 5 results for both teams — shown below the lineup
+// last 5 results for both teams, shown below the lineup
 
 import { useEffect, useState } from "react"
 import { Flag } from "@/components/Flag"
@@ -78,7 +77,6 @@ export function TeamFormCard({ fixtureId, homeTeam, awayTeam }: Props) {
             background: "var(--glass-bg-inner)", border: "1px solid var(--glass-border-inner)",
             borderRadius: "var(--r-md)", overflow: "hidden"
         }}>
-            {/* Header */}
             <div style={{
                 padding: "16px", borderBottom: "1px solid var(--glass-border-inner)",
                 display: "flex", alignItems: "center", gap: 6
@@ -92,10 +90,8 @@ export function TeamFormCard({ fixtureId, homeTeam, awayTeam }: Props) {
                 </span>
             </div>
 
-            {/* Two columns */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
 
-                {/* Home team */}
                 <div style={{ padding: "16px", borderRight: "1px solid var(--glass-border-inner)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
                         <Flag team={homeTeam} size="sm" />
@@ -114,7 +110,6 @@ export function TeamFormCard({ fixtureId, homeTeam, awayTeam }: Props) {
                     )}
                 </div>
 
-                {/* Away team */}
                 <div style={{ padding: "16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
                         <Flag team={awayTeam} size="sm" />

@@ -1,6 +1,4 @@
 "use client"
-// components/match/CounterfactualPanel.tsx
-//
 // Completed matches skip SSE and show the history fetched once via REST.
 // A loading card is prepended while the backend simulates a new event
 // (`calculating`) and disappears when the result streams in.
@@ -28,15 +26,14 @@ export function CounterfactualPanel({ fixtureId }: Props) {
     const currentElapsed = state?.elapsed ?? 0
     const isCompleted = ["FT", "AET", "PEN"].includes(state?.status_short ?? "")
 
-    // For live matches, filter out results from a stale future (replay guard).
-    // For completed matches, show the full history — every minute is valid.
+    // live matches: drop results from a stale future (replay guard)
+    // completed matches: show the full history
     const freshResults = isCompleted
         ? results
         : results.filter(r => r.minute <= currentElapsed + 5)
 
-    // Don't show the loader if a matching result already arrived in this
-    // render (guards a narrow race between the SSE result event and the
-    // calculating-clear logic in the hook).
+    // no loader if a matching result already arrived in this render (race between the
+    // SSE result event and the calculating-clear logic in the hook)
     const showLoader = !!calculating && !freshResults.some(
         r => r.minute === calculating.minute
             && r.event_type === calculating.event_type
@@ -48,7 +45,6 @@ export function CounterfactualPanel({ fixtureId }: Props) {
     return (
         <div style={{ display: "flex", flexDirection: "column" }}>
 
-            {/* Description */}
             <div style={{ padding: "18px 20px 14px", borderBottom: "1px solid var(--border)" }}>
                 <div style={{ fontSize: ".8rem", fontWeight: 600, color: "var(--text-1)", marginBottom: 4 }}>
                     Counterfactual Analysis
@@ -112,8 +108,7 @@ function CfLoadingCard({ calculating }: { calculating: CfCalculating }) {
                 </div>
             </div>
 
-            {/* Scoped keyframes — kept local to this component so no global
-                stylesheet edit is needed for this one loading state. */}
+            {/* scoped keyframes for this loading state */}
             <style jsx>{`
                 .cf-loading-spinner {
                     display: inline-block;

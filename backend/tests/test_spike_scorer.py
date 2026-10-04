@@ -155,9 +155,6 @@ def test_state_round_trip():
     assert a.z == b.z
 
 
-# ------------------------------------------------------------ signal helpers
-
-
 def test_window_rate_counts_and_saturation():
     now = 10_000.0
     ts = [now - 60 * i for i in range(10)] + [now - 4000]
@@ -171,9 +168,6 @@ def test_trends_lift_is_scale_invariant():
     assert ss.trends_lift(series) == pytest.approx(3.0)
     assert ss.trends_lift([v * 1.7 for v in series]) == pytest.approx(3.0)
     assert ss.trends_lift([0] * 55 + [100] * 5) is None  # sparse baseline
-
-
-# ------------------------------------------------------------ live sources
 
 
 def _iso(ts):
@@ -268,9 +262,6 @@ def test_trends_plan_limits_fetches():
     src._cache = {"A": (1.0, 0.0)}
     src.plan(["A", "B", "C", "D"], now=10_000.0)
     assert len(src._due) == nsd.TRENDS_PER_TICK
-
-
-# ------------------------------------------------------------ detector replay
 
 
 def test_detector_replay_emits_injected_spike_and_state_round_trips():

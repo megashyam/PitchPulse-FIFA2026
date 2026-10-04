@@ -1,5 +1,4 @@
 "use client"
-// app/narrative/page.tsx
 // Spike cards show a LIVE/UPCOMING badge when a spike carries fixture fields.
 
 import { useEffect, useState } from "react"
@@ -54,10 +53,9 @@ export default function NarrativePage() {
     const [triggering, setTriggering] = useState(false)
     const [trigMsg, setTrigMsg] = useState<string | null>(null)
 
-    // On-demand arc fetch: the backend generates arcs only for the top
-    // trending topics (ARC_TOP_N in api/workers/narrative_worker.py).
-    // Selecting a spike without an arc fetches one by topic and shows a
-    // loading state meanwhile.
+    // on-demand arc fetch: the backend generates arcs only for the top trending topics
+    // (ARC_TOP_N in api/workers/narrative_worker.py); selecting a spike without an arc
+    // fetches one by topic, with a loading state
     const [arcCache, setArcCache] = useState<Record<string, string>>({})
     const [arcLoadingTopic, setArcLoadingTopic] = useState<string | null>(null)
 
@@ -95,7 +93,7 @@ export default function NarrativePage() {
     return (
         <div className="ip-page">
 
-            {/* ── Header ── */}
+            {/* header */}
             <div className="ip-header">
                 <div className="ip-header-left">
                     <div className="ip-eyebrow">Robust z-score · 2-source corroboration · 60s cadence · sorted by live fixture</div>
@@ -119,10 +117,7 @@ export default function NarrativePage() {
                 </div>
             </div>
 
-            {/* ══════════════════════════════════════════════════
-                Narrative Arc — first thing shown, above the
-                source-strip KPI cards.
-                ══════════════════════════════════════════════════ */}
+            {/* narrative arc: first thing shown, above the source KPI cards */}
             {selected && (
                 <div className="narrative-arc-top">
                     <div style={{ fontFamily: "var(--font-mono)", fontSize: ".6rem", textTransform: "none", letterSpacing: "normal", color: "var(--c-ai)", display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -191,7 +186,7 @@ export default function NarrativePage() {
                         )}
                     </div>
 
-                    {/* Driving sources */}
+                    {/* driving sources */}
                     <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
                         <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-3)" }}>
                             Driving sources
@@ -214,7 +209,7 @@ export default function NarrativePage() {
                         })}
                     </div>
 
-                    {/* Detection info */}
+                    {/* detection info */}
                     <div style={{ marginTop: 14, padding: "12px", background: "var(--bg-3)", borderRadius: "var(--r-md)", border: "1px solid var(--border)" }}>
                         <div style={{ fontFamily: "var(--font-mono)", fontSize: ".56rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-3)", marginBottom: 8 }}>
                             Detection info
@@ -234,7 +229,7 @@ export default function NarrativePage() {
                 </div>
             )}
 
-            {/* ── Source KPI strip — compressed, sits below the arc ── */}
+            {/* source KPI strip, below the arc */}
             <div className="source-strip source-strip-compact">
                 {SOURCES.map(src => {
                     const cfg = cfgFor(src)
@@ -263,7 +258,7 @@ export default function NarrativePage() {
                 })}
             </div>
 
-            {/* ── Empty / warming state ── */}
+            {/* empty / warming state */}
             {(isWarming || (isWaiting && spikes.length === 0)) && (
                 <div className="nar-empty" style={{ minHeight: 260 }}>
                     <div className="nar-empty-icon">📡</div>
@@ -283,7 +278,7 @@ export default function NarrativePage() {
 
             {spikes.length > 0 && (<>
 
-                {/* ── Dense adaptive spike grid ── */}
+                {/* spike grid */}
                 <div className="spike-grid-section">
                     <div className="spike-grid-header">
                         <div className="spike-grid-title">
@@ -353,7 +348,7 @@ export default function NarrativePage() {
                     </div>
                 </div>
 
-                {/* ── Live comment bubbles for the selected topic ── */}
+                {/* live comment bubbles for the selected topic */}
                 {selected && (
                     <div style={{ padding: "0 0 4px" }}>
                         <div style={{
@@ -367,7 +362,7 @@ export default function NarrativePage() {
                     </div>
                 )}
 
-                {/* ── Signal detail — left column only (arc is at top) ── */}
+                {/* signal detail, left column only (arc is at the top) */}
                 {selected && (
                     <div style={{ padding: "16px 18px", borderTop: "1px solid var(--border-bright)" }}>
                         <div className="spike-detail-topic-row">
@@ -397,7 +392,7 @@ export default function NarrativePage() {
                     </div>
                 )}
 
-                {/* Methodology */}
+                {/* methodology */}
                 <div className="predict-method" style={{ margin: "16px 18px 0" }}>
                     <strong>Methodology —</strong> Per source, a one-sided robust z-score (median/MAD) of log rate against its own 3-hour live baseline. A topic alerts when ≥2 live sources are ≥3σ above baseline, or one is ≥6σ; drops never alert and mock values are never scored. Results sorted so topics tied to a currently-live fixture rank first, upcoming-kickoff topics next, then severity within each tier. Spikes trigger RAG over NarrativeArcs → LLM synthesis (local Ollama, Groq fallback) → arc stored back into Weaviate. One alert per surge episode per topic.
                 </div>

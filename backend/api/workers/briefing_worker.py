@@ -82,8 +82,8 @@ async def _maybe_brief(r: aioredis.Redis, fid: str) -> None:
     if delta < timedelta(0) or delta > KICKOFF_WINDOW:
         return  # already kicked off, or too far out
 
-    # Same milestone gate as the route: if an NS briefing was already
-    # generated (by the route OR a previous worker pass), don't regenerate.
+    # same milestone gate as the route: skip if an NS briefing already exists (route or
+    # earlier worker pass)
     last_status = await r.get(f"match:{fid}:briefing:last_status")
     if last_status == "NS":
         return

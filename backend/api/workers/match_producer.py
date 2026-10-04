@@ -63,9 +63,6 @@ MATCH_SPAN_S = 3 * 3600  # kickoff to final whistle, incl. ET and pens
 DETAIL_TTL = 12 * 3600
 
 
-# ── Redis persistence ──────────────────────────────────────────────────────
-
-
 async def _worker_visible(
     r: aioredis.Redis, fid: int, status: str, kickoff: Optional[datetime] = None
 ) -> bool:
@@ -124,9 +121,6 @@ async def expire_stale(r: aioredis.Redis, seen_ids: set[int]) -> None:
                 known = False
             if not known:
                 await r.srem(set_name, fid_str)
-
-
-# ── State assembly ─────────────────────────────────────────────────────────
 
 
 def build_state(f: Fixture, detail: Optional[MatchDetail]) -> MatchState:

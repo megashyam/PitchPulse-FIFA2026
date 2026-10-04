@@ -1,5 +1,5 @@
 "use client"
-// components/Flag.tsx — image flag with letter fallback
+// image flag with letter fallback
 import { flagUrl } from "@/lib/flag"
 
 interface Props { team: string; size?: "sm" | "md" | "lg" | "xl" }

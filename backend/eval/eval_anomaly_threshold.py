@@ -75,9 +75,6 @@ class TopicDay:
     events: List[Event] = field(default_factory=list)
 
 
-# ---------------------------------------------------------------- simulation
-
-
 def _schedule(rng) -> List[Event]:
     slots = list(rng.permutation(DAY // SLOT))
     # slow rise takes 3 contiguous slots
@@ -186,9 +183,6 @@ def simulate(seed: int) -> TopicDay:
     return day
 
 
-# ---------------------------------------------------------------- detectors
-
-
 def run_detector(
     day: TopicDay, z_corrob: float, z_solo: float, sources: Sequence[str] = SOURCES
 ) -> List[int]:
@@ -214,9 +208,6 @@ DETECTORS: Dict[str, Callable[[float], dict]] = {
         for s in SOURCES
     },
 }
-
-
-# ---------------------------------------------------------------- metrics
 
 
 def wilson(k: int, n: int, z: float = 1.96) -> List[Optional[float]]:
@@ -310,9 +301,6 @@ def recall_by_bucket(per_day: List[dict]) -> dict:
 
 def evaluate(days: List[TopicDay], kwargs: dict) -> List[dict]:
     return [score_day(d, run_detector(d, **kwargs)) for d in days]
-
-
-# ---------------------------------------------------------------- main
 
 
 def _row(label: str, m: dict) -> None:

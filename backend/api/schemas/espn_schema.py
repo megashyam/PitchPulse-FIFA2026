@@ -18,7 +18,6 @@ from pydantic.alias_generators import to_camel
 
 from ml.shot_xg import parse_clock
 
-# ── Code tables ────────────────────────────────────────────────────────────
 
 HOSTS = {"United States": "USA", "Mexico": "Mexico", "Canada": "Canada"}
 
@@ -123,9 +122,6 @@ POS_X = {
 }
 
 
-# ── Base ───────────────────────────────────────────────────────────────────
-
-
 def _int_or_none(v):
     try:
         return int(v)
@@ -162,9 +158,6 @@ class EspnTeam(EspnModel):
 
 class EspnAthlete(EspnModel):
     display_name: Optional[str] = None
-
-
-# ── Scoreboard ─────────────────────────────────────────────────────────────
 
 
 class EspnStatusType(EspnModel):
@@ -249,9 +242,6 @@ class EspnEvent(EspnModel):
     competitions: list[EspnCompetition] = Field(min_length=1)
 
 
-# ── Standings ──────────────────────────────────────────────────────────────
-
-
 class EspnStat(EspnModel):
     name: str = ""
     value: Optional[float] = None
@@ -276,9 +266,6 @@ class EspnStandingsGroup(EspnModel):
 
 class EspnStandings(EspnModel):
     children: list[EspnStandingsGroup] = []
-
-
-# ── Summary ────────────────────────────────────────────────────────────────
 
 
 class EspnStatEntry(EspnModel):

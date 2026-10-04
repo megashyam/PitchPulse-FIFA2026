@@ -74,8 +74,7 @@ async def _update_fixture(r: aioredis.Redis, fid: str, loop) -> None:
         log.warning(f"[{fid}] tactical MatchState parse error: {exc}")
         return
 
-    # NS matches have no live possession/pass data yet to build a descriptor
-    # from — skip until kickoff.
+    # NS matches have no live possession/pass data to build a descriptor from; skip until kickoff
     if state.status_short == "NS":
         return
     # Completed fixtures are computed once and cached for 30 days.

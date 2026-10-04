@@ -31,7 +31,7 @@ async def require_trigger_token(
 ) -> None:
     if not TRIGGER_TOKEN:
         if REQUIRE_TRIGGER_TOKEN:
-            # Fail closed: enforcement demanded but no secret configured.
+            # fail closed: enforcement on, no secret configured
             raise HTTPException(
                 status_code=503,
                 detail=(
@@ -39,7 +39,7 @@ async def require_trigger_token(
                     "but TRIGGER_TOKEN is not configured."
                 ),
             )
-        # Dev convenience: allow, but make the open state visible once.
+        # dev: allow, log the open state once
         global _warned_open
         if not _warned_open:
             _warned_open = True

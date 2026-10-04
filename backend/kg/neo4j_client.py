@@ -82,8 +82,6 @@ class Neo4jClient:
             log.warning(f"Neo4j query failed: {exc}")
             return []
 
-    # ── Query helpers ────────────────────────────────────────────────────
-
     def get_head_to_head(self, team_a: str, team_b: str, limit: int = 5) -> list[dict]:
         """Prior WC meetings between two teams, most recent first."""
         cypher = (

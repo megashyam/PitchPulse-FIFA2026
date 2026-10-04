@@ -1,14 +1,12 @@
 "use client"
-// components/ThemeToggle.tsx
-// Sliding pill switch — drop into NavBar (or anywhere) to toggle theme.
+// sliding pill switch for the theme
 
 import { useTheme } from "@/hooks/useTheme"
 
 export function ThemeToggle() {
     const { theme, toggleTheme, mounted } = useTheme()
 
-    // Avoid a flash of wrong state before the client has determined the
-    // real theme on first mount
+    // avoids a flash of the wrong state before the real theme is known on first mount
     if (!mounted) return <div style={{ width: 46, height: 24 }} />
 
     const isDark = theme === "dark"

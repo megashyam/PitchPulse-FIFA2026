@@ -1,5 +1,5 @@
 "use client"
-// app/predict/page.tsx — fully interactive outcome predictor
+// interactive outcome predictor
 
 import { useMemo, useState } from "react"
 import { usePredictStream } from "@/hooks/usePredictStream"
@@ -25,24 +25,24 @@ export default function PredictPage() {
     const [expandedTeam, setExpandedTeam] = useState<string | null>(null)
     const [selectedTop8, setSelectedTop8] = useState<string | null>(null)
 
-    // Top 4 for KPI strip
+    // top 4 for the KPI strip
     const top4 = useMemo(() =>
         hasData ? [...prediction!.teams].sort((a, b) => b.champion.p - a.champion.p).slice(0, 4) : []
         , [prediction])
 
-    // Teams in the active group sorted by champion prob
+    // teams in the active group, sorted by champion prob
     const groupTeams = useMemo(() =>
         hasData
             ? prediction!.teams.filter(t => t.group === activeGroup).sort((a, b) => b.champion.p - a.champion.p)
             : []
         , [prediction, activeGroup])
 
-    // Full table sorted
+    // full table, sorted
     const sorted = useMemo(() =>
         hasData ? [...prediction!.teams].sort((a, b) => b[sortStage].p - a[sortStage].p) : []
         , [prediction, sortStage])
 
-    // Top 8 for chart
+    // top 8 for the chart
     const top8 = useMemo(() =>
         hasData ? [...prediction!.teams].sort((a, b) => b.champion.p - a.champion.p).slice(0, 8) : []
         , [prediction])
@@ -53,7 +53,7 @@ export default function PredictPage() {
     return (
         <div className="ip-page">
 
-            {/* ── Header ── */}
+            {/* header */}
             <div className="ip-header">
                 <div className="ip-header-left">
                     <div className="ip-eyebrow">Monte Carlo · 48-team · numpy vectorized</div>
@@ -74,7 +74,7 @@ export default function PredictPage() {
                 </div>
             </div>
 
-            {/* ── Empty state ── */}
+            {/* empty state */}
             {!hasData && !isRunning && (
                 <div className="nar-empty" style={{ minHeight: 320 }}>
                     <div className="nar-empty-icon">🎯</div>
@@ -94,7 +94,7 @@ export default function PredictPage() {
 
             {hasData && (<>
 
-                {/* ── KPI strip — top 4 teams ── */}
+                {/* KPI strip, top 4 teams */}
                 <div className="kpi-strip">
                     {top4.map((team, i) => {
                         const colors = ["var(--accent)", "var(--home)", "var(--c-ai)", "var(--amber)"]
@@ -111,7 +111,7 @@ export default function PredictPage() {
                                 </div>
                                 <div className="kpi-cell-name">{team.name}</div>
                                 <div className="kpi-cell-sub">Elo {team.elo.toFixed(0)} · Group {team.group}</div>
-                                {/* Hover expand — full tournament path */}
+                                {/* hover: full tournament path */}
                                 <div className="kpi-cell-expand">
                                     {STAGES.map(s => (
                                         <div key={s} className="kpi-expand-row">
@@ -128,10 +128,10 @@ export default function PredictPage() {
                     })}
                 </div>
 
-                {/* ── Main grid ── */}
+                {/* main grid */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: 0, borderBottom: "1px solid var(--border-bright)" }}>
 
-                    {/* Left: group selector + team bars */}
+                    {/* left: group selector + team bars */}
                     <div style={{ borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column" }}>
 
                         <div style={{ padding: "16px 18px 0", borderBottom: "1px solid var(--border)" }}>
@@ -196,10 +196,10 @@ export default function PredictPage() {
 
                     </div>
 
-                    {/* Right: top 8 chart + match odds */}
+                    {/* right: top 8 chart + match odds */}
                     <div style={{ display: "flex", flexDirection: "column" }}>
 
-                        {/* Top 8 chart */}
+                        {/* top 8 chart */}
                         <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--border)" }}>
                             <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-3)", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                                 <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -248,7 +248,7 @@ export default function PredictPage() {
                             })()}
                         </div>
 
-                        {/* Per-match odds */}
+                        {/* per-match odds */}
                         <div style={{ flex: 1, padding: "14px 18px", overflow: "auto" }}>
                             <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-3)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
                                 <span style={{ width: 3, height: 10, background: "var(--away)", borderRadius: 2, display: "inline-block" }} />
@@ -260,7 +260,7 @@ export default function PredictPage() {
                     </div>
                 </div>
 
-                {/* ── Tournament table ── */}
+                {/* tournament table */}
                 <div style={{ padding: "0 0 0" }}>
                     <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-3)", display: "flex", alignItems: "center", gap: 6 }}>
@@ -333,7 +333,7 @@ export default function PredictPage() {
                     </div>
                 </div>
 
-                {/* Bracket impact */}
+                {/* bracket impact */}
                 <div style={{ padding: "16px 18px", borderTop: "1px solid var(--border-bright)" }}>
                     <div style={{ fontFamily: "var(--font-mono)", fontSize: ".58rem", textTransform: "none", letterSpacing: "normal", color: "var(--text-3)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ width: 3, height: 10, background: "var(--c-ai)", borderRadius: 2, display: "inline-block" }} />

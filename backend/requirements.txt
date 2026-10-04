@@ -1,4 +1,4 @@
-# WC2026 Match Intelligence Platform — backend requirements
+# WC2026 Match Intelligence Platform backend requirements
 # Install: pip install -r requirements.txt
 
 # Web framework / server
@@ -28,15 +28,15 @@ neo4j>=5.19,<6.0
 # Observability
 prometheus-fastapi-instrumentator>=7.0,<8.0
 
-# LLM/agent tracing (standalone SDK — no LangChain). No-op when
-# LANGSMITH_API_KEY is unset; see agents/langsmith_tracing.py.
+# LLM/agent tracing (standalone SDK, no LangChain); no-op when LANGSMITH_API_KEY is
+# unset, see agents/langsmith_tracing.py
 langsmith>=0.1,<1.0
 
 
 # Match-intel narration graph (agents/intel_graph.py)
 langgraph>=1.0,<2.0
 
-# Optional: Google Trends signal (mock fallback used automatically if absent)
+# optional: Google Trends signal (mock fallback if absent)
 pytrends>=4.9,<5.0
 
 # Dev, test and offline-eval dependencies live in requirements-dev.txt.

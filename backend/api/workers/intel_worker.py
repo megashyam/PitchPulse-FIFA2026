@@ -34,8 +34,8 @@ from monitoring.metrics import WORKER_ERRORS, WORKER_TICK_DURATION, tick_done
 log = logging.getLogger(__name__)
 INTERVAL = 30.0
 FEED_CAP = 30
-TTL_LIVE = 3_600  # 1 hour — match in progress
-TTL_COMPLETED = 2_592_000  # 30 days — match history
+TTL_LIVE = 3_600  # 1 hour: match in progress
+TTL_COMPLETED = 2_592_000  # 30 days: match history
 BACKFILL_PER_TICK = 2  # completed fixtures without a feed, per tick
 
 _known_fixtures: set[str] = set()
@@ -67,7 +67,7 @@ async def _update_all(r: aioredis.Redis) -> None:
     active_ids = set(await r.smembers("matches:active"))
     completed_ids = set(await r.smembers("matches:completed"))
 
-    # Release agent memory for fixtures that left the active set.
+    # drop agent state for fixtures that left the active set
     for stale in list(_known_fixtures - active_ids):
         _known_fixtures.discard(stale)
         try:
@@ -76,8 +76,8 @@ async def _update_all(r: aioredis.Redis) -> None:
             pass
     _known_fixtures.update(active_ids)
 
-    # Backfill is throttled so a restart after the tournament doesn't queue
-    # every finished match's narration at once.
+    # backfill is throttled so a restart after the tournament doesn't queue every
+    # finished match at once
     fixtures_to_process = set(active_ids)
     backfill = 0
     for cid in sorted(completed_ids - active_ids - _backfilled):
@@ -127,10 +127,10 @@ async def _update_fixture(r: aioredis.Redis, fid: str) -> None:
     current_elapsed = state.elapsed or 0
     completed = state.status_short in COMPLETED_STATUSES
     is_live = state.status_short in ("1H", "2H", "ET", "P")
-    # Task-local: each fixture runs in its own gather() task.
+    # task-local: each fixture runs in its own gather() task
     set_llm_priority(Priority.BACKGROUND if completed else Priority.LIVE)
 
-    # ── Existing feed + replay-restart guard ──────────────────────────────
+    # existing feed + replay-restart guard
     existing = _load_feed(await r.lrange(f"match:{fid}:intel:feed", 0, FEED_CAP - 1))
 
     newest_cached_minute = max((e.get("minute", 0) for e in existing), default=0)
@@ -152,7 +152,7 @@ async def _update_fixture(r: aioredis.Redis, fid: str) -> None:
 
     new_entries: list[dict] = []
 
-    # ── 1. Per-event history: one entry per goal / red not yet analysed ────
+    # per-event history: one entry per goal/red not yet analysed
     sig_events = [
         ev
         for ev in sorted(state.events, key=lambda e: e.elapsed)
@@ -168,7 +168,7 @@ async def _update_fixture(r: aioredis.Redis, fid: str) -> None:
         except Exception as exc:
             log.warning(f"[{fid}] analyze_event failed @{ev.elapsed}': {exc}")
 
-    # ── 2. Live tactical / xG colour for the current clock ────────────────
+    # live tactical/xG colour for the current clock
     if is_live:
         try:
             result = await match_intel_agent.update(state, momentum)
@@ -184,17 +184,14 @@ async def _update_fixture(r: aioredis.Redis, fid: str) -> None:
             new_entries.append(result)
             have_colour_keys.add(_colour_key(result))
 
-    # ── 3. Full-time wrap-up for completed matches with no event narration ─
-    # A finished match that produced no goals/red cards (e.g. a 0-0) would
-    # otherwise have an empty feed forever. Generate a single full-match
-    # summary so the Live Intelligence panel always has SOMETHING for a
-    # completed match (image: "No AI narration for this match yet"). Keyed by
-    # a stable ft_summary sig so it's produced at most once.
+    # FT wrap-up for completed matches with no event narration
+    # a finished match without goals or reds (e.g. 0-0) would have an empty feed; one
+    # full-match summary fills it
+    # keyed by a stable ft_summary sig, so produced at most once
     if completed:
         ft_sig = f"ft_summary:{state.home_score}:{state.away_score}"
         already_have_ft = any(e.get("event_sig") == ft_sig for e in existing)
-        # Only bother if there are no event-reaction entries either — if the
-        # match had goals, those already tell the story.
+        # skipped when there are event-reaction entries; those cover the match
         has_event_narration = bool(have_event_sigs) or any(
             e.get("event_sig") for e in existing
         )
@@ -218,8 +215,7 @@ async def _update_fixture(r: aioredis.Redis, fid: str) -> None:
 
     ttl = _ttl_for(state.status_short)
 
-    # transaction=True → readers see either the old feed or the new one,
-    # never the empty intermediate.
+    # transaction=True: readers see the old feed or the new one, never the empty intermediate
     pipe = r.pipeline(transaction=True)
     pipe.delete(f"match:{fid}:intel:feed")
     for e in ordered:

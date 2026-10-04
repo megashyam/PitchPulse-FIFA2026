@@ -23,7 +23,7 @@ log = logging.getLogger(__name__)
 
 TTL_LIVE = 86_400
 TTL_COMPLETED = 2_592_000
-FEED_CAP = 9  # up to 10 briefings per match — kickoff/HT/FT plus room
+FEED_CAP = 9  # up to 10 briefings per match: kickoff/HT/FT plus room
 
 
 def _ttl_for(status_short: str) -> int:

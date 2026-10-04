@@ -25,7 +25,6 @@ from ml.in_play import inplay_wdl, elo_deltas, _poisson_pmf
 from eval.eval_anomaly_threshold import aggregate
 from ml.backtest_elo_wdl import ELO_START, HOME_ADV, load_matches, update_elo
 
-# --------------------------------------------------------------- real Elo priors
 
 
 @pytest.fixture(scope="module")
@@ -60,8 +59,8 @@ def test_elo_to_wdl_valid_on_every_real_pairing(real_elo):
             w, d, loss = elo_to_wdl(real_elo[h] + HOME_ADV, real_elo[a])
             assert w + d + loss == pytest.approx(1.0, abs=1e-9)
             assert min(w, d, loss) >= 0.01 - 1e-12
-            # prior_builder.elo_to_wdl clips the draw to [0.03, 0.30]
-            assert 0.03 - 1e-9 <= d <= 0.30 + 1e-9
+            # draw peaks at an even fixture
+            assert d <= elo_to_wdl(1500.0, 1500.0)[1] + 1e-9
 
 
 @pytest.mark.integration
@@ -102,9 +101,6 @@ def test_inplay_valid_across_real_match_states(statsbomb_events, real_elo):
     assert inplay_wdl(pre, 90, hs, as_, extra=10) == exp
 
 
-# --------------------------------------------------------------- live market odds
-
-
 @pytest.mark.integration
 @pytest.mark.odds
 def test_shin_devig_on_live_market(live_odds):
@@ -138,9 +134,6 @@ def test_ko_prob_valid_from_live_market(live_odds):
     pytest.skip("No usable market for KO conversion")
 
 
-# --------------------------------------------------------------- always-true corners
-
-
 def test_poisson_pmf_normalises():
     assert sum(_poisson_pmf(1.3, k) for k in range(60)) == pytest.approx(1.0, abs=1e-9)
 
@@ -158,9 +151,6 @@ def test_stoppage_time_is_not_full_time():
     at90, at94, over = (inplay_wdl(pre, 90, 1, 1, extra=x) for x in (0, 4, 10))
     assert 0.0 < at94[0] < at90[0] and 0.0 < at94[2] < at90[2]
     assert over == (0.0, 1.0, 0.0)
-
-
-# --------------------------------------------------------------- in-play calibration
 
 
 @pytest.mark.parametrize("gap", [0, 50, 100, 200, 300, 400])
@@ -184,9 +174,6 @@ def test_inplay_lead_monotone_and_red_card_direction():
     base = inplay_wdl(pre, 30, 0, 0)
     red = inplay_wdl(pre, 30, 0, 0, red_home=1)
     assert red[0] < base[0] and red[2] > base[2]
-
-
-# --------------------------------------------------------------- Shin de-vig
 
 
 @pytest.mark.parametrize(
@@ -221,12 +208,23 @@ def test_shin_equals_normalisation_without_overround():
     assert oddsapi_to_wdl(*odds) == pytest.approx((0.5, 0.25, 0.25), abs=1e-12)
 
 
-# --------------------------------------------------------------- anomaly eval
-
-
 def test_false_alarm_rate_independent_of_seed_count():
     """A fixed per-day false-alert count gives the same FA/topic-day however
     many topic-days are pooled."""
     day = {"detected": [], "latency": [], "alerts": 4, "true_alerts": 1, "false_by_type": {}}
     rates = [aggregate([day] * n)["false_alerts_per_topic_day"] for n in (1, 5, 10, 50)]
     assert rates == pytest.approx([3.0] * 4)
+
+
+@pytest.mark.parametrize("a,b", [(1500.0, 1500.0), (1800.0, 1650.0), (2100.0, 1400.0), (1400.0, 2050.0)])
+def test_elo_to_wdl_symmetric_floored_normalised(a, b):
+    w, d, loss = elo_to_wdl(a, b)
+    assert elo_to_wdl(b, a) == pytest.approx((loss, d, w), abs=1e-12)
+    assert min(w, d, loss) >= 0.01 - 1e-12
+    assert w + d + loss == pytest.approx(1.0, abs=1e-12)
+
+
+def test_elo_to_wdl_draw_highest_at_gap_zero():
+    draws = [elo_to_wdl(1500.0 + g, 1500.0)[1] for g in (0, 50, 150, 300, 600)]
+    assert draws == sorted(draws, reverse=True)
+    assert elo_to_wdl(1500.0, 1500.0)[0] == pytest.approx(elo_to_wdl(1500.0, 1500.0)[2])

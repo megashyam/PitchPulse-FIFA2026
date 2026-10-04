@@ -1,6 +1,5 @@
 "use client"
-// components/match/EventsFeed.tsx
-// Compact single-line event rows.
+// compact single-line event rows
 
 import type { MatchState } from "@/types/match"
 

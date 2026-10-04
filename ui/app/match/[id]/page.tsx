@@ -1,7 +1,6 @@
 "use client"
-// app/match/[id]/page.tsx
-// Layout: left match-switcher rail, one unified tab strip, and a narrow
-// side column for always-on stats/events/timeline.
+// layout: left match-switcher rail, one tab strip, and a narrow side column for
+// stats/events/timeline
 
 import { useEffect, useState } from "react"
 import { useMatchStream } from "@/hooks/useMatchStream"
@@ -57,10 +56,8 @@ export default function MatchPage({ params }: Props) {
 
       <div className="mp-main">
 
-        {/* Header: score banner (round is already shown inside it; the back
-            link now lives in the global NavBar) + a small status line only
-            when there's something to say — avoids a full-width bar with a
-            big dead gap when there's just one thing to show. */}
+        {/* score banner (shows the round); status line only when there is something
+            to show */}
         <div className="mp-header">
           {(streamError || isWaiting) && (
             <div className="match-topbar">
@@ -71,7 +68,7 @@ export default function MatchPage({ params }: Props) {
           <ScoreHeader state={state} updatedAt={state.updated_at} />
         </div>
 
-        {/* Body: narrow side column (always-on stats) + wide tab content */}
+        {/* narrow side column (stats) + wide tab content */}
         <div className="mp-body">
 
           <div className="mp-side">

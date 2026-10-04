@@ -1,7 +1,6 @@
 "use client"
-// components/match/UnifiedTabs.tsx
-// Single tab strip (Tactical, What If?, Briefing, Live, Predictor,
-// Narrative); each panel renders full-width in the main content column.
+// single tab strip (Tactical, What If?, Briefing, Live, Predictor, Narrative); each
+// panel renders full-width in the main column
 
 import { useState, useEffect } from "react"
 import type { MatchState } from "@/types/match"
@@ -68,7 +67,7 @@ export function UnifiedTabs({ state, fixtureId }: Props) {
 
                 {active === "live" && (
                     <div className="mp-tabs-stack">
-                        {/* Win probability + xG live in the left stats column. */}
+                        {/* win probability + xG live in the left stats column */}
                         <IntelFeed fixtureId={fixtureId} statusShort={state.status_short} />
                         <TeamFormCard
                             fixtureId={fixtureId}

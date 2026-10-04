@@ -1,5 +1,4 @@
 "use client"
-// hooks/useIntelStream.ts
 // SSE subscription + 30s REST poll for live match intel narratives.
 //
 // Takes the match `statusShort` and:
@@ -82,7 +81,7 @@ export function useIntelStream(
                 entriesCountRef.current = deduped.length
                 setError(null)
             }
-            // 404 (no data) is a normal state, not an error — just fall through.
+            // 404 (no data) is normal, fall through
         } catch (e) {
             console.log("[intel v2] fetch error", e)
         } finally {
@@ -96,7 +95,7 @@ export function useIntelStream(
         setFirstLoadDone(false)
         entriesCountRef.current = 0
 
-        // Always do one fetch — a completed match may have stored history.
+        // always one fetch; a completed match may have stored history
         fetchFeed()
 
         // LIVE matches: poll + SSE indefinitely.
@@ -120,8 +119,8 @@ export function useIntelStream(
                 }
                 ftPolls += 1
                 if (ftPolls === FT_FAST_POLLS) {
-                    // Switch to the slower indefinite cadence instead of
-                    // stopping — re-create the interval at the new period.
+                    // switch to the slower cadence: re-create the interval at the new
+                    // period
                     clearInterval(poll)
                     poll = setInterval(tick, FT_SLOW_INTERVAL_MS)
                 }

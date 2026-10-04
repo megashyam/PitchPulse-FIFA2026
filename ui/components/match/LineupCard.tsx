@@ -1,9 +1,7 @@
 "use client"
-// components/match/LineupCard.tsx
-// Compact vertical formation widget for the narrow left stats column.
-// One team at a time (tab toggle) — a horizontal pitch doesn't fit this
-// width, so players are grouped into positional lines (attackers at top,
-// GK at the bottom) and centered in wrapping rows instead.
+// compact vertical formation widget for the narrow stats column; one team at a time
+// (tab toggle); players grouped into positional lines (attackers top, GK bottom),
+// centered in wrapping rows
 
 import { useEffect, useState } from "react"
 import { Flag } from "@/components/Flag"
@@ -48,8 +46,8 @@ function shortName(n: string): string {
 const LINE_OF_CODE: Record<string, Line> = { G: "GK", D: "DEF", M: "MID", F: "ATT" }
 
 function groupByLine(lineup: TeamLineup): Record<Line, { player?: Player; role: string; idx: number }[]> {
-    // Confirmed ESPN lineups tag each player's line; use it directly so any
-    // formation (4-1-3-2, 3-4-2-1, ...) renders from real positions.
+    // confirmed ESPN lineups tag each player's line; use it so any formation (4-1-3-2,
+    // 3-4-2-1, ...) renders from real positions
     if (lineup.startingXI.length && lineup.startingXI.every(p => p.line)) {
         const groups: Record<Line, { player?: Player; role: string; idx: number }[]> = { ATT: [], MID: [], DEF: [], GK: [] }
         lineup.startingXI.forEach((p, i) => groups[LINE_OF_CODE[p.line!]].push({ player: p, role: p.position, idx: i }))

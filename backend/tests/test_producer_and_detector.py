@@ -20,7 +20,6 @@ from agents import narrative_spike_detector as nsd
 from agents import spike_scorer as ss
 from agents.spike_scorer import SpikeScorer
 
-# --------------------------------------------------------------- Redis round-trip
 
 
 @pytest.mark.integration
@@ -90,9 +89,6 @@ async def test_pubsub_emitted_on_change(redis_client):
     assert got is not None and str(got["fixture_id"]) == str(fid)
 
 
-# --------------------------------------------------------------- live feed
-
-
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_espn_scoreboard_parses():
@@ -112,9 +108,6 @@ async def test_espn_scoreboard_parses():
     for p in parsed:
         assert p.status in STATUS_LONG
         assert p.home_name and p.away_name
-
-
-# --------------------------------------------------------------- Weaviate retrieval
 
 
 @pytest.mark.integration
@@ -175,9 +168,6 @@ def test_tactical_profiles_retrieval(weaviate, embedder):
     assert len(objs) > 0
     for o in objs:
         assert "ppda" in o and "team" in o
-
-
-# --------------------------------------------------------------- detector on real data
 
 
 @pytest.mark.integration

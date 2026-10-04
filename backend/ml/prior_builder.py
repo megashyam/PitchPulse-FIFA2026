@@ -1,25 +1,23 @@
+import json
+import math
+from pathlib import Path
+
 import numpy as np
 from typing import Dict, Optional, Tuple
 
 from ml.in_play import ko_advance_batch
 from ml.wc_2026_config import TEAM_BY_NAME, WC2026_TEAMS
 
-# Match probability type: (p_win, p_draw, p_loss) from team_a perspective
+# match probability: (p_win, p_draw, p_loss) from team_a's view
 MatchProb = Tuple[float, float, float]
 
-# Minimum probability floor — prevents 0.0 from causing log(0) issues
-# and extreme bracket distortions in the sim.
+# probability floor; avoids log(0) and extreme bracket distortion in the sim
 MIN_PROB = 0.01
 
-# Home advantage in Elo points (eloratings.net); only host nations playing in
-# their own country get it at this tournament.
-HOME_ADV = 100.0
+# ordered logit coefficients and home advantage, fitted by ml/fit_wdl_prior.py
+WDL_COEF_PATH = Path(__file__).with_name("wdl_prior_coef.json")
+_WDL_COEF: Optional[dict] = None
 DEFAULT_WDL: "MatchProb" = (0.40, 0.25, 0.35)
-
-
-# ---------------------------------------------------------------------------
-# Elo model
-# ---------------------------------------------------------------------------
 
 
 def elo_expected(rating_a: float, rating_b: float) -> float:
@@ -27,35 +25,28 @@ def elo_expected(rating_a: float, rating_b: float) -> float:
     return 1.0 / (1.0 + 10.0 ** ((rating_b - rating_a) / 400.0))
 
 
+def _wdl_coef() -> dict:
+    global _WDL_COEF
+    if _WDL_COEF is None:
+        _WDL_COEF = json.loads(WDL_COEF_PATH.read_text(encoding="utf-8"))
+    return _WDL_COEF
+
+
 def elo_to_wdl(rating_a: float, rating_b: float) -> MatchProb:
     """
-    Convert Elo ratings into W/D/L probabilities.
+    Elo ratings to W/D/L via a symmetric ordered logit on x = rating_a - rating_b:
 
-    Method: calibrated to international football draw rates (~23-27%).
-    - Base draw rate: 25%
-    - Draw rate scales up when teams are closely matched (Elo diff < 100)
-      and scales down for lopsided fixtures.
-    - Remaining probability split into W/L proportional to Elo expectation.
+        p_win  = sigmoid(beta*x - theta)
+        p_loss = sigmoid(-beta*x - theta)
+        p_draw = 1 - p_win - p_loss
+
+    beta, theta from ml/wdl_prior_coef.json. Swapping teams swaps win and loss.
     """
-    e_a = elo_expected(rating_a, rating_b)
-
-    # Draw probability: highest when fixture is even, falls off for big gaps
-    elo_diff = abs(rating_a - rating_b)
-    # Exponential decay: 30% draw at even, ~18% at 300 Elo gap
-    p_draw = 0.25 * np.exp(-elo_diff / 450.0) + 0.05
-    p_draw = float(np.clip(p_draw, 0.03, 0.30))
-
-    # Split remaining probability proportional to Elo expectation
-    remaining = 1.0 - p_draw
-    p_win = remaining * e_a
-    p_loss = remaining * (1.0 - e_a)
-
-    return _normalise(p_win, p_draw, p_loss)
-
-
-# ---------------------------------------------------------------------------
-# Bookmaker odds → fair probability
-# ---------------------------------------------------------------------------
+    c = _wdl_coef()
+    bx = c["beta"] * (rating_a - rating_b)
+    p_win = 1.0 / (1.0 + math.exp(c["theta"] - bx))
+    p_loss = 1.0 / (1.0 + math.exp(c["theta"] + bx))
+    return _normalise(p_win, 1.0 - p_win - p_loss, p_loss)
 
 
 def _shin_probs(pi: np.ndarray, z: float) -> np.ndarray:
@@ -107,22 +98,12 @@ def oddsapi_to_wdl(
     return _normalise(fair[0], fair[1], fair[2])
 
 
-# ---------------------------------------------------------------------------
-# Normalisation + floor
-# ---------------------------------------------------------------------------
-
-
 def _normalise(p_win: float, p_draw: float, p_loss: float) -> MatchProb:
     """Clip to floor then re-normalise to sum exactly to 1.0."""
     arr = np.array([p_win, p_draw, p_loss], dtype=np.float64)
     arr = np.clip(arr, MIN_PROB, None)
     arr /= arr.sum()
     return float(arr[0]), float(arr[1]), float(arr[2])
-
-
-# ---------------------------------------------------------------------------
-# Full prior table builder
-# ---------------------------------------------------------------------------
 
 
 def build_prior_table(
@@ -150,8 +131,8 @@ def build_prior_table(
             ta = teams[i]
             tb = teams[j]
             key = (ta.name, tb.name)
-            # A conditioned team's matches must reflect its adjusted strength,
-            # so bypass the static Betfair line whenever either side is nudged.
+            # conditioned team: bypass the static Betfair line when either side is
+            # nudged, so its adjusted strength is used
             conditioned = ta.name in ovr or tb.name in ovr
 
             if not conditioned and betfair_odds and key in betfair_odds:
@@ -195,14 +176,10 @@ def match_wdl(
     h, a = TEAM_BY_NAME.get(home), TEAM_BY_NAME.get(away)
     if h is None or a is None:
         return DEFAULT_WDL
-    rh = h.elo + ovr.get(home, 0.0) + (HOME_ADV if host_side == "home" else 0.0)
-    ra = a.elo + ovr.get(away, 0.0) + (HOME_ADV if host_side == "away" else 0.0)
+    home_adv = _wdl_coef()["home_adv"]
+    rh = h.elo + ovr.get(home, 0.0) + (home_adv if host_side == "home" else 0.0)
+    ra = a.elo + ovr.get(away, 0.0) + (home_adv if host_side == "away" else 0.0)
     return elo_to_wdl(rh, ra)
-
-
-# ---------------------------------------------------------------------------
-# Knockout version: no draws (extra time / penalties resolve)
-# ---------------------------------------------------------------------------
 
 
 def ko_prob(p_win: float, p_draw: float, p_loss: float) -> Tuple[float, float]:

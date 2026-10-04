@@ -1,9 +1,8 @@
 """
 Calibration backtest for the Elo → W/D/L model in ml/prior_builder.py.
 
-Validates the shape of ``elo_to_wdl`` (25% base draw rate, exp(-Δ/450)
-decay, [0.10, 0.30] clip) on StatsBomb open data, independent of the 2026
-config Elos.
+Checks ``elo_to_wdl`` (symmetric ordered logit fitted by ml/fit_wdl_prior.py)
+on StatsBomb open data, independent of the 2026 config Elos.
 
 Method:
     1. Load every men's World Cup match in StatsBomb open data (2018, 2022)
@@ -45,11 +44,6 @@ N_BOOT = 5000
 EPS = 1e-12
 
 
-# ---------------------------------------------------------------------------
-# Data loading
-# ---------------------------------------------------------------------------
-
-
 def load_matches() -> List[dict]:
     """Every WC 2018/2022 match, chronological, with 90-minute `hs90`/`as90`."""
     matches: List[dict] = []
@@ -75,11 +69,6 @@ def load_matches() -> List[dict]:
 
 def _adv(team: str) -> float:
     return HOME_ADV if team in HOSTS else 0.0
-
-
-# ---------------------------------------------------------------------------
-# Elo online update
-# ---------------------------------------------------------------------------
 
 
 def _expected(elo_a: float, elo_b: float) -> float:
@@ -110,11 +99,6 @@ def update_elo(elo: Dict[str, float], home: str, away: str, hs: int, as_: int) -
     delta = ELO_K * mult * (score_home - exp_home)
     elo[home] = elo.get(home, ELO_START) + delta
     elo[away] = elo.get(away, ELO_START) - delta
-
-
-# ---------------------------------------------------------------------------
-# Metrics
-# ---------------------------------------------------------------------------
 
 
 def outcome_index(hs: int, as_: int) -> int:
@@ -196,11 +180,6 @@ def reliability_table(
             }
         )
     return out
-
-
-# ---------------------------------------------------------------------------
-# Backtest driver
-# ---------------------------------------------------------------------------
 
 
 def run_backtest() -> dict:

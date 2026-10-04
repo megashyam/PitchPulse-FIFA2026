@@ -23,9 +23,6 @@ def _run(coro):
     return asyncio.run(coro)
 
 
-# ── Priority gate ──────────────────────────────────────────────────────────
-
-
 def test_gate_admits_by_priority_then_arrival():
     async def main():
         gate = PriorityGate("test", 1)
@@ -128,9 +125,6 @@ def test_pacer_spaces_requests():
     assert _run(main()) >= 0.09
 
 
-# ── Supervision ────────────────────────────────────────────────────────────
-
-
 def test_supervisor_restarts_crashed_worker():
     supervisor.reset()
     calls = {"n": 0}
@@ -174,9 +168,6 @@ def test_health_flags_stale_worker():
     assert h["status"] == "degraded"
     assert not h["workers"]["slow"]["alive"]
     supervisor.reset()
-
-
-# ── Leader election ────────────────────────────────────────────────────────
 
 
 def test_leader_lock_is_exclusive():
@@ -235,9 +226,6 @@ def test_only_one_instance_runs_workers_and_failover():
     supervisor.reset()
 
 
-# ── Predict sim lock ───────────────────────────────────────────────────────
-
-
 def test_claim_sim_is_atomic():
     async def main():
         r = fakeredis.FakeAsyncRedis(decode_responses=True)
@@ -248,9 +236,6 @@ def test_claim_sim_is_atomic():
     winners = [i for i in ids if i is not None]
     assert len(winners) == 1
     assert lock == winners[0]
-
-
-# ── SSE hub ────────────────────────────────────────────────────────────────
 
 
 def test_hub_fans_out_on_one_connection():
@@ -270,9 +255,6 @@ def test_hub_fans_out_on_one_connection():
     assert got == ("hello", "hello")
     assert len(pubsubs) == 1
     assert remaining == {}
-
-
-# ── Backfill throttling ────────────────────────────────────────────────────
 
 
 def test_finished_match_leaves_active_set_by_kickoff():

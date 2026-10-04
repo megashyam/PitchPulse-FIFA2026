@@ -45,9 +45,6 @@ WEB = "https://site.web.api.espn.com/apis/site/v2/sports/soccer"
 API = "https://site.api.espn.com/apis/v2/sports/soccer"
 
 
-# ── HTTP ───────────────────────────────────────────────────────────────────
-
-
 async def fetch_scoreboard(client: httpx.AsyncClient) -> list[dict]:
     r = await client.get(
         f"{SITE}/{LEAGUE}/scoreboard",
@@ -68,9 +65,6 @@ async def fetch_summary(client: httpx.AsyncClient, event_id: int | str) -> dict:
     r = await client.get(f"{WEB}/{LEAGUE}/summary", params={"event": event_id}, timeout=30)
     r.raise_for_status()
     return r.json()
-
-
-# ── Parsing ────────────────────────────────────────────────────────────────
 
 
 def parse_event(raw: dict) -> Optional[Fixture]:

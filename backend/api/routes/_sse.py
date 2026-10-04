@@ -69,8 +69,8 @@ class PubSubHub:
             q.put_nowait(data)
 
     async def _read(self) -> None:
-        # Loop on a flag, not only on cancellation: redis-py's get_message
-        # can swallow a CancelledError delivered mid-read.
+        # loop on a flag as well as cancellation; redis-py's get_message can swallow a
+        # CancelledError delivered mid-read
         while not self.closing:
             if not self.subs:
                 await asyncio.sleep(0.5)
@@ -182,7 +182,7 @@ async def pubsub_sse(
                     if str(payload.get("fixture_id")) != str(match_fixture_id):
                         continue
                 except Exception:
-                    pass  # malformed payload — fall through to a real check
+                    pass  # malformed payload; fall through to a real check
 
             raw = await redis_client.get(key)
             if raw is not None and raw != last_raw:

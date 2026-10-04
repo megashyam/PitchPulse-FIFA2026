@@ -1,8 +1,6 @@
 "use client"
-// components/match/IntelFeed.tsx — match intelligence activity feed
-//
-// Driven by the hook's `phase`: a spinner only while waiting on live
-// analysis, and a distinct message for matches that aren't live.
+// match intelligence feed, driven by the hook's phase: spinner only while waiting on
+// live analysis, a distinct message for non-live matches
 
 import { useIntelStream } from "@/hooks/useIntelStream"
 import type { IntelEntry } from "@/hooks/useIntelStream"
