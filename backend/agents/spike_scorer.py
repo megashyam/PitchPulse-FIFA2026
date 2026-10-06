@@ -19,30 +19,23 @@ from typing import Dict, Iterable, List, Optional, Sequence
 
 import numpy as np
 
+from config import (
+    BASELINE_TICKS,
+    EXIT_TICKS,
+    GAP,
+    MAX_SPIKES_PER_TICK,
+    MIN_BASELINE,
+    MIN_COUNT,
+    MIN_SCALE,
+    OUTAGE_ZERO_RATE,
+    TRENDS_MIN_MEDIAN,
+    Z_CORROB,
+    Z_EXIT,
+    Z_SOLO,
+)
+
 SOURCES = ("mastodon", "bluesky", "trends", "wikipedia")
 
-BASELINE_TICKS = 180  # 3h of 60s ticks
-MIN_BASELINE = 60  # live points before a source is scored
-GAP = 5  # most recent points left out of the baseline
-MIN_SCALE = 0.35  # log units
-Z_CORROB = 3.0
-Z_SOLO = 6.0
-Z_EXIT = 1.5
-EXIT_TICKS = 5
-MAX_SPIKES_PER_TICK = 3
-# A zero reading from a source whose baseline median is at least this rate
-# (per hour) is treated as an outage: not scored, not stored.
-OUTAGE_ZERO_RATE = 30.0
-# Trends index (0-100) the earlier part of the hour must reach for a lift.
-TRENDS_MIN_MEDIAN = 3.0
-
-# Raw floor a surging source must also clear (per hour; lift for trends).
-MIN_COUNT = {
-    "mastodon": 6.0,
-    "bluesky": 20.0,
-    "trends": 1.5,
-    "wikipedia": 3.0,
-}
 
 
 def window_rate(

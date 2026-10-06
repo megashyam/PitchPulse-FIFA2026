@@ -26,8 +26,8 @@ from itertools import combinations
 from typing import Iterable, List, Optional
 
 from api.match_timeline import around
-from api.schemas.event_types import GOAL_TYPES
-from api.schemas.schema import MatchState
+from schemas.event_types import GOAL_TYPES
+from schemas.schema import MatchState
 from ml.wc_2026_config import DATA_DIR, TEAM_BY_NAME
 
 _NUM = re.compile(r"(?<![\d.])\d+(?:\.\d+)?")
@@ -88,6 +88,11 @@ def _match_scores(state: MatchState) -> set:
                 continue
             scores |= {before[:2], after[:2]}
     return scores | {(b, a) for a, b in scores}
+
+
+def team_violations(text: str, allowed: set) -> List[str]:
+    """Real WC teams named in `text` (plain substring match) outside `allowed`."""
+    return [n for n in TEAM_BY_NAME if n not in allowed and n in text]
 
 
 def _allowed_teams(state: MatchState, rag_docs: Iterable[str]) -> set:

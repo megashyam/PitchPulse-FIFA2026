@@ -15,26 +15,16 @@ relevance label.
 """
 
 import argparse
-import json
 import logging
-import urllib.request
 from collections import Counter
 
 import httpx
 
-from agents.weaviate_client import (
-    VECTOR_NAME,
-    WEAVIATE_HOST,
-    WEAVIATE_PORT,
-    connect_local,
-    rest_headers,
-)
+from agents.weaviate_client import NARRATIVE_ARCS, get_weaviate_client
+from ml.embedding_model import get_embed_model
 from ml.statsbomb import COMPETITION_ID, SEASON_IDS, card_from_event, load, sort_events
 
 log = logging.getLogger(__name__)
-
-COLLECTION = "NarrativeArcs"
-
 
 def minute_band(minute: int) -> str:
     if minute <= 30:
@@ -195,86 +185,33 @@ def build_corpus() -> list[dict]:
     return docs
 
 
-def _get_count() -> int:
-    try:
-        q = json.dumps({"query": "{Aggregate{%s{meta{count}}}}" % COLLECTION})
-        req = urllib.request.Request(
-            f"http://{WEAVIATE_HOST}:{WEAVIATE_PORT}/v1/graphql",
-            data=q.encode(),
-            headers=rest_headers(),
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=5) as r:
-            data = json.loads(r.read())
-            return data["data"]["Aggregate"][COLLECTION][0]["meta"]["count"]
-    except Exception as exc:
-        log.warning(f"count failed: {exc}")
-        return 0
-
-
-def _create(client) -> None:
-    import weaviate.classes as wvc
-
-    client.collections.create(
-        name=COLLECTION,
-        properties=[
-            wvc.config.Property(name=name, data_type=dtype)
-            for name, dtype in [
-                ("content", wvc.config.DataType.TEXT),
-                ("match_id", wvc.config.DataType.TEXT),
-                ("competition", wvc.config.DataType.TEXT),
-                ("season", wvc.config.DataType.TEXT),
-                ("minute", wvc.config.DataType.INT),
-                ("event_type", wvc.config.DataType.TEXT),
-            ]
-        ],
-        vector_config=wvc.config.Configure.Vectors.self_provided(name=VECTOR_NAME),
-    )
-    log.info(f"Created collection {COLLECTION}")
-
-
 def main(check_only: bool = False, assume_yes: bool = False) -> None:
-    from sentence_transformers import SentenceTransformer
-
-    client = connect_local()
+    wv = get_weaviate_client()
     try:
-        log.info(f"Weaviate ready: {client.is_ready()}")
-        if not client.collections.exists(COLLECTION):
-            _create(client)
-        if check_only:
-            log.info(f"{COLLECTION} document count: {_get_count()}")
+        if not wv.ready:
+            log.error("Weaviate not ready")
             return
-
-        existing = _get_count()
-        if existing > 0:
-            if not assume_yes:
-                ans = input(f"Collection has {existing} documents. Re-index? (y/N): ")
-                if ans.strip().lower() != "y":
-                    return
-            # Re-index means replace, not append.
-            log.info(f"Dropping {existing} existing documents for a clean rebuild")
-            client.collections.delete(COLLECTION)
-            _create(client)
+        existing = wv.get_count(NARRATIVE_ARCS)
+        if check_only:
+            log.info(f"{NARRATIVE_ARCS} document count: {existing}")
+            return
+        if existing > 0 and not assume_yes:
+            ans = input(f"Collection has {existing} documents. Re-index? (y/N): ")
+            if ans.strip().lower() != "y":
+                return
+        # Re-index means replace, not append.
+        wv.recreate(NARRATIVE_ARCS)
 
         docs = build_corpus()
         log.info(f"Documents: {len(docs)} {dict(Counter(d['event_type'] for d in docs))}")
-
-        model = SentenceTransformer("all-MiniLM-L6-v2")
-        col = client.collections.get(COLLECTION)
-        vectors = model.encode(
+        vectors = get_embed_model().encode(
             [d["content"] for d in docs], normalize_embeddings=True, show_progress_bar=False
         )
-        with col.batch.dynamic() as batch:
-            for d, vec in zip(docs, vectors):
-                batch.add_object(
-                    properties={k: d[k] for k in ("content", "match_id", "competition", "season", "minute", "event_type")},
-                    vector={VECTOR_NAME: vec.tolist()},
-                )
-        if col.batch.failed_objects:
-            log.error(f"{len(col.batch.failed_objects)} objects failed to insert")
-        log.info(f"Done — {_get_count()} documents in Weaviate")
+        keys = ("content", "match_id", "competition", "season", "minute", "event_type")
+        wv.insert_many(NARRATIVE_ARCS, [{k: d[k] for k in keys} for d in docs], vectors)
+        log.info(f"Done — {wv.get_count(NARRATIVE_ARCS)} documents in Weaviate")
     finally:
-        client.close()
+        wv.close()
 
 
 if __name__ == "__main__":

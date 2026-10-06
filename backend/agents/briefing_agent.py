@@ -1,40 +1,28 @@
 """
 Pre-match briefing agent.
 
-Generates a Groq briefing grounded only in facts computed as of kickoff
+Generates an Ollama briefing grounded only in facts computed as of kickoff
 (agents/briefing_facts.py): pre-match probabilities, point-in-time Elo,
 each team's earlier results at this World Cup and head-to-head history.
 Briefings requested mid-match or after full time never see the result.
 
 Fallbacks:
-    - No GROQ_API_KEY or an API error: template built from the same facts.
+    - Ollama unavailable: template built from the same facts.
     - Neo4j head-to-head: used only for fixtures outside the snapshot.
 """
 
 import asyncio
 import logging
-import os
 from typing import List, Optional
 
-import httpx
-
 from agents.briefing_facts import briefing_facts, render
-from agents.langsmith_tracing import traceable
-from agents.ollama_client import groq_chat
+from langsmith import traceable
+from agents.ollama_client import generate_with_source
 from ml.odds_api_client import get_oddsapi_client
 
+from config import OLLAMA_MODEL
+
 log = logging.getLogger(__name__)
-
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
-
-
-def _groq_key() -> str:
-    return os.getenv("GROQ_API_KEY", "")
-
-
-def _model_label() -> str:
-    return f"{GROQ_MODEL} via Groq"
-
 
 def _graph_context(home_name: str, away_name: str) -> List[str]:
     """Prior WC meetings from the Neo4j graph; [] if Neo4j is down or none exist."""
@@ -82,11 +70,9 @@ async def generate(
     else:
         facts_text = render(facts, home_name, away_name)
 
-    if not _groq_key():
-        log.warning("No GROQ_API_KEY — using template briefing")
-        return _template(home_name, away_name, facts_text), "template"
-
     prompt = (
+        f"[INST] You are a precise pre-match football analyst. You only use "
+        f"the numbers you are given.\n\n"
         f"Write a pre-match briefing for {home_name} vs {away_name} at the "
         f"{competition}, in 3 sentences:\n"
         f"1. Who is favoured and by how much.\n"
@@ -96,37 +82,16 @@ async def generate(
         f"FACTS (as of kickoff):\n{facts_text}\n\n"
         f"Every number you state must appear in FACTS. Do not mention pressing, "
         f"formations, injuries or players — none are in FACTS. Do not invent "
-        f"previous meetings. No cliches."
+        f"previous meetings. No cliches. [/INST]"
     )
 
-    try:
-        text = await groq_chat(
-            [
-                {
-                    "role": "system",
-                    "content": "You are a precise pre-match football analyst. "
-                    "You only use the numbers you are given.",
-                },
-                {"role": "user", "content": prompt},
-            ],
-            GROQ_MODEL,
-            max_tokens=200,
-            temperature=0.4,
-            timeout=12.0,
-        )
-        if not text:
-            return _template(home_name, away_name, facts_text), "template"
-        log.info(f"Briefing for {home_name} vs {away_name} ({len(text)} chars)")
-        return text, _model_label()
-
-    except httpx.HTTPStatusError as exc:
-        log.warning(
-            f"Groq briefing HTTP {exc.response.status_code}: "
-            f"{exc.response.text[:200]}"
-        )
-    except Exception as exc:
-        log.warning(f"Groq briefing error: {exc}")
-    return _template(home_name, away_name, facts_text), "template"
+    text, _ = await generate_with_source(
+        prompt, timeout=35, max_tokens=200, temperature=0.4
+    )
+    if not text:
+        return _template(home_name, away_name, facts_text), "template"
+    log.info(f"Briefing for {home_name} vs {away_name} ({len(text)} chars)")
+    return text, f"{OLLAMA_MODEL} via Ollama"
 
 
 def _template(home_name: str, away_name: str, facts_text: str) -> str:

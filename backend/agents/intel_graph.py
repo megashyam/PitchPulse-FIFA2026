@@ -16,7 +16,6 @@ node tasks.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Sequence, TypedDict
@@ -26,11 +25,11 @@ from langgraph.runtime import Runtime
 
 from agents.grounding import violations
 from agents.ollama_client import generate_with_source
-from agents.weaviate_client import get_weaviate_client
-from api.schemas.schema import MatchState
-from ml.embedding_model import get_embed_model
-from ml.executors import EMBED_EXECUTOR
+from agents.rag import retrieve
+from schemas.schema import MatchState
 from monitoring.metrics import INTEL_NARRATIONS
+
+from config import INTEL_TOP_K
 
 log = logging.getLogger(__name__)
 
@@ -77,22 +76,11 @@ def with_feedback(prompt: str, found: List[str]) -> str:
 async def _retrieve(state: NarrationState, runtime: Runtime[NarrationSpec]) -> dict:
     spec = runtime.context
     try:
-        model = get_embed_model()
-        qv = await asyncio.get_running_loop().run_in_executor(
-            EMBED_EXECUTOR, lambda: model.encode(spec.query, normalize_embeddings=True).tolist()
-        )
-        docs = await asyncio.to_thread(
-            get_weaviate_client().hybrid_search,
-            query_vector=qv,
-            query_text=spec.query,
-            top_k=5,
-            event_filter=spec.event_filter,
-            collection=spec.collection,
-        )
+        docs = await retrieve(spec.query, spec.collection, INTEL_TOP_K, spec.event_filter)
     except Exception as exc:
         log.debug(f"[{spec.state.fixture_id}] {spec.kind} RAG failed: {exc}")
         docs = []
-    return {"use_llm": spec.use_llm, "rag_docs": docs or [], "attempts": 0, "violations": []}
+    return {"use_llm": spec.use_llm, "rag_docs": docs, "attempts": 0, "violations": []}
 
 
 async def _generate(state: NarrationState, runtime: Runtime[NarrationSpec]) -> dict:

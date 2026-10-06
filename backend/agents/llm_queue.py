@@ -1,7 +1,7 @@
 """
 Priority admission for LLM calls.
 
-Every Ollama and Groq request waits on a PriorityGate: a semaphore that
+Every Ollama request waits on a PriorityGate: a semaphore that
 admits waiters by (priority, arrival order), so a live goal's narration
 jumps ahead of queued backfill work. Running calls are never pre-empted.
 
@@ -9,7 +9,7 @@ Priority is carried in a context variable, set once around a block or per
 asyncio task:
 
     with llm_priority(Priority.BACKGROUND):
-        await counterfactual_agent.update_all(...)
+        await counterfactual_agent.update_backlog(...)
 
 Tasks created inside the block inherit it; set_llm_priority() sets it for
 the rest of the current task.
@@ -101,20 +101,3 @@ class PriorityGate:
                 fut.set_result(None)
                 return
         self.active -= 1
-
-
-class Pacer:
-    """Minimum spacing between request starts (Groq's per-minute limit)."""
-
-    def __init__(self, min_interval_s: float) -> None:
-        self.min_interval_s = min_interval_s
-        self._next = 0.0
-
-    async def wait(self) -> None:
-        if self.min_interval_s <= 0:
-            return
-        now = time.monotonic()
-        start = max(now, self._next)
-        self._next = start + self.min_interval_s
-        if start > now:
-            await asyncio.sleep(start - now)

@@ -42,23 +42,26 @@ from agents.spike_scorer import (
 )
 from ml.executors import IO_EXECUTOR
 
+from config import (
+    BLUESKY_PAGE,
+    BLUESKY_WINDOW_S,
+    MASTODON_INSTANCE,
+    MASTODON_PAGE,
+    MASTODON_WINDOW_S,
+    TRENDS_BACKOFF_S,
+    TRENDS_CACHE_S,
+    TRENDS_PER_TICK,
+    TRENDS_STALE_S,
+    WIKI_CACHE_S,
+    WIKI_PAGE,
+    WIKI_WINDOW_S,
+)
+
 log = logging.getLogger(__name__)
 
 HTTP_TIMEOUT = 8.0
 # Mastodon search is slower than the other sources
 MASTODON_TIMEOUT = 15.0
-
-MASTODON_WINDOW_S = 30 * 60
-MASTODON_PAGE = 40
-BLUESKY_WINDOW_S = 15 * 60
-BLUESKY_PAGE = 100
-WIKI_WINDOW_S = 60 * 60
-WIKI_PAGE = 50
-WIKI_CACHE_S = 5 * 60
-TRENDS_CACHE_S = 15 * 60
-TRENDS_STALE_S = 30 * 60
-TRENDS_PER_TICK = 2
-TRENDS_BACKOFF_S = 30 * 60
 
 TOPICS = [
     # Names match WC2026_TEAMS so the UI's "THIS MATCH" markers line up.
@@ -105,7 +108,6 @@ SOURCE_LABELS = {
     "wikipedia": "Wikipedia",
 }
 
-MASTODON_INSTANCE = os.getenv("MASTODON_INSTANCE", "mastodon.social")
 MASTODON_UA = "wc2026-narrative/1.0 (+https://localhost)"
 
 _HTML_TAG_RE = re.compile(r"<[^>]+>")

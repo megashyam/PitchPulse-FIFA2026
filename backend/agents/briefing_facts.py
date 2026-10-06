@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Optional
 
 from feeds import snapshot
-from ml.prior_builder import match_wdl
+from ml.prior_builder import prior_for
 from ml.wc_2026_config import FIXTURE_BY_ID, FIXTURES, TEAM_BY_NAME
 
 
@@ -50,10 +50,7 @@ def briefing_facts(
     fixture_id: Optional[int], home: str, away: str, odds_table=None
 ) -> dict:
     fx = FIXTURE_BY_ID.get(fixture_id or -1)
-    wdl = match_wdl(
-        home, away, host_side=fx.get("host_side") if fx else None, odds_table=odds_table
-    )
-    quoted = bool(odds_table) and ((home, away) in odds_table or (away, home) in odds_table)
+    wdl, _, source = prior_for(home, away, fixture_id, odds_table)
     h, a = TEAM_BY_NAME.get(home), TEAM_BY_NAME.get(away)
     before = fx["date"] if fx else "9999"
     return {
@@ -61,7 +58,7 @@ def briefing_facts(
         "venue": fx.get("venue") if fx else None,
         "host_side": fx.get("host_side") if fx else None,
         "wdl": wdl,
-        "wdl_source": "market odds" if quoted else "Elo",
+        "wdl_source": "market odds" if source == "market_odds" else "Elo",
         "elo": (
             fx["elo_home_pre"] if fx else (h.elo if h else None),
             fx["elo_away_pre"] if fx else (a.elo if a else None),

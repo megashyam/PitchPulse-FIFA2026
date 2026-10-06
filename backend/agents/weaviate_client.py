@@ -1,55 +1,42 @@
 """
 Weaviate client for the NarrativeArcs and tactical collections.
 
-WEAVIATE_HOST / WEAVIATE_PORT / WEAVIATE_GRPC_PORT control both the gRPC
-connection and the REST URLs; WEAVIATE_API_KEY enables API-key auth.
+WEAVIATE_HOST / WEAVIATE_PORT / WEAVIATE_GRPC_PORT control the connection.
 """
-
-import json
 import logging
-import os
 import time
-import urllib.request
 from typing import List, Optional
 
 import weaviate
 import weaviate.classes as wvc
-from weaviate.classes.init import Auth
 from weaviate.classes.query import MetadataQuery
+
+from config import (
+    HYBRID_ALPHA,
+    READY_TTL_S,
+    WEAVIATE_GRPC_PORT,
+    WEAVIATE_HOST,
+    WEAVIATE_PORT,
+)
 
 log = logging.getLogger(__name__)
 
-HYBRID_ALPHA = 0.75  # 75% vector + 25% BM25
 # Collections use one self-provided named vector. Vectors must be written
-# under this name: a plain `vector` list (batch) or the legacy REST "vector"
+# under this name: a plain `vector` list or the legacy REST "vector"
 # field is stored but never reaches the HNSW index, which silently turned
 # every hybrid query into 0.25 x BM25.
 VECTOR_NAME = "default"
-READY_TTL_S = 5.0
 
-WEAVIATE_HOST = os.getenv("WEAVIATE_HOST", "localhost")
-WEAVIATE_PORT = int(os.getenv("WEAVIATE_PORT", "8080"))
-WEAVIATE_GRPC_PORT = int(os.getenv("WEAVIATE_GRPC_PORT", "50051"))
-_REST_BASE = f"http://{WEAVIATE_HOST}:{WEAVIATE_PORT}"
-# Set when Weaviate runs with API-key auth (docker-compose.yml).
-WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY", "")
 
 
 def connect_local() -> weaviate.WeaviateClient:
-    auth = Auth.api_key(WEAVIATE_API_KEY) if WEAVIATE_API_KEY else None
     return weaviate.connect_to_local(
         host=WEAVIATE_HOST,
         port=WEAVIATE_PORT,
         grpc_port=WEAVIATE_GRPC_PORT,
-        auth_credentials=auth,
     )
 
 
-def rest_headers() -> dict:
-    h = {"Content-Type": "application/json"}
-    if WEAVIATE_API_KEY:
-        h["Authorization"] = f"Bearer {WEAVIATE_API_KEY}"
-    return h
 
 # collections
 #   NarrativeArcs     historical WC storylines (goals, red cards, momentum); used by
@@ -78,6 +65,9 @@ _SCHEMAS = {
         ("competition", wvc.config.DataType.TEXT),
         ("season", wvc.config.DataType.TEXT),
         ("ppda", wvc.config.DataType.NUMBER),
+        ("ppda_full", wvc.config.DataType.NUMBER),
+        ("pass_accuracy", wvc.config.DataType.NUMBER),
+        ("shots", wvc.config.DataType.INT),
         ("ppda_def_third", wvc.config.DataType.NUMBER),
         ("ppda_mid_third", wvc.config.DataType.NUMBER),
         ("ppda_att_third", wvc.config.DataType.NUMBER),
@@ -91,7 +81,7 @@ _RETURN_PROPS = {
     TACTICAL_PROFILES: [
         "content", "team", "opponent", "match_id", "competition", "season",
         "ppda", "ppda_def_third", "ppda_mid_third", "ppda_att_third",
-        "possession", "press_intensity",
+        "possession", "press_intensity", "ppda_full", "pass_accuracy", "shots",
     ],
 }
 
@@ -159,21 +149,19 @@ class WeaviateClient:
         )
         log.info(f"Created Weaviate collection '{name}'")
 
+    def recreate(self, name: str) -> None:
+        """Drop and recreate one collection (schema changes need a rebuild)."""
+        if self._client.collections.exists(name):
+            self._client.collections.delete(name)
+            log.info(f"Dropped Weaviate collection '{name}'")
+        self._ensure_one(name, _SCHEMAS[name])
     def get_count(self, collection: str = DEFAULT_COLLECTION) -> int:
         if collection not in _SCHEMAS:
             log.warning(f"get_count: unknown collection '{collection}'")
             return 0
         try:
-            q = json.dumps({"query": "{Aggregate{%s{meta{count}}}}" % collection})
-            req = urllib.request.Request(
-                f"{_REST_BASE}/v1/graphql",
-                data=q.encode(),
-                headers=rest_headers(),
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=5) as r:
-                data = json.loads(r.read())
-                return data["data"]["Aggregate"][collection][0]["meta"]["count"]
+            col = self._client.collections.get(collection)
+            return col.aggregate.over_all(total_count=True).total_count or 0
         except Exception as exc:
             log.warning(f"count failed for {collection}: {exc}")
             return 0
@@ -192,7 +180,7 @@ class WeaviateClient:
         return_objects: bool = False,
         alpha: float = HYBRID_ALPHA,
     ):
-        """Hybrid BM25 + vector search.
+        """Hybrid BM25 + vector search over `collection` (default NarrativeArcs).
 
         Defaults to NarrativeArcs, returning content strings; return_objects
         returns the full property dicts.
@@ -224,18 +212,17 @@ class WeaviateClient:
             )
 
             if return_objects:
-                out = []
-                for obj in results.objects:
-                    props = dict(obj.properties)
-                    try:
-                        props["_score"] = (
+                out = [
+                    {
+                        **obj.properties,
+                        "_score": (
                             float(obj.metadata.score)
                             if obj.metadata and obj.metadata.score is not None
                             else None
-                        )
-                    except Exception:
-                        props["_score"] = None
-                    out.append(props)
+                        ),
+                    }
+                    for obj in results.objects
+                ]
                 log.debug(f"Weaviate[{collection}]: {len(out)} objs for '{query_text[:50]}'")
                 return out
 
@@ -247,25 +234,30 @@ class WeaviateClient:
             log.warning(f"Weaviate search error [{collection}]: {exc}")
             return []
 
-    # insert via REST, bypassing Python client version differences
-
-    def insert_document(self, collection: str, properties: dict, vector: List[float]) -> bool:
-        """Generic insert. Caller supplies the full properties dict."""
-        payload = json.dumps(
-            {"class": collection, "properties": properties, "vectors": {VECTOR_NAME: vector}}
-        ).encode()
-        request = urllib.request.Request(
-            f"{_REST_BASE}/v1/objects",
-            data=payload,
-            headers=rest_headers(),
-            method="POST",
-        )
+    def fetch_all(self, collection: str) -> List[dict]:
+        """Every object's properties (no vectors)."""
+        if not self.ready or collection not in _SCHEMAS:
+            return []
         try:
-            with urllib.request.urlopen(request, timeout=10) as r:
-                return r.status in (200, 201)
+            col = self._client.collections.get(collection)
+            return [
+                dict(o.properties)
+                for o in col.iterator(return_properties=_RETURN_PROPS[collection])
+            ]
         except Exception as exc:
-            log.warning(f"Insert failed [{collection}]: {exc}")
-            return False
+            log.warning(f"Weaviate fetch_all error [{collection}]: {exc}")
+            return []
+
+    def insert_many(self, collection: str, props_list: List[dict], vectors) -> int:
+        """Batch insert under VECTOR_NAME; returns the number inserted."""
+        col = self._client.collections.get(collection)
+        with col.batch.dynamic() as batch:
+            for props, vec in zip(props_list, vectors):
+                batch.add_object(properties=props, vector={VECTOR_NAME: [float(x) for x in vec]})
+        failed = len(col.batch.failed_objects)
+        if failed:
+            log.error(f"{failed} objects failed to insert into {collection}")
+        return len(props_list) - failed
 
 
 _client: Optional[WeaviateClient] = None

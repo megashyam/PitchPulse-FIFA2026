@@ -7,9 +7,9 @@ For each goal or red card:
     2. Run two tournament simulations with common random numbers: earlier
        matches pinned to their real results, this match conditioned live on
        the before/after state. The champion-probability delta is the
-       event's effect.
+       event's effect; its SE is the paired std(hit_after - hit_before)/√N.
     3. Events that change neither score nor players on the pitch, or move
-       no team past DELTA_THRESHOLD, get a template entry (no LLM).
+       no team past max(DELTA_THRESHOLD, 2·SE), get a template entry (no LLM).
 
 Seeds use zlib.crc32 (stable across restarts); simulations run on
 ml.executors.CF_SIM_EXECUTOR.
@@ -17,42 +17,44 @@ ml.executors.CF_SIM_EXECUTOR.
 
 import asyncio
 import logging
-import os
 import time
 import zlib
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Awaitable, Callable, Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
+import numpy as np
+
+from agents.cf_prompts import _build_prompt, _no_impact_text, _template
+from agents.grounding import team_violations
 from agents.ollama_client import generate_with_source
 from api.match_timeline import around
-from api.schemas.event_types import TRIGGER_TYPES
-from api.schemas.schema import MatchEvent, MatchState
+from api.tournament_state import side_probs
+from schemas.event_types import TRIGGER_TYPES
+from schemas.feeds import CfEntry, Change
+from schemas.schema import MatchEvent, MatchState
 from ml.executors import CF_SIM_EXECUTOR
-from ml.in_play import inplay_wdl
 from ml.odds_api_client import get_oddsapi_client
-from ml.prior_builder import match_wdl
-from ml.team_names import to_sim
+from ml.prior_builder import prior_for
+from ml.team_names import canonical
 from ml.tournament_sim import LiveMatch, results_from_fixtures, run_simulation
-from ml.wc_2026_config import FIXTURE_BY_ID, TEAM_BY_NAME
+from ml.wc_2026_config import FIXTURE_BY_ID
+
+from config import (
+    CF_MAX_EVENTS_PER_PASS,
+    CF_MIN_GAP_S,
+    CF_NARRATIVE_MAX_TOKENS,
+    CF_SIMS,
+    DELTA_THRESHOLD,
+)
 
 log = logging.getLogger(__name__)
 
-DELTA_THRESHOLD = 0.003  # min |Δ champion prob| to list a team
-CF_SIMS = int(
-    os.getenv("CF_SIMS", "20000")
-)  # paths per before/after simulation
-
-# prompt asks for one 60-80 word paragraph; small models ignore that, so this token cap
-# (~80-90 words) enforces it
-CF_NARRATIVE_MAX_TOKENS = 130
-CF_NARRATIVE_NUM_CTX = 1280  # prompt + response must both fit this window
 
 @dataclass
 class CfState:
     covered: Set[str] = field(default_factory=set)
     last_time: float = 0.0
-    MIN_GAP: float = 45.0
 
 
 _states: Dict[int, CfState] = {}
@@ -79,43 +81,9 @@ def clear_state(fixture_id: int) -> None:
     _states.pop(fixture_id, None)
 
 
-def _maybe_reset_on_replay(cf: CfState, current_elapsed: int) -> None:
-    if not cf.covered or current_elapsed > 20:
-        return
-    covered_minutes = []
-    for sig in cf.covered:
-        try:
-            covered_minutes.append(int(sig.split(":")[0]))
-        except (ValueError, IndexError):
-            pass
-    if covered_minutes and max(covered_minutes) > current_elapsed + 20:
-        log.info(
-            f"Replay restart — covered up to {max(covered_minutes)}', "
-            f"now at {current_elapsed}'. Resetting."
-        )
-        cf.covered.clear()
-        cf.last_time = 0.0
-
-
-def _find_trigger(state: MatchState, cf: CfState) -> Optional[MatchEvent]:
-    current_elapsed = state.elapsed or 0
-    _maybe_reset_on_replay(cf, current_elapsed)
-
-    for ev in reversed(state.events):
-        if ev.type not in TRIGGER_TYPES:
-            continue
-        if ev.elapsed > current_elapsed:
-            continue
-        if _sig(ev) in cf.covered:
-            continue
-        return ev
-    return None
-
-
 def _find_all_triggers(state: MatchState, cf: CfState) -> List[MatchEvent]:
-    """Every uncovered trigger event in chronological order (for update_all)."""
+    """Uncovered trigger events, oldest first; update_latest() takes the last, update_backlog() all."""
     current_elapsed = state.elapsed or 0
-    _maybe_reset_on_replay(cf, current_elapsed)
 
     out: List[MatchEvent] = []
     seen: Set[str] = set()
@@ -132,150 +100,85 @@ def _find_all_triggers(state: MatchState, cf: CfState) -> List[MatchEvent]:
     return out
 
 
-def _no_impact_entry(
-    state: MatchState, trigger: MatchEvent, swing: Tuple[float, float], conditioned: bool
-) -> dict:
-    who = trigger.player_name or trigger.team_name
-    what = trigger.type.replace("_", " ")
-    reason = (
-        "left the score and the numbers on the pitch unchanged, so the bracket "
-        "outlook did not move."
-        if conditioned
-        else "is outside the simulated tournament."
-    )
+def _entry(
+    state: MatchState,
+    trigger: MatchEvent,
+    swing: Tuple[float, float],
+    conditioned: bool,
+    narrative: str,
+    via: str = "template",
+    path_shift: float = 0.0,
+    changes: Sequence[Change] = (),
+    n_sims: int = 0,
+    elapsed_s: float = 0.0,
+) -> CfEntry:
     return {
         "fixture_id": state.fixture_id,
         "minute": trigger.elapsed,
-        "extra": trigger.extra,
+        "extra": trigger.extra,  # stoppage-time sub-minute; lets the worker rebuild coverage
         "event_type": trigger.type,
         "event_team": trigger.team_name,
-        "event_team_id": trigger.team_id,
-        "path_shift_pct": 0.0,
-        "top_changes": [],
-        "narrative": f"{who}'s {what} at {trigger.elapsed}' {reason}",
-        "via": "template",
+        "event_team_id": trigger.team_id,  # lets the worker rebuild coverage
+        "path_shift_pct": round(path_shift, 3),
+        "top_changes": [
+            {
+                "team": c.team,
+                "before": round(c.before, 4),
+                "after": round(c.after, 4),
+                "delta": round(c.delta, 4),
+                "delta_se": round(c.se, 4) if c.se is not None else None,
+            }
+            for c in changes[:4]
+        ],
+        "narrative": narrative,
+        "via": via,
         "conditioned": conditioned,
         "match_win_prob_before": round(swing[0], 4),
         "match_win_prob_after": round(swing[1], 4),
-        "n_sims": 0,
-        "elapsed_s": 0.0,
+        "n_sims": n_sims,
+        "elapsed_s": elapsed_s,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
-def _divergence(
-    before_teams, after_teams
-) -> Tuple[List[Tuple[str, float, float, float]], float]:
-    before = {t.name: t.probs["champion"] for t in before_teams}
-    after = {t.name: t.probs["champion"] for t in after_teams}
-    changes: List[Tuple[str, float, float, float]] = []
+def _no_impact_entry(
+    state: MatchState, trigger: MatchEvent, swing: Tuple[float, float], conditioned: bool
+) -> CfEntry:
+    return _entry(state, trigger, swing, conditioned, _no_impact_text(trigger, conditioned))
+
+
+def _paired_se(before_result, after_result) -> Optional["np.ndarray"]:
+    """Per-team SE of the CRN champion delta: std(hit_after − hit_before)/√N."""
+    hb, ha = before_result.champion_hits, after_result.champion_hits
+    if hb is None or ha is None:
+        return None
+    d = ha.astype(np.int8) - hb.astype(np.int8)
+    return d.std(axis=0, ddof=1) / np.sqrt(d.shape[0])
+
+
+def _divergence(before_result, after_result) -> Tuple[List[Change], float]:
+    """Teams whose champion probability moved by at least
+    max(DELTA_THRESHOLD, 2·SE), with the paired SE when hits were kept."""
+    se = _paired_se(before_result, after_result)
+    after = {t.name: t.probs["champion"] for t in after_result.teams}
+    changes: List[Change] = []
     total_abs = 0.0
-    for name, pb in before.items():
-        pa = after.get(name, pb)
+    for i, t in enumerate(before_result.teams):
+        pb = t.probs["champion"]
+        pa = after.get(t.name, pb)
         d = pa - pb
         total_abs += abs(d)
-        if abs(d) >= DELTA_THRESHOLD:
-            changes.append((name, pb, pa, d))
-    changes.sort(key=lambda x: abs(x[3]), reverse=True)
+        s_i = float(se[i]) if se is not None else None
+        if abs(d) >= max(DELTA_THRESHOLD, 2 * (s_i or 0.0)):
+            changes.append(Change(t.name, pb, pa, d, s_i))
+    changes.sort(key=lambda c: abs(c.delta), reverse=True)
     # sum of |Δ| counts every move twice (one team's gain is another's loss); halved it
     # is the champion-probability mass that moved
     path_shift = min(1.0, total_abs / 2.0)
     return changes, path_shift
 
 
-def _team_stage_line(after_teams, sim_name: str) -> Optional[str]:
-    """One team's odds at every stage, not just champion."""
-    for t in after_teams:
-        if t.name == sim_name:
-            p = t.probs
-            return (
-                f"{t.name}: {p.get('champion', 0):.1%} champion, "
-                f"{p.get('final', 0):.1%} to reach the final, "
-                f"{p.get('sf', 0):.1%} to reach the semifinal"
-            )
-    return None
-
-
-def _build_prompt(state, trigger, changes, path_shift, after_teams, swing) -> str:
-    ev_desc = trigger.type.replace("_", " ")
-    score = f"{state.home_score}–{state.away_score}"
-    swing_line = (
-        f"In-play win probability for {trigger.team_name} moved "
-        f"{swing[0]:.0%} → {swing[1]:.0%} on this event.\n"
-        if swing
-        else ""
-    )
-    if changes:
-        lines = "\n".join(
-            f"  {name}: {pb:.1%} → {pa:.1%}  ({'+' if d > 0 else ''}{d:.1%})"
-            for name, pb, pa, d in changes[:4]
-        )
-        bracket_context = (
-            f"CHAMPION PROBABILITY SHIFTS "
-            f"(two {CF_SIMS:,}-sim brackets, common random numbers):\n{lines}\n\n"
-            f"Champion-probability mass relocated: {path_shift:.1%}."
-        )
-        task = (
-            "Explain how this event reshapes the tournament outlook. Lead with "
-            "the size of the shift and which team it favours or costs most — "
-            "don't open by restating the scoreline or event type, the reader "
-            "already knows those. Weave in a second team from the shifts list "
-            "so the ripple is visible, not just the headline mover, and land on "
-            "one non-obvious consequence: a team whose odds moved despite not "
-            "playing, or a favourite quietly benefiting from the result. Write "
-            "ONE tight paragraph, no more than 80 words — every clause should "
-            "add new information."
-        )
-    else:
-        home_line = _team_stage_line(after_teams, to_sim(state.home_name))
-        away_line = _team_stage_line(after_teams, to_sim(state.away_name))
-        team_lines = "\n".join(line for line in (home_line, away_line) if line)
-        top_now = sorted(after_teams, key=lambda t: t.probs["champion"], reverse=True)[
-            :3
-        ]
-        leaderboard = ", ".join(
-            f"{t.name} {t.probs['champion']:.1%}" for t in top_now
-        )
-        bracket_context = (
-            f"TOURNAMENT STATE — this event produced IDENTICAL odds to omitting "
-            f"it entirely, because the simulator only conditions on scoreline and "
-            f"dismissals, not on cautions or substitutions:\n"
-            f"{team_lines}\n\n"
-            f"Current championship-odds leaderboard: {leaderboard}."
-        )
-        task = (
-            f"Explain why the simulator treated this {ev_desc} as inconsequential "
-            f"— ground it in how the model actually works (it conditions on "
-            f"scoreline and dismissals, not on cautions or substitutions), not "
-            f"just 'nothing changed'. Use the multi-stage odds above (final, "
-            f"semifinal, champion — not just one number) to say something real "
-            f"about where {trigger.team_name} and their opponent actually stand "
-            f"in the tournament right now. Do not end by simply noting that a "
-            f"goal or red card would matter — that's obvious; instead close on "
-            f"what's specifically at stake for these two teams. Write ONE tight "
-            f"paragraph, no more than 60 words."
-        )
-
-    return (
-        f"[INST] You are the lead tournament analyst for a live World Cup 2026 "
-        f"intelligence desk. Your job is to explain, vividly and specifically, "
-        f"how one match event reshapes (or fails to reshape) the ENTIRE "
-        f"tournament bracket — the kind of insight a smart fan couldn't get "
-        f"just from watching the game.\n\n"
-        f"MATCH: {state.home_name} {score} {state.away_name} "
-        f"· Minute {trigger.elapsed}' · {state.status_short}\n"
-        f"EVENT: {trigger.team_name} — {ev_desc}\n"
-        f"{swing_line}\n"
-        f"{bracket_context}\n\n"
-        f"{task}\n\n"
-        f"Use the actual percentages given. Avoid the words 'significant', "
-        f"'crucial', 'notable', 'pivotal'. Only name teams that appear above — "
-        f"do not invent a rival, precedent match, or scoreline not given here. "
-        f"[/INST]"
-    )
-
-
-def _allowed_teams(state, changes, after_teams) -> set:
+def _cf_allowed_teams(state, changes, after_teams) -> set:
     """Team names the narrative may mention.
 
     The two sides playing, every team in the computed bracket shift and the
@@ -283,101 +186,29 @@ def _allowed_teams(state, changes, after_teams) -> set:
     no number for.
     """
     allowed = {state.home_name, state.away_name}
-    allowed.update(name for name, *_ in changes)
+    allowed.update(c.team for c in changes)
     top = sorted(after_teams, key=lambda t: t.probs["champion"], reverse=True)[:8]
     allowed.update(t.name for t in top)
     return allowed
 
 
-def _grounding_violation(narrative: str, state, changes, after_teams) -> bool:
-    """True if the narrative names a WC 2026 team outside _allowed_teams."""
-    allowed = _allowed_teams(state, changes, after_teams)
-    for name in TEAM_BY_NAME:
-        if name in allowed:
-            continue
-        if name in narrative:
-            return True
-    return False
-
-
-def _ordinal_pct(x: float) -> str:
-    return f"{x * 100:.1f}%"
-
-
-def _template(state, trigger, changes, path_shift, after_teams, swing) -> str:
-    """Number-dense fallback narrative used when no LLM is reachable."""
-    ev_desc = trigger.type.replace("_", " ")
-    score = f"{state.home_score}–{state.away_score}"
-
-    # this team's in-match win prob before and after the event
-    swing_txt = ""
-    if swing and abs(swing[1] - swing[0]) > 0.005:
-        swing_txt = (
-            f" The event swung {trigger.team_name}'s in-match win probability "
-            f"from {_ordinal_pct(swing[0])} to {_ordinal_pct(swing[1])}."
-        )
-
+async def _narrate(state, trigger, changes, path_shift, swing, after_teams) -> Tuple[str, str]:
+    """(narrative, via). LLM only when some team moved; an ungrounded or empty
+    LLM answer falls back to the template."""
+    narrative, via = "", "template"
     if changes:
-        # biggest riser and faller across the bracket
-        risers = [c for c in changes if c[3] > 0]
-        fallers = [c for c in changes if c[3] < 0]
-        top = changes[0]
-        name, pb, pa, delta = top
-        direction = "climbs" if delta > 0 else "slips"
-
-        lead = (
-            f"{path_shift * 100:.1f}% of the tournament's title probability just "
-            f"relocated across the bracket. {name} {direction} from "
-            f"{_ordinal_pct(pb)} to {_ordinal_pct(pa)} to lift the World Cup "
-            f"({'+' if delta > 0 else ''}{delta * 100:.1f} points)"
+        prompt = _build_prompt(state, trigger, changes, path_shift, swing)
+        narrative, via = await generate_with_source(
+            prompt,
+            timeout=35.0,
+            max_tokens=CF_NARRATIVE_MAX_TOKENS,
         )
-
-        # second team: the biggest faller
-        second = ""
-        if delta > 0 and fallers:
-            fn, fpb, fpa, fd = fallers[0]
-            second = (
-                f", while {fn} pays for it, sliding {fpb * 100:.1f}% → "
-                f"{fpa * 100:.1f}%"
-            )
-        elif delta < 0 and risers:
-            rn, rpb, rpa, rd = risers[0]
-            second = (
-                f", while {rn} is the quiet beneficiary, rising {rpb * 100:.1f}% "
-                f"→ {rpa * 100:.1f}%"
-            )
-        elif len(changes) > 1:
-            n2, pb2, pa2, d2 = changes[1]
-            second = (
-                f", and {n2} moves {pb2 * 100:.1f}% → {pa2 * 100:.1f}% "
-                f"in the ripple"
-            )
-
-        return (
-            f"{lead}{second}. The {ev_desc} in {state.home_name} {score} "
-            f"{state.away_name} at {trigger.elapsed}' didn't just change this "
-            f"result — it reweighted the whole draw.{swing_txt}"
-        )
-
-    # no material bracket change
-    top = sorted(after_teams, key=lambda t: t.probs["champion"], reverse=True)[:3]
-    leaders = (
-        ", ".join(f"{t.name} ({_ordinal_pct(t.probs['champion'])})" for t in top)
-        if top
-        else "the field"
-    )
-    return (
-        f"{trigger.team_name}'s {ev_desc} at {trigger.elapsed}' in "
-        f"{state.home_name} {score} {state.away_name} didn't touch the "
-        f"championship math — under {max(0.1, path_shift * 100):.1f}% of title "
-        f"probability shifted, which the model treats as noise rather than "
-        f"signal. That's because the two conditioned brackets only diverge on "
-        f"scoreline and red cards, and this event changed neither.{swing_txt} "
-        f"The favourites sit exactly where they did before kickoff on this "
-        f"storyline: {leaders}. It would take a goal, an equaliser, or a "
-        f"sending-off — not a caution or a fresh legs substitution — to move "
-        f"any of those numbers again."
-    )
+    if narrative and team_violations(narrative, _cf_allowed_teams(state, changes, after_teams)):
+        log.warning(f"[{state.fixture_id}] CF narrative failed grounding check — discarding")
+        narrative = ""
+    if not narrative:
+        return _template(state, trigger, changes, path_shift, after_teams, swing), "template"
+    return narrative, via
 
 
 def _stable_seed(fid: int, trigger: MatchEvent) -> int:
@@ -386,58 +217,50 @@ def _stable_seed(fid: int, trigger: MatchEvent) -> int:
     return zlib.crc32(raw) % 2_147_483_646 + 1
 
 
-async def update(
+async def update_latest(
     state: MatchState,
     loop: asyncio.AbstractEventLoop,
-    on_start: Optional[Callable[[dict], Awaitable[None]]] = None,
     results: Optional[Dict[int, dict]] = None,
-) -> Optional[dict]:
-    """Analyse the newest uncovered trigger event, at most once per MIN_GAP.
-
-    Live path. `on_start`, if given, is awaited before the simulations run
-    so the worker can publish a "calculating" signal.
-    """
+) -> Optional[CfEntry]:
+    """Analyse the newest uncovered trigger event, at most once per CF_MIN_GAP_S (live path)."""
     fid = state.fixture_id
     cf = _states.setdefault(fid, CfState())
 
-    if time.time() - cf.last_time < cf.MIN_GAP:
+    if time.time() - cf.last_time < CF_MIN_GAP_S:
         return None
 
-    trigger = _find_trigger(state, cf)
-    if not trigger:
+    triggers = _find_all_triggers(state, cf)
+    if not triggers:
         return None
+    trigger = triggers[-1]
 
     cf.last_time = time.time()
-    return await _analyze_trigger(state, cf, trigger, loop, on_start=on_start, results=results)
+    return await _analyze_trigger(state, cf, trigger, loop, results=results)
 
 
-async def update_all(
+async def update_backlog(
     state: MatchState,
     loop: asyncio.AbstractEventLoop,
-    on_start: Optional[Callable[[dict], Awaitable[None]]] = None,
-    max_events: int = 20,
     results: Optional[Dict[int, dict]] = None,
-) -> List[dict]:
+) -> List[CfEntry]:
     """Analyse every uncovered trigger event, oldest first (backfill path).
 
-    Not MIN_GAP-throttled. `max_events` caps one pass; the rest run next tick.
+    Not CF_MIN_GAP_S-throttled. CF_MAX_EVENTS_PER_PASS caps one pass; the rest run next tick.
     """
     fid = state.fixture_id
     cf = _states.setdefault(fid, CfState())
 
-    triggers = _find_all_triggers(state, cf)[:max_events]
+    triggers = _find_all_triggers(state, cf)[:CF_MAX_EVENTS_PER_PASS]
     if not triggers:
         return []
 
-    results: List[dict] = []
+    out: List[CfEntry] = []
     for trigger in triggers:
-        result = await _analyze_trigger(
-            state, cf, trigger, loop, on_start=on_start, results=results
-        )
+        result = await _analyze_trigger(state, cf, trigger, loop, results=results)
         if result is not None:
-            results.append(result)
+            out.append(result)
     cf.last_time = time.time()
-    return results
+    return out
 
 
 async def _analyze_trigger(
@@ -445,41 +268,26 @@ async def _analyze_trigger(
     cf: "CfState",
     trigger: MatchEvent,
     loop: asyncio.AbstractEventLoop,
-    on_start: Optional[Callable[[dict], Awaitable[None]]] = None,
     results: Optional[Dict[int, dict]] = None,
-) -> Optional[dict]:
+) -> Optional[CfEntry]:
     """Two CRN-paired conditioned brackets for one event, then a narrative."""
     fid = state.fixture_id
-
-    if on_start is not None:
-        try:
-            await on_start(
-                {
-                    "minute": trigger.elapsed,
-                    "event_type": trigger.type,
-                    "event_team": trigger.team_name,
-                }
-            )
-        except Exception:
-            log.warning(f"[{fid}] on_start callback failed", exc_info=True)
 
     odds_client = get_oddsapi_client()
     odds_table = await odds_client.get_all_odds()  # cached: see odds_api_client
 
     cf.covered.add(_sig(trigger))
 
-    fx = FIXTURE_BY_ID.get(fid)
-    home_c, away_c = to_sim(state.home_name), to_sim(state.away_name)
-    conditioned = fx is not None
-    pre_wdl = match_wdl(
-        home_c, away_c, host_side=fx.get("host_side") if fx else None, odds_table=odds_table
+    conditioned = fid in FIXTURE_BY_ID
+    pre_wdl, totals, _ = prior_for(
+        canonical(state.home_name), canonical(state.away_name), fid, odds_table
     )
 
     # match state just before and just after the event, not the final score
     before, after = around(state, trigger)
     minute = trigger.elapsed
-    after_wdl = inplay_wdl(pre_wdl, minute, *after, extra=trigger.extra)
-    before_wdl = inplay_wdl(pre_wdl, minute, *before, extra=trigger.extra)
+    after_wdl = side_probs(pre_wdl, fid, minute, after, extra=trigger.extra, totals=totals)
+    before_wdl = side_probs(pre_wdl, fid, minute, before, extra=trigger.extra, totals=totals)
 
     acted_home = trigger.team_id == 1
     swing = (
@@ -505,6 +313,7 @@ async def _analyze_trigger(
             seed=seed,
             results=pinned,
             live={fid: LiveMatch(minute, *snap, extra=trigger.extra)},
+            keep_hits=True,
         )
 
     try:
@@ -517,55 +326,16 @@ async def _analyze_trigger(
         cf.covered.discard(_sig(trigger))
         return None
 
-    changes, path_shift = _divergence(before_result.teams, after_result.teams)
-
+    changes, path_shift = _divergence(before_result, after_result)
     # no team past DELTA_THRESHOLD: template, no LLM call
-    narrative, via = "", "template"
-    if changes:
-        prompt = _build_prompt(state, trigger, changes, path_shift, after_result.teams, swing)
-        narrative, via = await generate_with_source(
-            prompt,
-            timeout=35.0,
-            max_tokens=CF_NARRATIVE_MAX_TOKENS,
-            num_ctx=CF_NARRATIVE_NUM_CTX,
-        )
-    if narrative and _grounding_violation(narrative, state, changes, after_result.teams):
-        log.warning(f"[{fid}] CF narrative failed grounding check — discarding")
-        narrative = ""
-    if not narrative:
-        narrative = _template(
-            state, trigger, changes, path_shift, after_result.teams, swing
-        )
-        via = "template"
+    narrative, via = await _narrate(state, trigger, changes, path_shift, swing, after_result.teams)
 
     log.info(
         f"[{fid}] CF: {trigger.type}@{trigger.elapsed}' "
         f"path_shift={path_shift:.2%} changes={len(changes)}"
     )
-
-    return {
-        "fixture_id": fid,
-        "minute": trigger.elapsed,
-        "extra": trigger.extra,  # stoppage-time sub-minute; lets the worker rebuild coverage
-        "event_type": trigger.type,
-        "event_team": trigger.team_name,
-        "event_team_id": trigger.team_id,  # lets the worker rebuild coverage
-        "path_shift_pct": round(path_shift, 3),
-        "top_changes": [
-            {
-                "team": name,
-                "before": round(pb, 4),
-                "after": round(pa, 4),
-                "delta": round(d, 4),
-            }
-            for name, pb, pa, d in changes[:4]
-        ],
-        "narrative": narrative,
-        "via": via,
-        "conditioned": conditioned,
-        "match_win_prob_before": round(swing[0], 4),
-        "match_win_prob_after": round(swing[1], 4),
-        "n_sims": after_result.n_sims,
-        "elapsed_s": after_result.elapsed_s,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
+    return _entry(
+        state, trigger, swing, conditioned, narrative, via,
+        path_shift=path_shift, changes=changes,
+        n_sims=after_result.n_sims, elapsed_s=after_result.elapsed_s,
+    )
