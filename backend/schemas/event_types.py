@@ -12,4 +12,5 @@ SIGNIFICANT_TYPES = GOAL_TYPES | RED_TYPES
 TRIGGER_TYPES = SIGNIFICANT_TYPES | frozenset({"yellow", "substitution"})
 
 LIVE_STATUSES = frozenset({"1H", "HT", "2H", "ET", "P"})
+IN_PLAY = LIVE_STATUSES - {"HT"}  # ball in play: colour narration runs
 COMPLETED_STATUSES = frozenset({"FT", "AET", "PEN"})

@@ -7,7 +7,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Optional
 
-from api.schemas.schema import Fixture, MatchDetail
+from schemas.schema import Fixture, MatchDetail
 from ml.wc_2026_config import DATA_DIR, FIXTURES
 
 

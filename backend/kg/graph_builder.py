@@ -19,7 +19,7 @@ import httpx
 
 from kg.neo4j_client import Neo4jClient, get_neo4j_client
 from ml.statsbomb import COMPETITION_ID, SB_BASE, SEASON_IDS
-from ml.team_names import SIM_NAMES, to_sim
+from ml.team_names import SIM_NAMES, canonical
 from ml.wc2026_format import R32_SLOTS
 from ml.wc_2026_config import GROUPS, WC2026_TEAMS
 
@@ -79,8 +79,8 @@ async def build_head_to_head_edges(client: Neo4jClient) -> int:
                 continue
 
             for m in matches:
-                home = to_sim(m["home_team"]["home_team_name"])
-                away = to_sim(m["away_team"]["away_team_name"])
+                home = canonical(m["home_team"]["home_team_name"])
+                away = canonical(m["away_team"]["away_team_name"])
                 if home == away or home not in SIM_NAMES or away not in SIM_NAMES:
                     continue
                 await asyncio.to_thread(

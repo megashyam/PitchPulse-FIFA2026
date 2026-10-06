@@ -1,6 +1,6 @@
 """
 Pydantic models for match state and the ESPN feed records behind it.
-Raw payloads are validated in api/schemas/espn_schema.py and converted
+Raw payloads are validated in schemas/espn_schema.py and converted
 here with `from_espn`.
 
     MatchState.stats_source       "espn" | "unavailable"
@@ -13,7 +13,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from api.schemas.espn_schema import (
+from schemas.espn_schema import (
     HOSTS,
     KEY_EVENT_TYPES,
     LINE_ORDER,
@@ -54,6 +54,8 @@ class TeamStats(BaseModel):
     pass_accuracy: float = 0.0
     corner_kicks: int = 0
     fouls: int = 0
+    tackles: int = 0
+    interceptions: int = 0
     offsides: int = 0
     yellow_cards: int = 0
     red_cards: int = 0
@@ -76,12 +78,19 @@ class TeamStats(BaseModel):
             pass_accuracy=round(accurate / passes * 100, 1) if passes else 0.0,
             corner_kicks=int(v.get("corner_kicks", 0)),
             fouls=int(v.get("fouls", 0)),
+            tackles=int(v.get("tackles", 0)),
+            interceptions=int(v.get("interceptions", 0)),
             offsides=int(v.get("offsides", 0)),
             yellow_cards=int(v.get("yellow_cards", 0)),
             red_cards=int(v.get("red_cards", 0)),
             goalkeeper_saves=int(v.get("goalkeeper_saves", 0)),
             expected_goals=round(xg, 2),
         )
+
+    def ppda_full(self, opp: "TeamStats") -> float:
+        """Whole-pitch PPDA: opponent completed passes per tackle,
+        interception or foul (live feeds have no event locations)."""
+        return opp.passes_accurate / max(1, self.tackles + self.interceptions + self.fouls)
 
 
 class MatchEvent(BaseModel):

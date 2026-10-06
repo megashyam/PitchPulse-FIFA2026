@@ -6,7 +6,7 @@ tables. Only the fields we read are declared; the rest is ignored.
     EspnStandings  standings   (children = groups)
     EspnSummary    summary     boxscore, keyEvents, rosters, commentary
 
-Domain models are built from these in api/schemas/schema.py (`from_espn`).
+Domain models are built from these in schemas/schema.py (`from_espn`).
 """
 
 from __future__ import annotations
@@ -98,6 +98,8 @@ STAT_KEYS = {
     "accuratePasses": "passes_accurate",
     "wonCorners": "corner_kicks",
     "foulsCommitted": "fouls",
+    "totalTackles": "tackles",  # attempted, like StatsBomb Duel/Tackle
+    "interceptions": "interceptions",
     "offsides": "offsides",
     "yellowCards": "yellow_cards",
     "redCards": "red_cards",

@@ -35,11 +35,6 @@ def canonical(name: str) -> str:
     return _ALIASES.get(name, name)
 
 
-def to_sim(name: str) -> str:
-    """Any spelling → simulator name; unknown names pass through unchanged."""
-    return canonical(name)
-
-
 def _sim_names() -> Set[str]:
     # Lazy: the snapshot builder imports this module before a snapshot exists.
     from ml.wc_2026_config import WC2026_TEAMS

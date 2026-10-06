@@ -8,7 +8,6 @@ method returns an empty result when Neo4j is down.
 from __future__ import annotations
 
 import logging
-import os
 import time
 from typing import Optional
 
@@ -16,12 +15,10 @@ from neo4j import GraphDatabase
 
 from kg.schema import CONSTRAINT_STATEMENTS
 
+from config import NEO4J_PASSWORD, NEO4J_URI, NEO4J_USER, READY_TTL_S
+
 log = logging.getLogger(__name__)
 
-NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
-NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "wc2026pass")
-READY_TTL_S = 5.0
 
 
 class Neo4jClient:

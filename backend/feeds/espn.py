@@ -9,7 +9,7 @@ play-by-play with shot coordinates, for league slug ``fifa.world``.
     summary     {WEB}/{league}/summary?event={id}                 one match
 
 Fetchers return raw JSON. Parsers validate it into the Espn* models in
-api/schemas/espn_schema.py, then build domain models with `from_espn`.
+schemas/espn_schema.py, then build domain models with `from_espn`.
 
 Uses httpx's default User-Agent (ESPN's CDN returns 403 for custom UAs).
 """
@@ -17,14 +17,13 @@ Uses httpx's default User-Agent (ESPN's CDN returns 403 for custom UAs).
 from __future__ import annotations
 
 import logging
-import os
 from typing import Optional
 
 import httpx
 from pydantic import ValidationError
 
-from api.schemas.espn_schema import EspnEvent, EspnKeyEvent, EspnStandings, EspnSummary
-from api.schemas.schema import (
+from schemas.espn_schema import EspnEvent, EspnKeyEvent, EspnStandings, EspnSummary
+from schemas.schema import (
     Fixture,
     Lineup,
     MatchDetail,
@@ -36,10 +35,10 @@ from api.schemas.schema import (
 from ml import shot_xg
 from ml.team_names import canonical
 
+from config import ESPN_LEAGUE as LEAGUE, ESPN_SEASON as SEASON
+
 log = logging.getLogger(__name__)
 
-LEAGUE = os.getenv("ESPN_LEAGUE", "fifa.world")
-SEASON = os.getenv("ESPN_SEASON", "2026")
 SITE = "https://site.api.espn.com/apis/site/v2/sports/soccer"
 WEB = "https://site.web.api.espn.com/apis/site/v2/sports/soccer"
 API = "https://site.api.espn.com/apis/v2/sports/soccer"
