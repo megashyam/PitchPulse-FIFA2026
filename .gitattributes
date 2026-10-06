@@ -10,3 +10,5 @@ ui/**/*.css linguist-vendored
 
 ui/node_modules/* linguist-generated
 ui/.next/* linguist-generated
+
+*.sh text eol=lf

@@ -35,3 +35,5 @@ backend/data/*
 *.tsbuildinfo
 
 backend/.cache/
+
+.playwright-cli/

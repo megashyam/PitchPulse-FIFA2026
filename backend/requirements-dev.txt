@@ -7,10 +7,13 @@ pytest-asyncio>=0.23,<2.0
 ruff>=0.4,<1.0
 fakeredis[lua]>=2.23,<3.0
 
+# Offline fits (ml/fit_shot_xg.py, ml/fit_wdl_prior.py).
+scikit-learn>=1.4,<2.0
+statsmodels>=0.14,<0.15
+scipy>=1.11,<2.0  # eval/eval_anomaly_threshold.py
+
 # Offline generation eval (agents/eval_generation_ragas.py). RAGAS's judge
 # needs these thin LLM/embeddings wrappers.
 ragas>=0.2,<1.0
 langchain-core>=0.3,<1.0
-langchain-ollama>=0.2,<1.0
 langchain-openai>=0.2,<1.0
-langchain-huggingface>=0.1,<1.0
