@@ -65,11 +65,11 @@ def facts_block(prompt: str) -> str:
 
 
 async def _generate(out: Path, graph: bool = False) -> None:
-    from agents import match_intel_agent as mi
+    from agents import intel_prompts, match_intel_agent as mi
     from agents.intel_graph import narrate
     from agents.ollama_client import OLLAMA_MODEL, generate_with_source
     from agents.weaviate_client import NARRATIVE_ARCS, get_weaviate_client
-    from api.schemas.event_types import GOAL_TYPES, RED_TYPES
+    from schemas.event_types import GOAL_TYPES, RED_TYPES
     from api.workers.match_producer import build_state
     from feeds import snapshot
     from ml.embedding_model import get_embed_model
@@ -94,7 +94,7 @@ async def _generate(out: Path, graph: bool = False) -> None:
             f"{OLLAMA_MODEL} via agents.intel_graph (grounding check, 1 retry, template fallback)"
             if graph else f"{OLLAMA_MODEL} via agents.ollama_client.generate_with_source"
         ),
-        "prompt": "agents.match_intel_agent._event_prompt, live Weaviate retrieval, Elo prior",
+        "prompt": "agents.intel_prompts._event_prompt, live Weaviate retrieval, Elo prior",
     }
     fixtures = sorted((f for f in snapshot.fixtures() if f.kickoff), key=lambda f: f.kickoff)
     rows = []
@@ -116,7 +116,7 @@ async def _generate(out: Path, graph: bool = False) -> None:
             if graph:
                 res = await narrate(mi.event_spec(state, ev, wp))
                 rag_docs, text, via = res["rag_docs"], res["narrative"], res["via"]
-                prompt = mi._event_prompt(state, ev, rag_docs, completed, wp)
+                prompt = intel_prompts._event_prompt(state, ev, rag_docs, completed, wp)
                 extra = {"attempts": res["attempts"], "violations": res.get("violations", [])}
             else:
                 query, ev_filter = mi.event_query(state, ev)
@@ -125,7 +125,7 @@ async def _generate(out: Path, graph: bool = False) -> None:
                     query_vector=qv, query_text=query, top_k=5,
                     event_filter=ev_filter, collection=NARRATIVE_ARCS,
                 )
-                prompt = mi._event_prompt(state, ev, rag_docs, completed, wp)
+                prompt = intel_prompts._event_prompt(state, ev, rag_docs, completed, wp)
                 text, via = await generate_with_source(prompt)
                 extra = {}
             rows.append({

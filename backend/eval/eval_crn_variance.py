@@ -18,6 +18,7 @@ import json
 
 import numpy as np
 
+from agents.counterfactual_agent import _paired_se
 from ml.tournament_sim import run_simulation
 from ml.wc_2026_config import WC2026_TEAMS
 
@@ -27,6 +28,9 @@ def measure(team: str, elo_boost: float, n_sims: int, repeats: int) -> dict:
     deltas_ind: list[float] = []
     shifts_crn: list[float] = []
     shifts_ind: list[float] = []
+    paired_se: list[float] = []
+
+    idx = next(i for i, t in enumerate(WC2026_TEAMS) if t.name == team)
 
     def champ(res, name):
         return res.team(name).probs["champion"]
@@ -44,9 +48,10 @@ def measure(team: str, elo_boost: float, n_sims: int, repeats: int) -> dict:
     for k in range(repeats):
         # CRN: identical seed for both legs
         seed = 10_000 + k
-        base = run_simulation(n_sims=n_sims, seed=seed)
-        cf = run_simulation(n_sims=n_sims, seed=seed, elo_overrides={team: elo_boost})
+        base = run_simulation(n_sims=n_sims, seed=seed, keep_hits=True)
+        cf = run_simulation(n_sims=n_sims, seed=seed, elo_overrides={team: elo_boost}, keep_hits=True)
         deltas_crn.append(champ(cf, team) - champ(base, team))
+        paired_se.append(float(_paired_se(base, cf)[idx]))
         shifts_crn.append(path_shift(base, cf))
 
         # independent: two different seeds
@@ -79,6 +84,9 @@ def measure(team: str, elo_boost: float, n_sims: int, repeats: int) -> dict:
             "independent_seeds": stats(shifts_ind),
         },
         "variance_reduction_factor": round(var_ratio, 1),
+        # one-run paired SE (counterfactual_agent) vs the std of CRN deltas across repeats
+        "paired_se_mean": round(float(np.mean(paired_se)), 6),
+        "paired_se_vs_empirical_std": round(float(np.mean(paired_se)) / max(s_crn["std"], 1e-18), 2),
         "equivalent_extra_sims": (
             f"independent seeding needs ~{var_ratio:.0f}x more simulations "
             f"for the same delta precision"
@@ -106,10 +114,11 @@ def main() -> None:
     print(f"  Δ champion prob (CRN):         mean={c['mean']:+.5f}  std={c['std']:.5f}")
     print(f"  Δ champion prob (independent): mean={i['mean']:+.5f}  std={i['std']:.5f}")
     print(f"  variance reduction factor:     {report['variance_reduction_factor']}x")
+    print(f"  paired SE (one run):           {report['paired_se_mean']:.5f}  ({report['paired_se_vs_empirical_std']}x empirical std)")
     print(f"  → {report['equivalent_extra_sims']}\n")
 
     if args.json:
-        with open(args.json, "w") as f:
+        with open(args.json, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
         print(f"Wrote {args.json}")
 

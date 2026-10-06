@@ -33,7 +33,7 @@ from agents.match_intel_agent import event_query
 from agents.rag_indexer import build_corpus, game_state, minute_band
 from agents.weaviate_client import HYBRID_ALPHA, NARRATIVE_ARCS, get_weaviate_client
 from api.match_timeline import around
-from api.schemas.event_types import GOAL_TYPES, RED_TYPES
+from schemas.event_types import GOAL_TYPES, RED_TYPES
 from api.workers.match_producer import build_state
 from feeds import snapshot
 from ml.embedding_model import get_embed_model

@@ -9,8 +9,9 @@ Method:
        in chronological order.
     2. Keep an online Elo per team from 1500. Before each match, predict
        W/D/L with ``elo_to_wdl``; then apply a goal-difference-aware update.
-    3. Score predictions with multiclass log loss, Brier and a reliability
-       table, against the empirical H/D/A base rate.
+    3. Score predictions with multiclass log loss, Brier (with its Murphy
+       decomposition), ranked probability score and a reliability table,
+       against the empirical H/D/A base rate.
     4. Report overall and on the back half, after ratings warm up.
 
 Labels are the 90-minute result (knockout scores rebuilt from period 1-2
@@ -26,12 +27,22 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 from typing import Dict, List, Tuple
 
 import httpx
 import numpy as np
 
+from ml import elo_ratings as er
+from ml.metrics import (
+    brier,
+    log_loss,
+    murphy,
+    paired_bootstrap,
+    per_match_brier,
+    per_match_ll,
+    per_match_rps,
+    rps,
+)
 from ml.prior_builder import elo_to_wdl
 from ml.statsbomb import COMPETITION_ID, SEASON_IDS, goals_in_regulation, load
 
@@ -39,9 +50,7 @@ ELO_START = 1500.0
 ELO_K = 40.0  # update step
 HOME_ADV = 60.0  # Elo points, host nation only (venues are otherwise neutral)
 HOSTS = {"Russia", "Qatar"}  # WC 2018, WC 2022
-N_BOOT = 5000
-
-EPS = 1e-12
+N_BOOT = 5000  # paired_bootstrap default
 
 
 def load_matches() -> List[dict]:
@@ -71,31 +80,20 @@ def _adv(team: str) -> float:
     return HOME_ADV if team in HOSTS else 0.0
 
 
-def _expected(elo_a: float, elo_b: float) -> float:
-    return 1.0 / (1.0 + 10.0 ** ((elo_b - elo_a) / 400.0))
 
-
-def _gd_multiplier(goal_diff: int) -> float:
-    """FIFA-style goal-difference weighting of the Elo update."""
-    g = abs(goal_diff)
-    if g <= 1:
-        return 1.0
-    if g == 2:
-        return 1.5
-    return (11.0 + g) / 8.0
 
 
 def update_elo(elo: Dict[str, float], home: str, away: str, hs: int, as_: int) -> None:
     ra = elo.get(home, ELO_START) + _adv(home)
     rb = elo.get(away, ELO_START) + _adv(away)
-    exp_home = _expected(ra, rb)
+    exp_home = er.expected(ra - rb)
     if hs > as_:
         score_home = 1.0
     elif hs == as_:
         score_home = 0.5
     else:
         score_home = 0.0
-    mult = _gd_multiplier(hs - as_)
+    mult = er.goal_mult(hs - as_)
     delta = ELO_K * mult * (score_home - exp_home)
     elo[home] = elo.get(home, ELO_START) + delta
     elo[away] = elo.get(away, ELO_START) - delta
@@ -108,40 +106,6 @@ def outcome_index(hs: int, as_: int) -> int:
     if hs == as_:
         return 1
     return 2
-
-
-def log_loss(preds: List[Tuple[float, float, float]], actuals: List[int]) -> float:
-    total = 0.0
-    for p, y in zip(preds, actuals):
-        total += -math.log(max(p[y], EPS))
-    return total / len(preds)
-
-
-def brier(preds: List[Tuple[float, float, float]], actuals: List[int]) -> float:
-    total = 0.0
-    for p, y in zip(preds, actuals):
-        target = [0.0, 0.0, 0.0]
-        target[y] = 1.0
-        total += sum((p[k] - target[k]) ** 2 for k in range(3))
-    return total / len(preds)
-
-
-def per_match_ll(preds, actuals) -> np.ndarray:
-    return np.array([-math.log(max(p[y], EPS)) for p, y in zip(preds, actuals)])
-
-
-def per_match_brier(preds, actuals) -> np.ndarray:
-    return np.array(
-        [sum((p[k] - (1.0 if k == y else 0.0)) ** 2 for k in range(3)) for p, y in zip(preds, actuals)]
-    )
-
-
-def paired_bootstrap(diff: np.ndarray, n_boot: int = N_BOOT, seed: int = 0) -> List[float]:
-    """95% percentile CI for the mean of a per-match difference."""
-    rng = np.random.default_rng(seed)
-    idx = rng.integers(0, len(diff), size=(n_boot, len(diff)))
-    means = diff[idx].mean(axis=1)
-    return [round(float(np.percentile(means, 2.5)), 4), round(float(np.percentile(means, 97.5)), 4)]
 
 
 def base_rate(actuals: List[int]) -> Tuple[float, float, float]:
@@ -214,6 +178,8 @@ def run_backtest() -> dict:
             "n": len(p),
             "log_loss": round(log_loss(p, a), 4),
             "brier": round(brier(p, a), 4),
+            "rps": round(rps(p, a), 4),
+            "murphy": murphy(p, a),
         }
 
     def delta(p, a) -> dict:
@@ -221,11 +187,14 @@ def run_backtest() -> dict:
         b = [base] * len(a)
         dll = per_match_ll(p, a) - per_match_ll(b, a)
         dbr = per_match_brier(p, a) - per_match_brier(b, a)
+        drps = per_match_rps(p, a) - per_match_rps(b, a)
         return {
             "log_loss": round(float(dll.mean()), 4),
             "log_loss_ci95": paired_bootstrap(dll),
             "brier": round(float(dbr.mean()), 4),
             "brier_ci95": paired_bootstrap(dbr),
+            "rps": round(float(drps.mean()), 4),
+            "rps_ci95": paired_bootstrap(drps),
         }
 
     report = {
@@ -285,10 +254,11 @@ def _print(report: dict) -> None:
             f"{'below' if e['log_loss'] < b['log_loss'] else 'above'} baseline"
         )
         print(f"  Brier      Elo {e['brier']:.4f}   baseline {b['brier']:.4f}")
+        print(f"  RPS        Elo {e['rps']:.4f}   baseline {b['rps']:.4f}")
         d = report[key]["elo_minus_baseline"]
         print(
             f"  Elo - baseline: log loss {d['log_loss']:+.4f} CI {d['log_loss_ci95']}, "
-            f"Brier {d['brier']:+.4f} CI {d['brier_ci95']}"
+            f"Brier {d['brier']:+.4f} CI {d['brier_ci95']}, RPS {d['rps']:+.4f} CI {d['rps_ci95']}"
         )
 
     print("\nReliability (second half) — predicted home-win prob vs realised:")

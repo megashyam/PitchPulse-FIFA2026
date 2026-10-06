@@ -3,7 +3,8 @@ Fit and validate the commentary xG model (ml/shot_xg.py).
 
     Train     ESPN summaries for --leagues in --year (80% of matches, split
               by match, seeded)
-    Held-out  remaining 20%: log loss / Brier vs a constant base rate
+    Held-out  remaining 20%: log loss / Brier vs a constant base rate, ROC AUC
+              and a quantile-binned calibration curve
     External  WC 2022 via ESPN: per team-match xG vs StatsBomb xG
               (Pearson r, calibration)
     WC 2026   --wc26-raw: xG sum vs goals on the other coordinate convention
@@ -21,12 +22,18 @@ import json
 import os
 import random
 import time
+import warnings
 from pathlib import Path
 
 import httpx
 import numpy as np
+import statsmodels.api as sm
+from sklearn.calibration import calibration_curve
+from sklearn.metrics import roc_auc_score
+from statsmodels.tools.sm_exceptions import PerfectSeparationError
 
 from ml import shot_xg
+from ml.metrics import binary_logloss
 from ml.statsbomb import SB_BASE
 from ml.team_names import canonical
 
@@ -71,30 +78,34 @@ def _design(shots: list[shot_xg.Shot]) -> tuple[np.ndarray, np.ndarray]:
     return X, y
 
 
-def _fit_logistic(X: np.ndarray, y: np.ndarray, l2: float = 1e-3, iters: int = 50):
-    """Newton-Raphson with a light ridge on standardised features."""
+def _fit_logistic_se(X: np.ndarray, y: np.ndarray):
+    """MLE logit on standardised features, mapped back to the raw scale.
+    Returns (intercept, coef, se_intercept, se_coef); SEs are None if the data separate."""
     mu, sd = X.mean(0), X.std(0)
     sd[sd == 0] = 1.0
-    Z = np.hstack([np.ones((len(X), 1)), (X - mu) / sd])
-    w = np.zeros(Z.shape[1])
-    reg = np.full(Z.shape[1], l2)
-    reg[0] = 0.0
-    for _ in range(iters):
-        p = 1 / (1 + np.exp(-Z @ w))
-        g = Z.T @ (p - y) + reg * w * len(y)
-        H = (Z * (p * (1 - p))[:, None]).T @ Z + np.diag(reg * len(y))
-        step = np.linalg.solve(H, g)
-        w -= step
-        if np.abs(step).max() < 1e-8:
-            break
-    coef = w[1:] / sd
-    intercept = w[0] - float((w[1:] * mu / sd).sum())
-    return float(intercept), coef
+    Z = sm.add_constant((X - mu) / sd, has_constant="add")
+    k = X.shape[1]
+    A = np.zeros((k + 1, k + 1))  # raw params = A @ standardised params
+    A[0, 0], A[0, 1:] = 1.0, -mu / sd
+    A[1:, 1:] = np.diag(1 / sd)
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            res = sm.Logit(y, Z).fit(disp=0, maxiter=200)
+        if not res.mle_retvals["converged"] or not np.all(np.abs(res.params) < 20):
+            raise PerfectSeparationError("quasi-separation")
+        w, se = A @ res.params, np.sqrt(np.diag(A @ res.cov_params() @ A.T))
+        return float(w[0]), w[1:], float(se[0]), se[1:]
+    except (PerfectSeparationError, np.linalg.LinAlgError):
+        alpha = np.r_[0.0, np.full(k, 1e-3)]  # ridge, intercept unpenalised
+        glm = sm.GLM(y, Z, family=sm.families.Binomial())
+        w = A @ glm.fit_regularized(alpha=alpha, L1_wt=0.0).params
+        return float(w[0]), w[1:], None, None
 
 
-def _logloss(p: np.ndarray, y: np.ndarray) -> float:
-    p = np.clip(p, 1e-6, 1 - 1e-6)
-    return float(-(y * np.log(p) + (1 - y) * np.log(1 - p)).mean())
+def _fit_logistic(X: np.ndarray, y: np.ndarray):
+    """(intercept, coef)"""
+    return _fit_logistic_se(X, y)[:2]
 
 
 def _statsbomb_wc2022(client: httpx.Client, cache: Path) -> dict[tuple[str, str], float]:
@@ -146,10 +157,12 @@ def main() -> None:
     penalty_xg = sum(s.outcome == "goal" for s in pens) / max(1, len(pens))
     tr = [s for s in train if not s.penalty]
     Xtr, ytr = _design(tr)
-    intercept, coef = _fit_logistic(Xtr, ytr)
+    intercept, coef, se0, se = _fit_logistic_se(Xtr, ytr)
     model = {
         "intercept": intercept,
         "coef": dict(zip(shot_xg.FEATURES, map(float, coef))),
+        "se": None if se is None else {"intercept": round(se0, 4),
+                                       **{f: round(float(v), 4) for f, v in zip(shot_xg.FEATURES, se)}},
         "penalty_xg": round(penalty_xg, 4),
         "trained_on": f"ESPN {a.leagues} {a.year}",
         "n_shots": len(tr),
@@ -162,14 +175,21 @@ def main() -> None:
     Xte, yte = _design(te)
     p = np.array([shot_xg.xg(s) for s in te])
     base = np.full_like(yte, ytr.mean())
+    frac_goal, mean_xg = calibration_curve(yte, p, n_bins=10, strategy="quantile")
     held_out = {
         "n_shots": len(te),
         "goals": int(yte.sum()),
         "xg_sum": round(float(p.sum()), 1),
-        "logloss": round(_logloss(p, yte), 4),
-        "logloss_base_rate": round(_logloss(base, yte), 4),
+        "logloss": round(binary_logloss(p, yte), 4),
+        "logloss_base_rate": round(binary_logloss(base, yte), 4),
         "brier": round(float(((p - yte) ** 2).mean()), 4),
         "brier_base_rate": round(float(((base - yte) ** 2).mean()), 4),
+        "auc": round(float(roc_auc_score(yte, p)), 4),
+        # quantile bins (~equal shot counts): mean predicted xG vs observed goal rate
+        "calibration_deciles": [
+            {"mean_xg": round(float(m), 4), "goal_rate": round(float(f), 4)}
+            for m, f in zip(mean_xg, frac_goal)
+        ],
     }
 
     # External: WC 2022 vs StatsBomb.

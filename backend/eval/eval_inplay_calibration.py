@@ -1,10 +1,11 @@
-"""Backtest the Poisson in-play model against real World Cup outcomes.
+"""Backtest the Dixon-Coles in-play model against real World Cup outcomes.
 
 For each historical match, reconstruct the true score and red-card state at
 fixed checkpoints (0', 15', 45', 75'), feed it to `inplay_wdl` with an
 Elo-warmed pre-match prior, and score the produced W/D/L distribution against
-the actual full-time result. Reports log-loss and Brier per checkpoint, versus
-two baselines: the static pre-match prior and the outcome base rate.
+the actual full-time result. Reports log-loss, Brier (with Murphy
+decomposition) and RPS per checkpoint, versus two baselines: the static
+pre-match prior and the outcome base rate.
 
 Minute 0 is a sanity check: at 0-0 kickoff the model is fitted to reproduce
 the prior, so its scores must equal the pre-match prior's. After that, a
@@ -25,27 +26,26 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 from typing import Dict, List, Tuple
 
 import httpx
 
-from ml.backtest_elo_wdl import (
-    ELO_START,
-    _adv,
-    load_matches,
-    outcome_index,
+from ml.backtest_elo_wdl import ELO_START, _adv, load_matches, outcome_index, update_elo
+from ml.metrics import (
+    brier,
+    log_loss,
+    murphy,
     paired_bootstrap,
     per_match_brier,
     per_match_ll,
-    update_elo,
+    per_match_rps,
+    rps,
 )
 from ml.in_play import inplay_wdl
 from ml.prior_builder import elo_to_wdl
 from ml.statsbomb import card_from_event, load
 
 CHECKPOINTS = [0, 15, 45, 75]
-EPS = 1e-12
 
 
 def match_timeline(events: List[dict], home: str, away: str):
@@ -77,19 +77,6 @@ def state_at(goals, reds, minute: int) -> Tuple[int, int, int, int]:
     rh = sum(1 for m, h in reds if m <= minute and h)
     ra = sum(1 for m, h in reds if m <= minute and not h)
     return hs, as_, rh, ra
-
-
-def log_loss(preds, actuals) -> float:
-    return sum(-math.log(max(p[y], EPS)) for p, y in zip(preds, actuals)) / len(preds)
-
-
-def brier(preds, actuals) -> float:
-    total = 0.0
-    for p, y in zip(preds, actuals):
-        t = [0.0, 0.0, 0.0]
-        t[y] = 1.0
-        total += sum((p[k] - t[k]) ** 2 for k in range(3))
-    return total / len(preds)
 
 
 def run(max_matches: int | None = None) -> dict:
@@ -147,11 +134,21 @@ def run(max_matches: int | None = None) -> dict:
     def minus_prior(p) -> dict:
         d_ll = per_match_ll(p, actuals) - per_match_ll(prior_preds, actuals)
         d_br = per_match_brier(p, actuals) - per_match_brier(prior_preds, actuals)
+        d_rps = per_match_rps(p, actuals) - per_match_rps(prior_preds, actuals)
         return {
             "log_loss": round(float(d_ll.mean()), 4),
             "log_loss_ci95": paired_bootstrap(d_ll),
             "brier": round(float(d_br.mean()), 4),
             "brier_ci95": paired_bootstrap(d_br),
+            "rps": round(float(d_rps.mean()), 4),
+            "rps_ci95": paired_bootstrap(d_rps),
+        }
+
+    def scores(p) -> dict:
+        return {
+            "log_loss": round(log_loss(p, actuals), 4),
+            "brier": round(brier(p, actuals), 4),
+            "rps": round(rps(p, actuals), 4),
         }
 
     report = {
@@ -161,20 +158,11 @@ def run(max_matches: int | None = None) -> dict:
         "ci": "paired bootstrap over matches, 95% percentile",
         "n_matches": n,
         "baselines": {
-            "pre_match_prior": {
-                "log_loss": round(log_loss(prior_preds, actuals), 4),
-                "brier": round(brier(prior_preds, actuals), 4),
-            },
-            "base_rate": {
-                "log_loss": round(log_loss([base] * n, actuals), 4),
-                "brier": round(brier([base] * n, actuals), 4),
-            },
+            "pre_match_prior": scores(prior_preds),
+            "base_rate": scores([base] * n),
         },
         "in_play_by_checkpoint": {
-            f"minute_{cp}": {
-                "log_loss": round(log_loss(preds[cp], actuals), 4),
-                "brier": round(brier(preds[cp], actuals), 4),
-            }
+            f"minute_{cp}": {**scores(preds[cp]), "murphy": murphy(preds[cp], actuals)}
             for cp in CHECKPOINTS
         },
         "in_play_minus_prior": {f"minute_{cp}": minus_prior(preds[cp]) for cp in CHECKPOINTS},
@@ -198,12 +186,12 @@ def main() -> None:
     print(f"\nIn-play calibration — {report['n_matches']} warmed-up WC matches")
     pm = report["baselines"]["pre_match_prior"]
     br = report["baselines"]["base_rate"]
-    print(f"  pre-match prior : log-loss {pm['log_loss']}  brier {pm['brier']}")
-    print(f"  base rate       : log-loss {br['log_loss']}  brier {br['brier']}")
+    print(f"  pre-match prior : log-loss {pm['log_loss']}  brier {pm['brier']}  rps {pm['rps']}")
+    print(f"  base rate       : log-loss {br['log_loss']}  brier {br['brier']}  rps {br['rps']}")
     for cp, m in report["in_play_by_checkpoint"].items():
         d = report["in_play_minus_prior"][cp]
-        print(f"  in-play @{cp:>10}: log-loss {m['log_loss']}  brier {m['brier']}"
-              f"  (vs prior {d['log_loss']:+} {d['log_loss_ci95']})")
+        print(f"  in-play @{cp:>10}: log-loss {m['log_loss']}  brier {m['brier']}  rps {m['rps']}"
+              f"  (vs prior {d['log_loss']:+} {d['log_loss_ci95']}, rps {d['rps']:+} {d['rps_ci95']})")
     print(
         "\nExpected: minute 0 equals the pre-match prior; later checkpoints "
         "should fall monotonically and undercut it."

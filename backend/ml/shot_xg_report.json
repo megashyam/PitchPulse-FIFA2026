@@ -1,17 +1,30 @@
 {
   "model": {
-    "intercept": -0.0716104482424047,
+    "intercept": -0.029483845735014502,
     "coef": {
-      "log_dist": -1.073266902728737,
-      "angle": 1.5422595099962657,
-      "header": -0.9962340203243562,
-      "header_x_log_dist": -0.039879514999316266,
-      "cross": -0.2542771658221129,
-      "through_ball": 1.0406463882071246,
-      "corner": 0.5133151018371535,
-      "set_piece": 0.7078234892409101,
-      "fast_break": 1.6043221473097087,
-      "direct_fk": 2.052391955771979
+      "log_dist": -1.0958003076679312,
+      "angle": 1.5780557790717502,
+      "header": -1.4291658753060141,
+      "header_x_log_dist": 0.15148592244620518,
+      "cross": -0.26511630146580506,
+      "through_ball": 1.0453818447279484,
+      "corner": 0.5330158811109017,
+      "set_piece": 0.714845809393453,
+      "fast_break": 1.6189401803711831,
+      "direct_fk": 2.0889446563425302
+    },
+    "se": {
+      "intercept": 0.3301,
+      "log_dist": 0.096,
+      "angle": 0.1617,
+      "header": 0.2979,
+      "header_x_log_dist": 0.1367,
+      "cross": 0.0651,
+      "through_ball": 0.0787,
+      "corner": 0.0656,
+      "set_piece": 0.0956,
+      "fast_break": 0.0725,
+      "direct_fk": 0.1532
     },
     "penalty_xg": 0.7711,
     "trained_on": "ESPN eng.1,esp.1,ger.1,ita.1,fra.1 2025",
@@ -22,22 +35,65 @@
     "n_shots": 8213,
     "goals": 820,
     "xg_sum": 851.8,
-    "logloss": 0.2648,
+    "logloss": 0.2649,
     "logloss_base_rate": 0.3248,
-    "brier": 0.0751,
-    "brier_base_rate": 0.0899
+    "brier": 0.0752,
+    "brier_base_rate": 0.0899,
+    "auc": 0.8006,
+    "calibration_deciles": [
+      {
+        "mean_xg": 0.0268,
+        "goal_rate": 0.0182
+      },
+      {
+        "mean_xg": 0.0346,
+        "goal_rate": 0.0183
+      },
+      {
+        "mean_xg": 0.0413,
+        "goal_rate": 0.0256
+      },
+      {
+        "mean_xg": 0.0494,
+        "goal_rate": 0.0341
+      },
+      {
+        "mean_xg": 0.0578,
+        "goal_rate": 0.0474
+      },
+      {
+        "mean_xg": 0.0685,
+        "goal_rate": 0.0585
+      },
+      {
+        "mean_xg": 0.0817,
+        "goal_rate": 0.078
+      },
+      {
+        "mean_xg": 0.1062,
+        "goal_rate": 0.1279
+      },
+      {
+        "mean_xg": 0.17,
+        "goal_rate": 0.1937
+      },
+      {
+        "mean_xg": 0.4006,
+        "goal_rate": 0.3966
+      }
+    ]
   },
   "external_wc2022": {
     "team_matches_paired": 127,
     "pearson_r_vs_statsbomb": 0.915,
-    "mean_abs_diff": 0.225,
-    "ours_total_xg": 150.7,
+    "mean_abs_diff": 0.226,
+    "ours_total_xg": 150.8,
     "statsbomb_total_xg": 155.9,
     "actual_goals_non_og": 170
   },
   "wc2026_non_penalty_calibration": {
     "shots": 2553,
     "goals": 278,
-    "xg_sum": 279.6
+    "xg_sum": 279.4
   }
 }

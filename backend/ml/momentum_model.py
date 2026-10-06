@@ -18,8 +18,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from api.schemas.event_types import LIVE_STATUSES
-from api.schemas.schema import MatchState
+from schemas.event_types import LIVE_STATUSES
+from schemas.feeds import Momentum
+from schemas.schema import MatchState
 from ml.momentum_features import WINDOW, match_time, predict, team_features
 
 log = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ def _goals_and_reds(state: MatchState) -> tuple[list, list]:
     return goals, reds
 
 
-def update(state: MatchState, shots: list[dict]) -> Optional[dict]:
+def momentum_snapshot(state: MatchState, shots: list[dict]) -> Optional[Momentum]:
     """Momentum for a live match, else None; `shots` is match:{id}:shots."""
     if state.status_short not in LIVE_STATUSES:
         return None

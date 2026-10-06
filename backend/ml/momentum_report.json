@@ -4,6 +4,18 @@
     "samples": 277516,
     "goal_rate": 0.0644
   },
+  "coef_se": {
+    "intercept": 0.0186,
+    "xg15_for": 0.0445,
+    "xg15_against": 0.0498,
+    "shots15_for": 0.0067,
+    "shots15_against": 0.0075,
+    "xg_for": 0.0182,
+    "xg_against": 0.0205,
+    "score_diff": 0.0249,
+    "red_diff": 0.0283,
+    "minute_norm": 0.0422
+  },
   "held_out_club": {
     "n": 69440,
     "goal_rate": 0.0651,
@@ -12,56 +24,56 @@
     "logloss_base_rate": 0.2407,
     "brier": 0.0606,
     "brier_base_rate": 0.06083,
-    "ece": 0.0039,
+    "ece": 0.0042,
     "reliability": [
       {
-        "mean_pred": 0.0436,
+        "mean_pred": 0.0433,
         "observed": 0.0356,
         "n": 6944
       },
       {
-        "mean_pred": 0.0533,
-        "observed": 0.056,
+        "mean_pred": 0.0531,
+        "observed": 0.0552,
         "n": 6944
       },
       {
-        "mean_pred": 0.0565,
-        "observed": 0.055,
+        "mean_pred": 0.0563,
+        "observed": 0.0559,
         "n": 6944
       },
       {
-        "mean_pred": 0.0587,
-        "observed": 0.0657,
-        "n": 6892
+        "mean_pred": 0.0586,
+        "observed": 0.0672,
+        "n": 6680
       },
       {
-        "mean_pred": 0.0602,
-        "observed": 0.0599,
-        "n": 6996
+        "mean_pred": 0.0601,
+        "observed": 0.0567,
+        "n": 7208
       },
       {
-        "mean_pred": 0.0627,
-        "observed": 0.0613,
+        "mean_pred": 0.0626,
+        "observed": 0.0661,
         "n": 6944
       },
       {
         "mean_pred": 0.0654,
-        "observed": 0.066,
+        "observed": 0.0637,
         "n": 6944
       },
       {
-        "mean_pred": 0.0691,
-        "observed": 0.0652,
+        "mean_pred": 0.0692,
+        "observed": 0.0668,
         "n": 6944
       },
       {
-        "mean_pred": 0.0753,
-        "observed": 0.0874,
+        "mean_pred": 0.0755,
+        "observed": 0.0857,
         "n": 6944
       },
       {
-        "mean_pred": 0.0998,
-        "observed": 0.0985,
+        "mean_pred": 0.1005,
+        "observed": 0.0982,
         "n": 6944
       }
     ]
@@ -75,56 +87,56 @@
     "logloss_base_rate": 0.2234,
     "brier": 0.05512,
     "brier_base_rate": 0.0552,
-    "ece": 0.0101,
+    "ece": 0.0108,
     "reliability": [
       {
-        "mean_pred": 0.0475,
-        "observed": 0.0453,
+        "mean_pred": 0.0472,
+        "observed": 0.046,
         "n": 1347
       },
       {
-        "mean_pred": 0.0537,
-        "observed": 0.0557,
+        "mean_pred": 0.0535,
+        "observed": 0.0572,
         "n": 1346
       },
       {
-        "mean_pred": 0.0566,
+        "mean_pred": 0.0564,
         "observed": 0.0438,
         "n": 1346
       },
       {
-        "mean_pred": 0.0585,
-        "observed": 0.0371,
-        "n": 1293
-      },
-      {
-        "mean_pred": 0.0597,
-        "observed": 0.0521,
-        "n": 1400
-      },
-      {
-        "mean_pred": 0.0619,
-        "observed": 0.0691,
-        "n": 1346
-      },
-      {
-        "mean_pred": 0.0642,
-        "observed": 0.0728,
+        "mean_pred": 0.0584,
+        "observed": 0.0386,
         "n": 1347
       },
       {
-        "mean_pred": 0.0676,
-        "observed": 0.078,
+        "mean_pred": 0.0596,
+        "observed": 0.0505,
         "n": 1346
       },
       {
-        "mean_pred": 0.0727,
-        "observed": 0.0698,
+        "mean_pred": 0.0618,
+        "observed": 0.0661,
         "n": 1346
       },
       {
-        "mean_pred": 0.0884,
-        "observed": 0.0616,
+        "mean_pred": 0.0641,
+        "observed": 0.0765,
+        "n": 1347
+      },
+      {
+        "mean_pred": 0.0675,
+        "observed": 0.0788,
+        "n": 1346
+      },
+      {
+        "mean_pred": 0.0728,
+        "observed": 0.0646,
+        "n": 1346
+      },
+      {
+        "mean_pred": 0.089,
+        "observed": 0.0638,
         "n": 1347
       }
     ]
@@ -136,59 +148,59 @@
     "logloss": 0.2371,
     "logloss_score_clock_only": 0.2403,
     "logloss_base_rate": 0.242,
-    "brier": 0.06062,
+    "brier": 0.06061,
     "brier_base_rate": 0.06127,
-    "ece": 0.0111,
+    "ece": 0.01,
     "reliability": [
       {
-        "mean_pred": 0.0422,
-        "observed": 0.0234,
-        "n": 2220
+        "mean_pred": 0.0419,
+        "observed": 0.0256,
+        "n": 2223
       },
       {
-        "mean_pred": 0.0524,
-        "observed": 0.0467,
-        "n": 2225
-      },
-      {
-        "mean_pred": 0.0559,
-        "observed": 0.0513,
+        "mean_pred": 0.0522,
+        "observed": 0.0432,
         "n": 2222
       },
       {
-        "mean_pred": 0.0583,
-        "observed": 0.0505,
-        "n": 2158
-      },
-      {
-        "mean_pred": 0.0599,
-        "observed": 0.0608,
-        "n": 2286
-      },
-      {
-        "mean_pred": 0.0624,
-        "observed": 0.0666,
+        "mean_pred": 0.0557,
+        "observed": 0.0531,
         "n": 2222
       },
       {
-        "mean_pred": 0.0655,
-        "observed": 0.0495,
+        "mean_pred": 0.0582,
+        "observed": 0.0525,
+        "n": 2211
+      },
+      {
+        "mean_pred": 0.0598,
+        "observed": 0.0622,
+        "n": 2233
+      },
+      {
+        "mean_pred": 0.0623,
+        "observed": 0.0612,
         "n": 2222
       },
       {
-        "mean_pred": 0.0697,
-        "observed": 0.0774,
+        "mean_pred": 0.0654,
+        "observed": 0.0531,
         "n": 2222
       },
       {
-        "mean_pred": 0.0766,
-        "observed": 0.0977,
-        "n": 2221
+        "mean_pred": 0.0698,
+        "observed": 0.0752,
+        "n": 2222
       },
       {
-        "mean_pred": 0.107,
-        "observed": 0.1313,
-        "n": 2224
+        "mean_pred": 0.0768,
+        "observed": 0.0995,
+        "n": 2222
+      },
+      {
+        "mean_pred": 0.1081,
+        "observed": 0.13,
+        "n": 2223
       }
     ]
   }

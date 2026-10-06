@@ -6,7 +6,7 @@ import numpy as np
 from typing import Dict, Optional, Tuple
 
 from ml.in_play import ko_advance_batch
-from ml.wc_2026_config import TEAM_BY_NAME, WC2026_TEAMS
+from ml.wc_2026_config import FIXTURE_BY_ID, TEAM_BY_NAME, WC2026_TEAMS
 
 # match probability: (p_win, p_draw, p_loss) from team_a's view
 MatchProb = Tuple[float, float, float]
@@ -18,11 +18,6 @@ MIN_PROB = 0.01
 WDL_COEF_PATH = Path(__file__).with_name("wdl_prior_coef.json")
 _WDL_COEF: Optional[dict] = None
 DEFAULT_WDL: "MatchProb" = (0.40, 0.25, 0.35)
-
-
-def elo_expected(rating_a: float, rating_b: float) -> float:
-    """Standard Elo expected score for A against B (1=win, 0.5=draw, 0=loss)."""
-    return 1.0 / (1.0 + 10.0 ** ((rating_b - rating_a) / 400.0))
 
 
 def _wdl_coef() -> dict:
@@ -106,59 +101,12 @@ def _normalise(p_win: float, p_draw: float, p_loss: float) -> MatchProb:
     return float(arr[0]), float(arr[1]), float(arr[2])
 
 
-def build_prior_table(
-    betfair_odds: Optional[Dict[Tuple[str, str], Tuple[float, float, float]]] = None,
-    elo_overrides: Optional[Dict[str, float]] = None,
-) -> Dict[Tuple[str, str], MatchProb]:
-    """W/D/L prior for every possible pairing of the 48 WC 2026 teams.
-
-    Args:
-        betfair_odds: optional {(home, away): (decimal_home, decimal_draw,
-                      decimal_away)} market odds; override Elo where present.
-
-    Returns:
-        {(team_a, team_b): (p_win, p_draw, p_loss)} from team_a's perspective.
-    """
-    teams = WC2026_TEAMS
-    n = len(teams)
-    ovr = elo_overrides or {}
-    priors: Dict[Tuple[str, str], MatchProb] = {}
-
-    for i in range(n):
-        for j in range(n):
-            if i == j:
-                continue
-            ta = teams[i]
-            tb = teams[j]
-            key = (ta.name, tb.name)
-            # conditioned team: bypass the static Betfair line when either side is
-            # nudged, so its adjusted strength is used
-            conditioned = ta.name in ovr or tb.name in ovr
-
-            if not conditioned and betfair_odds and key in betfair_odds:
-                o_h, o_d, o_a = betfair_odds[key]
-                priors[key] = oddsapi_to_wdl(o_h, o_d, o_a)
-            elif (
-                not conditioned and betfair_odds and (tb.name, ta.name) in betfair_odds
-            ):
-                o_h, o_d, o_a = betfair_odds[(tb.name, ta.name)]
-                rev = oddsapi_to_wdl(o_h, o_d, o_a)
-                priors[key] = (rev[2], rev[1], rev[0])  # flip perspective
-            else:
-                priors[key] = elo_to_wdl(
-                    ta.elo + ovr.get(ta.name, 0.0),
-                    tb.elo + ovr.get(tb.name, 0.0),
-                )
-
-    return priors
-
-
 def match_wdl(
     home: str,
     away: str,
     *,
     host_side: Optional[str] = None,
-    odds_table: Optional[Dict[Tuple[str, str], Tuple[float, float, float]]] = None,
+    odds_table: Optional[Dict[Tuple[str, str], Tuple[float, ...]]] = None,
     elo_overrides: Optional[Dict[str, float]] = None,
 ) -> MatchProb:
     """Pre-match W/D/L prior for a real fixture.
@@ -169,9 +117,9 @@ def match_wdl(
     ovr = elo_overrides or {}
     if odds_table and home not in ovr and away not in ovr:
         if (home, away) in odds_table:
-            return oddsapi_to_wdl(*odds_table[(home, away)])
+            return oddsapi_to_wdl(*odds_table[(home, away)][:3])
         if (away, home) in odds_table:
-            w, d, lo = oddsapi_to_wdl(*odds_table[(away, home)])
+            w, d, lo = oddsapi_to_wdl(*odds_table[(away, home)][:3])
             return (lo, d, w)
     h, a = TEAM_BY_NAME.get(home), TEAM_BY_NAME.get(away)
     if h is None or a is None:
@@ -182,17 +130,39 @@ def match_wdl(
     return elo_to_wdl(rh, ra)
 
 
-def ko_prob(p_win: float, p_draw: float, p_loss: float) -> Tuple[float, float]:
-    """(p_team_a_advances, p_team_b_advances) from 90' W/D/L.
+def match_totals(
+    home: str,
+    away: str,
+    *,
+    odds_table: Optional[Dict[Tuple[str, str], Tuple[float, ...]]] = None,
+    elo_overrides: Optional[Dict[str, float]] = None,
+) -> Optional[Tuple[float, float]]:
+    """Market ``(P(total goals > line), line)`` for the fixture, or None when
+    no totals are quoted or match_wdl would not use the market line."""
+    ovr = elo_overrides or {}
+    if not odds_table or home in ovr or away in ovr:
+        return None
+    row = odds_table.get((home, away)) or odds_table.get((away, home))
+    return (row[3], row[4]) if row and len(row) >= 5 else None
 
-    Extra time at a third of the fitted Poisson rates, then a 50/50 shootout.
-    """
-    p_a = float(ko_advance_batch(np.array([[p_win, p_draw, p_loss]]))[0])
-    return p_a, 1.0 - p_a
+
+def prior_for(
+    home: str,
+    away: str,
+    fixture_id: Optional[int] = None,
+    odds_table: Optional[Dict[Tuple[str, str], Tuple[float, ...]]] = None,
+) -> Tuple[MatchProb, Optional[Tuple[float, float]], str]:
+    """(W/D/L, market totals or None, "market_odds" | "elo") for a fixture,
+    with the host-side advantage from the schedule."""
+    fx = FIXTURE_BY_ID.get(fixture_id) or {}
+    wdl = match_wdl(home, away, host_side=fx.get("host_side"), odds_table=odds_table)
+    quoted = bool(odds_table) and ((home, away) in odds_table or (away, home) in odds_table)
+    totals = match_totals(home, away, odds_table=odds_table)
+    return wdl, totals, "market_odds" if quoted else "elo"
 
 
 def build_ko_matrix(
-    priors: Dict[Tuple[str, str], MatchProb],
+    odds_table: Optional[Dict[Tuple[str, str], Tuple[float, ...]]] = None,
     elo_overrides: Optional[Dict[str, float]] = None,
 ) -> np.ndarray:
     """(48 × 48) float32 matrix: P(team i advances vs team j), neutral venue.
@@ -201,17 +171,10 @@ def build_ko_matrix(
     """
     teams = WC2026_TEAMS
     n = len(teams)
-    ovr = elo_overrides or {}
     iu, ju = np.triu_indices(n, k=1)
     wdl = np.array(
         [
-            priors.get(
-                (teams[i].name, teams[j].name),
-                elo_to_wdl(
-                    teams[i].elo + ovr.get(teams[i].name, 0.0),
-                    teams[j].elo + ovr.get(teams[j].name, 0.0),
-                ),
-            )
+            match_wdl(teams[i].name, teams[j].name, odds_table=odds_table, elo_overrides=elo_overrides)
             for i, j in zip(iu, ju)
         ]
     )

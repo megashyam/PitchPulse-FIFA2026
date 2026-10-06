@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import random
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Sequence
@@ -42,6 +41,7 @@ from agents.narrative_spike_detector import (
     MockSource,
 )
 from agents.spike_scorer import SOURCES, SpikeScorer, trends_lift, window_rate
+from ml.metrics import wilson
 
 WARMUP = 240  # ticks before the scored day
 DAY = 1440
@@ -210,14 +210,10 @@ DETECTORS: Dict[str, Callable[[float], dict]] = {
 }
 
 
-def wilson(k: int, n: int, z: float = 1.96) -> List[Optional[float]]:
+def wilson95(k: int, n: int) -> List[Optional[float]]:
     if n == 0:
         return [None, None]
-    p = k / n
-    d = 1 + z * z / n
-    c = (p + z * z / (2 * n)) / d
-    h = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
-    return [round(max(0.0, c - h), 4), round(min(1.0, c + h), 4)]
+    return [round(x, 4) for x in wilson(k, n, z=1.96)]
 
 
 def poisson_rate_ci(k: int, exposure: float) -> List[float]:
@@ -274,11 +270,11 @@ def aggregate(per_day: List[dict]) -> dict:
         "events": len(detected),
         "events_detected": int(sum(detected)),
         "event_recall": round(recall, 4),
-        "event_recall_ci95": wilson(int(sum(detected)), len(detected)),
+        "event_recall_ci95": wilson95(int(sum(detected)), len(detected)),
         "alerts": alerts,
         "true_alerts": true_alerts,
         "alert_precision": round(precision, 4),
-        "alert_precision_ci95": wilson(true_alerts, alerts),
+        "alert_precision_ci95": wilson95(true_alerts, alerts),
         "f1": round(f1, 4),
         "false_alerts_per_topic_day": round(false_alerts / len(per_day), 3),
         "false_alerts_per_topic_day_ci95": poisson_rate_ci(false_alerts, len(per_day)),
@@ -294,7 +290,7 @@ def recall_by_bucket(per_day: List[dict]) -> dict:
             mag = "x2-4" if e.factor < 4 else "x4-8"
             buckets.setdefault(f"{len(e.sources)} sources, {mag}", []).append(hit)
     return {
-        k: {"n": len(v), "recall": round(float(np.mean(v)), 3), "ci95": wilson(int(sum(v)), len(v))}
+        k: {"n": len(v), "recall": round(float(np.mean(v)), 3), "ci95": wilson95(int(sum(v)), len(v))}
         for k, v in sorted(buckets.items())
     }
 

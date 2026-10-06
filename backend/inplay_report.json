@@ -7,78 +7,128 @@
   "baselines": {
     "pre_match_prior": {
       "log_loss": 1.0878,
-      "brier": 0.6571
+      "brier": 0.6571,
+      "rps": 0.2371
     },
     "base_rate": {
       "log_loss": 1.0622,
-      "brier": 0.6421
+      "brier": 0.6421,
+      "rps": 0.2313
     }
   },
   "in_play_by_checkpoint": {
     "minute_0": {
       "log_loss": 1.0878,
-      "brier": 0.6571
+      "brier": 0.6571,
+      "rps": 0.2371,
+      "murphy": {
+        "reliability": 0.037,
+        "resolution": 0.023,
+        "uncertainty": 0.6421,
+        "brier": 0.6571
+      }
     },
     "minute_15": {
-      "log_loss": 1.1138,
-      "brier": 0.665
+      "log_loss": 1.1079,
+      "brier": 0.6632,
+      "rps": 0.2429,
+      "murphy": {
+        "reliability": 0.0835,
+        "resolution": 0.0624,
+        "uncertainty": 0.6421,
+        "brier": 0.6632
+      }
     },
     "minute_45": {
-      "log_loss": 0.8636,
-      "brier": 0.5005
+      "log_loss": 0.8599,
+      "brier": 0.4993,
+      "rps": 0.1673,
+      "murphy": {
+        "reliability": 0.0528,
+        "resolution": 0.1892,
+        "uncertainty": 0.6421,
+        "brier": 0.4993
+      }
     },
     "minute_75": {
-      "log_loss": 0.6265,
-      "brier": 0.354
+      "log_loss": 0.6209,
+      "brier": 0.3518,
+      "rps": 0.0984,
+      "murphy": {
+        "reliability": 0.0341,
+        "resolution": 0.3238,
+        "uncertainty": 0.6421,
+        "brier": 0.3518
+      }
     }
   },
   "in_play_minus_prior": {
     "minute_0": {
       "log_loss": 0.0,
       "log_loss_ci95": [
-        -0.0002,
-        0.0002
+        -0.0,
+        0.0
       ],
-      "brier": 0.0,
+      "brier": -0.0,
       "brier_ci95": [
-        -0.0001,
-        0.0001
+        -0.0,
+        0.0
+      ],
+      "rps": 0.0,
+      "rps_ci95": [
+        -0.0,
+        0.0
       ]
     },
     "minute_15": {
-      "log_loss": 0.026,
+      "log_loss": 0.0201,
       "log_loss_ci95": [
-        -0.0644,
-        0.1248
+        -0.0664,
+        0.1139
       ],
-      "brier": 0.008,
+      "brier": 0.0062,
       "brier_ci95": [
-        -0.0489,
-        0.0673
+        -0.0497,
+        0.0641
+      ],
+      "rps": 0.0058,
+      "rps_ci95": [
+        -0.0206,
+        0.0345
       ]
     },
     "minute_45": {
-      "log_loss": -0.2242,
+      "log_loss": -0.2279,
       "log_loss_ci95": [
-        -0.3759,
-        -0.0603
+        -0.3757,
+        -0.071
       ],
-      "brier": -0.1566,
+      "brier": -0.1577,
       "brier_ci95": [
         -0.2511,
-        -0.0572
+        -0.0596
+      ],
+      "rps": -0.0698,
+      "rps_ci95": [
+        -0.1105,
+        -0.0272
       ]
     },
     "minute_75": {
-      "log_loss": -0.4613,
+      "log_loss": -0.4669,
       "log_loss_ci95": [
-        -0.6655,
-        -0.2352
+        -0.6647,
+        -0.2479
       ],
-      "brier": -0.303,
+      "brier": -0.3053,
       "brier_ci95": [
-        -0.4303,
-        -0.1626
+        -0.4296,
+        -0.1683
+      ],
+      "rps": -0.1387,
+      "rps_ci95": [
+        -0.1811,
+        -0.0929
       ]
     }
   }

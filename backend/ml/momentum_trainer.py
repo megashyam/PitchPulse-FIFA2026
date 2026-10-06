@@ -28,10 +28,11 @@ from pathlib import Path
 
 import numpy as np
 
-from api.schemas.espn_schema import EspnSummary
+from schemas.espn_schema import EspnSummary
 from feeds.espn import match_events
 from ml import shot_xg
-from ml.fit_shot_xg import _fit_logistic, _logloss
+from ml.fit_shot_xg import _fit_logistic, _fit_logistic_se
+from ml.metrics import binary_logloss
 from ml.momentum_features import (
     FEATURES,
     HORIZON,
@@ -143,9 +144,9 @@ def _evaluate(samples, w, bw, base_rate) -> dict:
     return {
         "n": int(len(y)),
         "goal_rate": round(float(y.mean()), 4),
-        "logloss": round(_logloss(p, y), 4),
-        "logloss_score_clock_only": round(_logloss(pb, y), 4),
-        "logloss_base_rate": round(_logloss(np.full_like(y, base_rate), y), 4),
+        "logloss": round(binary_logloss(p, y), 4),
+        "logloss_score_clock_only": round(binary_logloss(pb, y), 4),
+        "logloss_base_rate": round(binary_logloss(np.full_like(y, base_rate), y), 4),
         "brier": round(float(((p - y) ** 2).mean()), 5),
         "brier_base_rate": round(float(((base_rate - y) ** 2).mean()), 5),
         "ece": ece,
@@ -169,7 +170,7 @@ def main() -> None:
     held = [s for m in club[cut:] for s in m]
 
     X, y = _xy(train, FEATURES)
-    w = _fit_logistic(X, y)
+    *w, se0, se = _fit_logistic_se(X, y)
     Xb, _ = _xy(train, BASELINE_FEATURES)
     bw = _fit_logistic(Xb, y)
     base_rate = float(y.mean())
@@ -189,6 +190,9 @@ def main() -> None:
     )
     report = {
         "train": {"matches": cut, "samples": int(len(y)), "goal_rate": round(base_rate, 4)},
+        # iid MLE SEs; minute samples within a match are correlated, so these understate
+        "coef_se": None if se is None else {"intercept": round(se0, 4),
+                                            **{f: round(float(v), 4) for f, v in zip(FEATURES, se)}},
         "held_out_club": _evaluate(held, w, bw, base_rate),
     }
     for d in filter(None, a.wc_dirs.split(",")):

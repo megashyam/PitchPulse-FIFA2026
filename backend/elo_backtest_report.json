@@ -21,12 +21,26 @@
     "elo": {
       "n": 128,
       "log_loss": 1.0777,
-      "brier": 0.651
+      "brier": 0.651,
+      "rps": 0.2352,
+      "murphy": {
+        "reliability": 0.0338,
+        "resolution": 0.031,
+        "uncertainty": 0.6471,
+        "brier": 0.651
+      }
     },
     "baseline": {
       "n": 128,
       "log_loss": 1.068,
-      "brier": 0.6471
+      "brier": 0.6471,
+      "rps": 0.2359,
+      "murphy": {
+        "reliability": 0.0,
+        "resolution": 0.0,
+        "uncertainty": 0.6471,
+        "brier": 0.6471
+      }
     },
     "elo_minus_baseline": {
       "log_loss": 0.0097,
@@ -38,6 +52,11 @@
       "brier_ci95": [
         -0.0225,
         0.0309
+      ],
+      "rps": -0.0008,
+      "rps_ci95": [
+        -0.0111,
+        0.0105
       ]
     }
   },
@@ -45,12 +64,26 @@
     "elo": {
       "n": 64,
       "log_loss": 1.0878,
-      "brier": 0.6571
+      "brier": 0.6571,
+      "rps": 0.2371,
+      "murphy": {
+        "reliability": 0.037,
+        "resolution": 0.023,
+        "uncertainty": 0.6421,
+        "brier": 0.6571
+      }
     },
     "baseline": {
       "n": 64,
       "log_loss": 1.0657,
-      "brier": 0.6447
+      "brier": 0.6447,
+      "rps": 0.2326,
+      "murphy": {
+        "reliability": 0.0026,
+        "resolution": 0.0,
+        "uncertainty": 0.6421,
+        "brier": 0.6447
+      }
     },
     "elo_minus_baseline": {
       "log_loss": 0.0221,
@@ -62,6 +95,11 @@
       "brier_ci95": [
         -0.0296,
         0.0575
+      ],
+      "rps": 0.0045,
+      "rps_ci95": [
+        -0.0136,
+        0.0241
       ]
     }
   },

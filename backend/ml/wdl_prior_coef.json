@@ -2,6 +2,22 @@
   "beta": 0.00508725,
   "theta": 0.642062,
   "home_adv": 116.22,
+  "se": {
+    "beta": 6.685e-05,
+    "theta": 0.007663,
+    "home_adv": 3.26
+  },
   "trained_on": "martj42 internationals 2000-01-01 to 2026-06-10",
-  "n_matches": 25354
+  "n_matches": 25354,
+  "test": {
+    "train": "2000-01-01 to 2021-12-31",
+    "test": "2022-01-01 to 2026-06-10",
+    "n_train": 20778,
+    "n_test": 4576,
+    "log_loss": {
+      "ordered_logit": 0.8756,
+      "hand_set": 0.8804,
+      "base_rate": 1.0505
+    }
+  }
 }
